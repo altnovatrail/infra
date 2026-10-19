@@ -1,0 +1,6 @@
+{
+  "claudeMdExcludes": [
+    "**/infra/spec/CLAUDE.md",
+    "**/infra/spec/**/CLAUDE.md"
+  ]
+}
