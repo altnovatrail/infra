@@ -17,7 +17,7 @@ A component of [NovaTrail](https://github.com/altnovatrail/spec/tree/v0.9.13), a
 
 ## Status
 
-Detailing. The documents come first: the first epic of [RUN.md](RUN.md) decides what the component's card left open, and the code follows in the order RUN.md sets. For now the repository holds only documents; its code, Terraform or OpenTofu among it, comes after the first epic. The region of the platform's data, spec's question П-11, is decided: the US, with Cloud Run and infra's regional resources in `us-east4` and `api`'s Neon database in `aws-us-east-1` (R109 spec).
+Detailed, no code yet. The first epic of [RUN.md](RUN.md) decided what the component's card left open (finished 2026-11-08), and the code follows in the order RUN.md sets: the next epic proposed is the first code. For now the repository holds only documents; Terraform or OpenTofu is the first thing that epic decides. The region of the platform's data, spec's question П-11, is decided: the US, with Cloud Run and infra's regional resources in `us-east4` and `api`'s Neon database in `aws-us-east-1` (R109 spec).
 
 ## Documents
 
