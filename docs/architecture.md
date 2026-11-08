@@ -11,9 +11,9 @@
 **Делает:**
 - описывает кодом общую основу платформы: проекты в облаке, Workload Identity Federation для CI, Artifact Registry, домены, Secret Manager и бюджеты (architecture 3.11 spec). Основа — технологическая база MathTrail Canvas: Cloud Run и управляемые сервисы с масштабированием до нуля, Terraform (R11 spec). Образец — `infra/` canvas-api: `bootstrap.sh` и один корневой модуль Terraform. Будет ли это Terraform или его открытый форк OpenTofu, решит первый код `infra` (architecture 3.11 spec; Т-29);
 - настраивает журналы и трассы платформы — Cloud Logging и Trace (architecture 3.12 spec):
-  - журналы запросов Cloud Run исключаются в Cloud Logging. Cloud Run пишет их сам, и в их поле `httpRequest` есть IP-адрес клиента, а COPPA относит IP-адрес к персональной информации (architecture 1 spec; privacy 4 spec);
+  - журналы запросов Cloud Run исключаются в Cloud Logging. Cloud Run пишет их сам, и в их поле `httpRequest` есть IP-адрес клиента, а COPPA относит IP-адрес к персональной информации (architecture 1 spec; privacy 4 spec). Исключаются все, фильтром в каждом sink, а трасс у первого среза нет (R07; раздел 3.4);
   - регион журналов — `us-east4`, а бакет `_Required` — в `global`, пока нет организации Google Cloud (R04; R109 spec);
-- выбирает и настраивает хостинг сборки `app` (Т-17), а к этапу 4 — домен виджетов, отдельный регистрируемый (R16 spec), и хостинг виджетов (architecture 3.12 spec; Т-17). Платформе годится только хостинг, который шлёт свои заголовки ответа — CSP по `csp.json` сборки и кеш, — и отдаёт `/deployment.json` вне архива сборки (Т-17; architecture 3.12 spec). На хостинг сборки `app` потом переезжает и страница образцов `canvas` (R25 spec);
+- выбирает и настраивает хостинг сборки `app` — Firebase Hosting, а своего домена у первого развёртывания нет (R06; раздел 3.3), а к этапу 4 — домен виджетов, отдельный регистрируемый (R16 spec), и хостинг виджетов (architecture 3.12 spec; Т-17). Платформе годится только хостинг, который шлёт свои заголовки ответа — CSP по `csp.json` сборки и кеш, — и отдаёт `/deployment.json` вне архива сборки (Т-17; architecture 3.12 spec). На хостинг сборки `app` потом переезжает и страница образцов `canvas` (R25 spec);
 - выкатывает сервисы и сборку `app` по одному списку точных версий и дайджестов — это решил R106 spec, и Т-19 закрыт. На схеме зависимостей `infra` выкатывает релизы `api` и `app` (repositories 3 spec). Как идёт выкладка (R105 spec, R106 spec; architecture 3.11 spec):
   - образ сервиса собирает выкладка `infra`: берёт из релиза сервиса бинарник и `Dockerfile`, проверяет их рецептом `spec` `release-verify` (R77 spec), собирает образ на базе `gcr.io/distroless/static-debian13:nonroot` по digest, кладёт его в закрытый Artifact Registry `infra` и выкатывает ревизию Cloud Run по digest образа. Что сервис кладёт в образ сверх бинарника, делает его собственный код на стадии сборки: у `api` это пакеты модулей. Образов NovaTrail не публикует (RULES.md, Production images);
   - сборку `app` выкатка проверяет по подписи архива, пишет `/deployment.json` из списка выкатки, проверив его по `deployment.schema.json` этой сборки, собирает заголовок CSP по её `csp.json` и выпускает сборку, файл и заголовок одним выпуском хостинга (R85 spec). Список называет рядом с дайджестом сборки дайджест её `/deployment.json` (Т-19);
@@ -60,36 +60,12 @@
 
 ### 2.3. Хостинг сборки `app` и домены (Т-17)
 
-- **Суть:** где раздаётся сборка `app` и на каких доменах живут `app`, `api` и, к этапу 4, виджеты. Хостинг сборки `app` выбирает `infra` (architecture 3.12 spec), и Т-17, вопрос реестра `spec`, оставляет этот выбор здесь. Домен виджетов — отдельный регистрируемый (R16 spec), а регистрация основного домена ждёт проверки товарного знака (О-16).
-- **Что известно:**
-  - в canvas-api хостинг сборки — Firebase Hosting (architecture 3.12 spec);
-  - хостинг `app` сам пишет IP-адрес в свои журналы, как записано по canvas-api. Эти журналы решаются вместе с выбором хостинга, а их сроки — П-9 (architecture 1 spec; privacy 4 spec). Хостинг — обработчик данных (privacy 2 spec);
-  - `app` читает конфигурацию развёртывания во время работы, из `/deployment.json`, так что хостинг раздаёт одну подписанную сборку без пересборки под окружение (R85 spec; Т-19);
-  - что хостинг сборки `app` должен уметь, решил автор по рекомендации `app` (Т-17): отдавать `/deployment.json` вне архива сборки; `index.html` и `/deployment.json` — с `Cache-Control: no-cache`, а `/assets/**` — immutable; держать файлы прошлого релиза и не отдавать `index.html` на запросы к ним и к `/deployment.json`; слать свои заголовки ответа — CSP по `csp.json` сборки с `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` и HSTS — и не слать `Cross-Origin-Opener-Policy: same-origin`, который рвёт окно входа Firebase. Платформе годится только хостинг со своими заголовками, а self-hosting на хостинге без них `infra` описывает как более слабую защиту (Т-17; architecture 3.12 spec);
-  - `app` живёт в корне своего origin, а `api` — на том же origin или на своём (Т-17). Каждое развёртывание ставит домен `app` в разрешённые домены своего проекта Firebase (Т-19; architecture 3.12 spec);
-  - в canvas-api своего домена не было: API отвечал по адресу Cloud Run `*.run.app`, а приложение — по адресу Firebase Hosting `web.app`, и только этот адрес был разрешён в CORS API. Свой домен закрытой бете по приглашениям не нужен, а domain mapping Cloud Run был в Preview (R55 canvas-api; раздел 4 этого документа);
-  - Т-17 — о том, где хранить и как раздавать пакеты модулей, медиафайлы и бандлы виджетов и где хостится сборка `app`. Рекомендация: на этапе 2 пакеты — в образе `api`, медиафайлы раздаёт `api`; хранилище с CDN в `infra` — когда модулей станет больше или придут сторонние авторы. Домен виджетов — отдельный регистрируемый, купить его вместе с основным после О-16. Хостинг сборки `app` выбирает T03 — по тому, что хостинг пишет в журналы, — и туда же потом переезжает страница образцов (repositories 8 spec);
-  - R16 spec решил, что виджет работает в iframe без `allow-same-origin` на отдельном регистрируемом домене, и Т-17 вариант «поддомен основного» снял. Карточка 3.11 spec и таблица 3.12 spec ссылаются за доменом виджетов на R16 spec, а таблица 3.12 spec за хостингом виджетов — на Т-17;
-  - страница образцов `canvas` к первому замеру — без хостинга: сборка из релиза `canvas` открывается на устройстве добровольца, и ничьи журналы не видят его IP-адреса. На хостинг сборки `app` она переедет, когда тот появится, а делают ею и образцы детей (R25 spec);
-  - О-16: товарный знак «NovaTrail» проверить до публичного запуска и до регистрации домена (product 13 spec). Домена у проекта пока нет (R22 spec);
-  - виджеты — этап 4 (product 11 spec): в первом срезе их нет (product 10 spec).
-- **Варианты:** пока пусто.
+- **Решено:** R06 — Firebase Hosting; своего домена у первого развёртывания нет: `app` — на `web.app` проекта, `api` — на `*.run.app`, с разными origin и CORS. Когда покупать основной домен и домен виджетов, решает `spec` (О-16, Т-17); рекомендация — вместе после О-16, до публичного запуска (В6). Хостинг, его журналы и домены — раздел 3.3; что из этого уходит в `spec` — строки В6 и В7 таблицы 3 [RUN.md](../RUN.md).
 - **Задача:** T03.
 
 ### 2.4. Исключение журналов запросов
 
-- **Суть:** как именно журналы запросов Cloud Run не попадают в хранилище журналов, какие ещё журналы платформы несут IP-адрес клиента и что остаётся для разбора сбоев, когда журналов запросов нет. Это сверх списка карточки (см. начало раздела).
-- **Что известно:**
-  - Cloud Run сам пишет журналы запросов со стандартным полем `httpRequest`, в нём `remoteIp` — IP-адрес клиента. Объём журналов запросов из Cloud Run не настраивается, но Cloud Logging умеет их исключать (architecture 1, 8 spec);
-  - COPPA относит IP-адрес к постоянным идентификаторам, то есть к персональной информации (architecture 1 spec);
-  - журналы платформы — без прямых идентификаторов, IP-адресов и содержания (R09 spec; privacy 4 spec). `api` сам не пишет их в журналы (architecture 3.5 spec);
-  - фильтр исключения — часть sink: запись, которая подходит под фильтр исключения, этот sink не направляет никуда (раздел 4 этого документа). Значит, исключать надо в каждом sink, который мог бы направить такую запись;
-  - применяется фильтр к записям, которые Logging API уже принял (раздел 4 этого документа): IP-адрес до Cloud Logging всё равно доходит, хотя и не хранится. Что это значит для обещаний privacy spec, решает задача;
-  - в canvas-api журналы запросов не исключались: они лежали в бакете журналов 30 дней (R57 canvas-api), а вопрос о них в privacy.md canvas-api открыт, с рекомендацией сократить срок (раздел 4 этого документа);
-  - Cloud Logging и Trace выбирает `infra`, и в них не должно быть прямых идентификаторов и IP-адресов (architecture 3.12 spec). Пишут ли IP-адрес трассы Cloud Run, не проверено — это выясняет задача;
-  - сам хостинг `app` выбирается в подразделе 2.3, а сервис входа выбрал `api` — Firebase Auth (architecture 1, 3.12 spec). Но если их журналы попадут в Cloud Logging проекта, их направят те же sink, что настраивает `infra`: тогда исключать нужно и их. Сроки хранения — П-9: IP-адреса Firebase Auth держит несколько недель (privacy 4 spec);
-  - в проекте будут и задания Cloud Run `api` — задание после выкладки и ежедневное задание оператора (architecture 3.12 spec). Их журналы пишет код самого `api`, а он IP-адресов в журналы не пишет (architecture 3.5 spec). Что Cloud Run пишет о заданиях сам, сверх их журналов, выясняет T04.
-- **Варианты:** пока пусто.
+- **Решено:** R07 — журналы запросов Cloud Run исключаются все, фильтром в sink `_Default` и в каждом sink проекта; для разбора сбоев — журнал `api` и встроенные метрики Cloud Run; трасс у первого среза нет; журналы платформы — 30 дней в `us-east4`, аудит в `_Required` — 400 дней в `global`. Перечень журналов — раздел 3.4; что уходит в `spec` — строка В8 таблицы 3 [RUN.md](../RUN.md).
 - **Задача:** T04.
 
 ### 2.5. Terraform или OpenTofu (Т-29)
@@ -105,7 +81,7 @@
 
 ## 3. Устройство
 
-Сюда переезжает то, что решено по разделу 2: из каких частей компонент состоит, его типы и данные, как он связан с другими репозиториями. Пока решены регион и выкатка.
+Сюда переезжает то, что решено по разделу 2: из каких частей компонент состоит, его типы и данные, как он связан с другими репозиториями. Пока решены регион, выкатка, хостинг сборки `app` и журналы.
 
 ### 3.1. Регион
 
@@ -116,7 +92,7 @@
 | сервисы и задания Cloud Run | `us-east4` (Ashburn, Virginia) | рядом с Neon `aws-us-east-1` базы `api`; цены Tier 1 |
 | репозиторий Artifact Registry | `us-east4`, регионально | место репозитория не меняется; мультирегион медленнее |
 | секреты Secret Manager | репликация по выбору, место `us-east4` | места репликации не меняются; автоматическая репликация — без ограничений, а региональный секрет доступен только из своего региона, и CI на GitHub, который читал бы ключ eval по Т-28, его бы не прочитал |
-| бакет журналов | свой, `us-east4`; sink `_Default` направлен в него | бакет `_Default` создан в `global`, и место бакета не меняется — меняется sink. Журналы запросов Cloud Run исключаются (раздел 2.4) |
+| бакет журналов | свой, `us-east4`; sink `_Default` направлен в него | бакет `_Default` создан в `global`, и место бакета не меняется — меняется sink. Журналы запросов Cloud Run исключаются (раздел 3.4) |
 | бакет `_Required` | `global` | sink `_Required` не меняется, а регион бакету даёт только настройка организации или папки до создания проекта; организация связана с доменом, которого до О-16 нет — Д3 в таблице 4 [RUN.md](../RUN.md) |
 | бакет трасс `_Trace` | `us-east4`, создаётся через Observability API до первой трассы | иначе место выберут настройки по умолчанию или сама система, а сменить его может только reprovision, который трассы стирает |
 
@@ -188,7 +164,7 @@
 
 Новый релиз `app`:
 1. `release-verify` архива и sha256 — как в шаге 2;
-2. архив раскладывается на хостинг, `/deployment.json` пишется из `deploy/production/deployment.json`, заголовок CSP собирается по `csp.json` архива, и всё выходит одним выпуском хостинга (R85 spec; R09 app). Как это идёт на выбранном хостинге, решает T03;
+2. архив раскладывается на хостинг, `/deployment.json` пишется из `deploy/production/deployment.json`, заголовок CSP собирается по `csp.json` архива, и всё выходит одним выпуском хостинга (R85 spec; R09 app). На Firebase Hosting — раздел 3.3 (R06);
 3. домен `app` — в разрешённых доменах проекта Firebase (Т-19).
 
 **Откат:**
@@ -199,6 +175,86 @@
 Не дошедшую выкладку повторяют, перезапустив её задания, или чинят вперёд новым pull request.
 
 **Self-hosting** — тот же каталог `deploy/` со своими `deployment.json` и фактами, те же проверки и шаги в своём проекте и своём закрытом реестре. Подписанные файлы релизов у всех одни (R105, R106 spec; Т-20).
+
+### 3.3. Хостинг сборки `app` и домены
+
+Сборку `app` раздаёт Firebase Hosting — сайт проекта по умолчанию, план Blaze; бюджет проекта с оповещением ставит первый код (R06).
+
+**Выпуск** — шаг выкладки `app` раздела 3.2:
+1. папка выпуска — архив новой сборки, `assets/` сборки, которая сейчас выпущена на Hosting, и `/deployment.json` из `deploy/production/deployment.json`. Выпущенную сборку выкатка узнаёт по выпуску Hosting, а не по списку на `main`, и проверяет её архив, как новый: `release-verify` и sha256. Версия Hosting — полный набор файлов, и без `assets/` прошлой сборки она убрала бы их. У первого выпуска прошлой сборки нет;
+2. `firebase.json` пишет выкатка:
+   - `headers`: на всех путях — `X-Content-Type-Options: nosniff` и HSTS; на всех путях вне `/assets/**` — CSP по `csp.json` архива с `{api}` и `{authDomain}` из `deployment.json` и с `frame-ancestors 'none'`, и `Cache-Control: no-cache`; у `/assets/**` — `immutable`. Заголовки Hosting сверяет с путём запроса до rewrites, поэтому они стоят не по пути `index.html`;
+   - rewrite SPA на `index.html` — только вне `/assets/**` и `/deployment.json`;
+   - без `Cross-Origin-Opener-Policy: same-origin`;
+3. выпуск — одна версия: файлы и `firebase.json` вместе;
+4. проверка после выпуска — байты `index.html`, заголовки у `/`, у пути SPA и у файла в `/assets/`, `404` на неизвестный файл в `/assets/`.
+
+Откат — по R05, pull request с прежним блоком `app`; откат версией в консоли Firebase не используется.
+
+**Журналы:**
+
+| Журнал | IP-адрес | Где и сколько |
+|---|---|---|
+| журналы самого Firebase Hosting | да | у Firebase, глобально: «a few months», не настраивается — В7 таблицы 3 [RUN.md](../RUN.md) |
+| выгрузка журналов Hosting в Cloud Logging | да, `remoteIp` | не включается: в Cloud Logging проекта журналов Hosting нет (вход T04) |
+
+**Адреса и домены:**
+
+| Что | Адрес | Когда меняется |
+|---|---|---|
+| `app` | `<проект>.web.app` | свой домен у Hosting — когда он будет куплен |
+| `api` | `*.run.app` своего сервиса, CORS — точному origin `app` | когда будет свой домен; как — решить тогда, domain mapping Cloud Run в Preview |
+| `authDomain` Firebase Auth | `<проект>.firebaseapp.com` | не меняется: `app` входит окном (R09 app) |
+| основной домен и домен виджетов | нет | когда покупать, решает `spec` (О-16, Т-17); рекомендация — вместе после О-16, до публичного запуска (В6 таблицы 3 [RUN.md](../RUN.md)); виджеты — этап 4, хостинг бандлов — Т-17 |
+
+Сайт по умолчанию отвечает на двух адресах, `web.app` и `firebaseapp.com`, с одним содержимым. Origin `app` — только `web.app`: его называют CORS `api` и `/deployment.json`. Выкатка добавляет его в разрешённые домены проекта Firebase (Т-19) и не убирает тех, что ставит туда сам Firebase.
+
+**Страница образцов `canvas`** — когда переедет на хостинг (R25 spec), отдельным сайтом проекта и своим origin: выход `app` стирает хранилище своего origin. Тогда в журналы Firebase попадут и IP-адреса устройств, на которых делают образцы детей, — В7.
+
+**Не проверено — первый код:** умеют ли rewrites исключить `/assets/**` и `/deployment.json` (иначе — явный список путей SPA) и шлёт ли Hosting сам HSTS или `Cross-Origin-Opener-Policy`.
+
+### 3.4. Журналы и трассы
+
+Журналы платформы — без прямых идентификаторов и IP-адресов (privacy 4 spec). Как этого держится `infra` — R07.
+
+**Sink и фильтры:**
+
+| Sink | Куда | Фильтр исключения |
+|---|---|---|
+| `_Default` | свой бакет журналов в `us-east4`, 30 дней (R04) | `LOG_ID("run.googleapis.com/requests")` — журналы запросов Cloud Run |
+| `_Required` | бакет `_Required` в `global`, 400 дней | не меняется; журналов запросов не получает |
+| любой sink, который заведёт проект | — | тот же, что у `_Default` |
+
+Фильтр применяется к записи, которую Logging API или Telemetry API уже принял: IP-адрес доходит до Google как до обработчика, но в бакете не хранится. Точное имя журнала в фильтре первый код сверяет по записи в проекте.
+
+**Перечень журналов и трасс:**
+
+| Что | Что в нём | Где и сколько |
+|---|---|---|
+| журналы запросов Cloud Run, у сервиса `api` | `httpRequest`: IP-адрес клиента, user agent | исключены — не хранятся |
+| журналы контейнера `api` и его заданий | события `api` без идентификаторов и адресов; у заданий — счётчики (R26 api; T28 api) | бакет `us-east4`, 30 дней |
+| системные журналы Cloud Run | события платформы о ревизиях и заданиях | бакет `us-east4`, 30 дней |
+| Admin Activity | `callerIp` и почта вызывающего — оператора и CI при правке ресурсов; `SignUp` Identity Platform тоже пишет сюда, а вход Google, `SignInWithIdp`, — нет | `_Required`, `global`, 400 дней (Д3); не исключить |
+| System Event | действия самого Google с ресурсами проекта | `_Required`, `global`, 400 дней |
+| Policy Denied | `callerIp` и почта того, кому политика отказала | бакет `us-east4`, 30 дней |
+| Data Access audit | был бы `callerIp` | не включается |
+| журнал активности Identity Platform | был бы каждый запрос входа | не включается |
+| выгрузка журналов Firebase Hosting | была бы `remoteIp` | не включается (R06) |
+| журналы Firebase Auth и Firebase Hosting у самого Firebase | IP-адреса | у Firebase: Auth — «a few weeks», Hosting — «a few months» (П-9; В7) |
+| трассы | — | нет: Cloud Trace API не включается |
+
+Журналов запросов у заданий Cloud Run нет: их пишут только сервисы.
+
+**Для разбора сбоев:**
+- журнал `api` — метод, код, причина отказа и время каждого вызова, без тела, заголовков и адреса (architecture 3.9 api);
+- встроенные метрики Cloud Run в Cloud Monitoring — число запросов, задержки, экземпляры;
+- Error Reporting — по журналам `api`, которые хранятся.
+
+Своих метрик по журналам, где меткой стал бы адрес, проект не заводит: они считаются и по исключённым записям. Оповещения — на встроенных метриках, первый код.
+
+**Трассы:** нет. Cloud Trace API не включается, а бакет `_Trace` всё равно создаётся в `us-east4` до любой трассы (R04): Cloud Run трассирует часть запросов сам.
+
+**Не проверено — первый код:** точное имя журнала запросов в фильтре; что без Cloud Trace API у Cloud Run нет трасс, а если есть — их атрибуты; вызывает ли что-то в проекте `SignUp` Identity Platform и что лежит в его записи Admin Activity (В8).
 
 ## 4. Источники
 
@@ -229,21 +285,48 @@
 - **Регион вызовов ИИ** (раздел 2.1; В3), прочитано 2026-11-08:
   - Anthropic, [Data residency](https://platform.claude.com/docs/en/manage-claude/data-residency), даты на странице нет: «"us" Inference runs only in US-based infrastructure»; «Inference geo: Only "us" and "global" are available. Workspace geo: Only "us" is currently available»; «US-only inference ( inference_geo: "us" ) is priced at 1.1x the standard rate across all token pricing categories»;
   - OpenAI, [Your data](https://developers.openai.com/api/docs/guides/your-data), даты на странице нет: «Contact our sales team to see if you're eligible for using data residency controls»; «To use data residency with any region other than the United States, you must be approved for abuse monitoring controls, and execute a Modified Retention amendment».
-- **Маршрутизация журналов в Cloud Logging** (раздел 2.4) — Google Cloud, [Route log entries](https://docs.cloud.google.com/logging/docs/routing/overview), обновлено 2026-10-16, прочитано 2026-10-19:
+- **Маршрутизация журналов в Cloud Logging** (разделы 2.4, 3.4) — Google Cloud, [Route log entries](https://docs.cloud.google.com/logging/docs/routing/overview), обновлено 2026-10-16, прочитано 2026-10-19; перечитано 2026-11-08, обновлено 2026-11-06, и эти фразы на месте, а последняя теперь кончается «Logging API or Telemetry API». Ещё — с неё же: «A project-level sink routes the log entry to the sink's destination when the log entry matches the sink's inclusion filter but doesn't match any of the sink's exclusion filters»; «You can modify and disable the _Default log sink»:
   - «If the log entry matches the inclusion filter and at least one exclusion filter, then it isn't routed»;
   - «You can't use exclusion filters to reduce the consumption of your entries.write API quota or the number of entries.write API calls. Exclusion filters are applied after log entries are received by the Logging API»;
   - «For each Google Cloud project, billing account, folder, and organization, Cloud Logging creates two log sinks, one named _Required and the other named _Default».
+- **Журналы и трассы Google Cloud** (раздел 3.4; R07), прочитано 2026-11-08:
+  - [Logging for Cloud Run](https://docs.cloud.google.com/run/docs/logging), обновлено 2026-10-30: «Request logs (services only): logs of requests sent to Cloud Run services. These logs are created automatically»; «Although you cannot control the amount of request logs directly from Cloud Run, you can make use of the logs exclusion feature from Cloud Logging»; имя журнала в образце записи — `run.googleapis.com%2Frequests`, типы ресурсов — `cloud_run_revision` и `cloud_run_job`;
+  - [Log-based metrics overview](https://docs.cloud.google.com/logging/docs/logs-based-metrics), обновлено 2026-11-06: «System log-based metrics are calculated from included logs only. User-defined log-based metrics are calculated from both included and excluded logs»;
+  - [Field-level access control](https://docs.cloud.google.com/logging/docs/field-level-acl), обновлено 2026-11-06: «Field-level access controls let you hide individual LogEntry fields from users of a Google Cloud project»;
+  - [Cloud Audit Logs overview](https://docs.cloud.google.com/logging/docs/audit), обновлено 2026-11-06: «Admin Activity audit logs are always written; you can't configure, exclude, or disable them»; «Except for BigQuery, Data Access audit logs are disabled by default because they can generate large volumes of data»; «Publicly available resources that have the Identity and Access Management policies allAuthenticatedUsers or allUsers don't generate audit logs»; «The IP address of the caller is held in the RequestMetadata.callerIp field of the AuditLog object»; «Audit logging doesn't redact the caller's principal email address for any access that succeeds or for any write operation»; _Default «store any enabled Data Access audit logs as well as Policy Denied audit logs»;
+  - [Quotas and limits](https://docs.cloud.google.com/logging/quotas), обновлено 2026-11-06: «_Required project, folder, organization 400 days Not configurable»; «you can configure Cloud Logging to retain your logs between 1 day and 3650 days»;
+  - [Cloud Observability pricing](https://cloud.google.com/stackdriver/pricing), даты на странице нет: «Suppose a log entry originates in a project but the project doesn't store the log entry in one of its log buckets. In this scenario, the project isn't charged for the log entry»;
+  - [Monitor Cloud Run](https://docs.cloud.google.com/run/docs/monitoring), обновлено 2026-10-30: «Cloud Run is automatically integrated with Cloud Monitoring with no setup or configuration required»; «there is no charge for metrics on the fully managed version of Cloud Run»; среди метрик — Request count и Request latencies;
+  - [Trace for Cloud Run](https://docs.cloud.google.com/run/docs/trace), обновлено 2026-10-30: «Incoming requests to Cloud Run services automatically generate traces that you can view in Cloud Trace»; «requests are sampled at a maximum rate of 0.1 requests per second for each instance»; «Cloud Run does not support configuration of the Cloud Run sample rate». Атрибутов спанов страница не называет; [Cloud Trace quotas](https://docs.cloud.google.com/trace/docs/quotas), обновлено 2026-11-06: «Spans stored in the _Trace bucket» — 30 дней;
+  - [Identity Platform activity logging](https://cloud.google.com/identity-platform/docs/activity-logging), обновлено 2026-11-03: «Activity logging is disabled by default», журнал `identitytoolkit.googleapis.com/requests`;
+  - [Identity Platform audit logging](https://docs.cloud.google.com/identity-platform/docs/audit-logging), обновлено 2026-11-03: «Methods that require an IAM permission with the type property value of ADMIN_WRITE generate Admin Activity audit logs»; у «google.cloud.identitytoolkit.v1.AuthenticationService.SignUp» — «Audit log type: Admin activity»; `SignInWithIdp` — в списке «The following methods don't produce audit logs»;
+  - [Error Reporting overview](https://docs.cloud.google.com/error-reporting/docs/grouping-errors), обновлено 2026-11-06: «Error Reporting collects events directly from the Error Reporting API or infers them by scanning log entries»; условие — «The log bucket is stored in the same project where the log entries originated».
+- **Журналы `api`** (раздел 3.4; R07) — [`api` `main` 5a02ff4](https://github.com/altnovatrail/api/tree/5a02ff4), прочитано 2026-11-08 через API GitHub: architecture 3.9 api — «перехватчик Connect пишет метод, код, причину отказа и время. Тела, заголовков и адреса запроса он не пишет»; `internal/server/server.go` — жалобы сервера, которые «name the client's address, so they go through the log's guard, which drops them».
 - **Лицензии Terraform и OpenTofu** (разделы 1 и 2.5; Т-29, который вырос из строки В2 таблицы 3 [RUN.md](../RUN.md)), прочитано 2026-10-20:
   - [hashicorp/terraform, `LICENSE`](https://github.com/hashicorp/terraform/blob/79307e8/LICENSE), коммит 79307e8: «Business Source License 1.1», «Licensed Work: Terraform Version 1.6.0 or later». Additional Use Grant: «You may make production use of the Licensed Work, provided Your use does not include offering the Licensed Work to third parties on a hosted or embedded basis in order to compete with IBM Corp.'s paid version(s) of the Licensed Work»; «Products that are not provided on a paid basis are not competitive». Тот же файл на теге v1.5.7, последнем теге ветки 1.5, — «Mozilla Public License, version 2.0». Последний релиз Terraform — v1.16.6 от 2026-10-14 (релизы hashicorp/terraform на GitHub);
   - [opentofu/opentofu, `LICENSE`](https://github.com/opentofu/opentofu/blob/42f15c9/LICENSE), коммит 42f15c9: «Mozilla Public License, version 2.0»;
   - Open Source Initiative, [OSI Approved Licenses](https://opensource.org/licenses): Mozilla Public License 2.0 в списке есть, Business Source License — нет.
 - **Секрет томом в Cloud Run** (раздел 3.2; R05) — Google Cloud, [Configure secrets for services](https://docs.cloud.google.com/run/docs/configuring/services/secrets), обновлено 2026-10-30, прочитано 2026-11-08: «In the Version 1 list, select the version of the secret to reference. By default, the latest version is selected. You can select a specific version if you want»; «--update-secrets = PATH = SECRET_NAME : VERSION».
+- **Firebase Hosting** (раздел 3.3; R06), прочитано 2026-11-08; у всех страниц firebase.google.com дата «Last updated 2026-11-05 UTC» — дата сайта, а не страницы:
+  - [Firebase Hosting](https://firebase.google.com/docs/hosting): «By default, every Firebase project has subdomains at no cost on the web.app and firebaseapp.com domains. These two sites serve the same deployed content and configuration»; «You can create multiple sites if you have related sites and apps that serve different content but still share the same Firebase project resources»;
+  - [Configure Hosting behavior](https://firebase.google.com/docs/hosting/full-config): «Specify custom, file-specific response headers by creating a headers attribute that contains an array of header objects»; «The URL pattern matching for custom headers is done before any rewrite rules are applied»; «Firebase Hosting only applies a rewrite rule if a file or directory does not exist at a URL path that matches the specified source or regex URL pattern»;
+  - [Manage live & preview channels, releases, and versions](https://firebase.google.com/docs/hosting/manage-hosting-resources): «The content and configuration served by each channel is packaged into a version object that has a unique identifier»; «By rolling back, you create a new release that serves the same version of content as a previous release»; «the primary way to delete selected files from a deployed site is to delete the files locally, and then redeploy»;
+  - [Privacy and Security in Firebase](https://firebase.google.com/support/privacy): «Hosting uses IP addresses of incoming requests to detect abuse and provide customers with detailed analysis of usage data. Retention: Hosting retains IP data for a few months»; Hosting — в списке «Global services»: «The majority of Firebase services run on global Google infrastructure»;
+  - [Web request logs and metrics](https://firebase.google.com/docs/hosting/web-request-logs-and-metrics): «Click Link in the Cloud Logging integration card in the Firebase console»; поле «remoteIp The originating client IP for the request»;
+  - [Usage, quotas, and pricing](https://firebase.google.com/docs/hosting/usage-quotas-pricing): «Storage for your Hosting content is at no cost up to 10 GB»; «Data transfer from the CDN to your end users is at no cost up to 10 GB/month»; на плане Spark при превышении — «your sites will be disabled»;
+  - [Serve dynamic content with Cloud Run](https://firebase.google.com/docs/hosting/cloud-run): «Firebase Hosting is subject to a 60-second request timeout»; `us-east4` — среди регионов rewrites.
+- **Firebase Auth** (раздел 3.3; R06), прочитано 2026-11-08: [Best practices for using signInWithRedirect](https://firebase.google.com/docs/auth/web/redirect-best-practices) — «If you host your app with a service other than Firebase, use Option 2, Option 3, Option 4, or Option 5», а Option 2, вход окном, — «popups are occasionally blocked by the device or platform, and the flow is less smooth for mobile users»; [Email link authentication](https://firebase.google.com/docs/auth/web/email-link-auth) — «In projects created after April 28, 2025, Firebase Authentication no longer includes localhost as an authorized domain by default».
+- **Отвергнутые хостинги** (R06), прочитано 2026-11-08:
+  - Google Cloud, [External Application Load Balancer logging](https://docs.cloud.google.com/load-balancing/docs/https/https-logging-monitoring), обновлено 2026-11-03: «For external Application Load Balancers with backend buckets, logging is automatically enabled and cannot be disabled»; [Web serving overview](https://docs.cloud.google.com/architecture/web-serving-overview), обновлено 2026-02-18: для «Static website» — «Cloud Storage», «Firebase Hosting»;
+  - Cloudflare, [Serving Pages](https://developers.cloudflare.com/pages/configuration/serving-pages/): «If your project does not include a top-level 404.html file, Pages assumes that you are deploying a single-page application»;
+  - GitHub, [community discussion 54257](https://github.com/orgs/community/discussions/54257), ответ сотрудника GitHub 2023-05-02: «We don't support this feature today so a `meta` tag unfortunately is the only way».
+- **RE2** (раздел 3.3; R06) — [синтаксис RE2](https://github.com/google/re2/wiki/Syntax), прочитано 2026-11-08: `(?=re)` — «NOT SUPPORTED».
 - **Список выкатки: `api`, `app`, `tutor` и `.github`** (раздел 3.2; R05), прочитано 2026-11-08 через API GitHub:
   - `api`, [`main` 5ad5c8b](https://github.com/altnovatrail/api/tree/5ad5c8b), `docs/decisions.md`: R25 api — «выкладка `infra` передаёт оба значения ревизии Cloud Run, а `api` читает их при старте. Как именно — переменной окружения или файлом, — решают T02 `infra` и эпик кода `api`. Секретов в них нет»; «„Автор“ — только в первом приложении: любое развёртывание, даже где учится один автор, передаёт „полную“»; «Нет значения ступени — „полная“». R26 api — «конфигурация, `internal/config`: только окружение, только объявленные имена», «префикс переменных — `API_`»; о секретах — «Значение — из переменной `X` или из файла по абсолютному пути в `X_FILE`». Релизов у `api` ещё нет;
   - `app`, [`main` 375a09b](https://github.com/altnovatrail/app/tree/375a09b), architecture 3.7 app: «`release-files` пакует сборку — `index.html` с нижним слоем, `assets/`, `deployment.schema.json` и `csp.json`, без `deployment.json`»; «Откат — прежний список: прежняя сборка со своим файлом, тоже одним выпуском». Релизов у `app` ещё нет;
   - `tutor`, [`main` 28ea592](https://github.com/altnovatrail/tutor/tree/28ea592), `admission/models.go`: `StageAuthor Stage = "author"`, `StageFull Stage = "full"`;
   - `.github`, релиз v0.1.21, `.github/workflows/release.yml`: у `workflow_call` нет `outputs`; файлы релиза — то, что рецепт `release-files` вызывающего пишет в `dist/`, и `.sigstore.json` к каждому. Образец имён файлов сервиса Go — релиз `module-kit` v0.2.6: `module-kit_v0.2.6_linux_amd64` и `SHA256SUMS`.
-- **Регион, адреса, журналы и выкладка в canvas-api** (разделы 2.1–2.4, 3.2) — [mathtrail/canvas-api](https://github.com/mathtrail/canvas-api/tree/0901af0), коммит 0901af0, прочитано 2026-10-19, а цитаты R45 и R58 canvas-api, его environments и `service_api.tf` — 2026-11-08:
-  - `docs/decisions.md`: R54 canvas-api — весь контур в `us-east4`, потому что в бете только семьи из США; R55 canvas-api — API по адресу `*.run.app`, приложение по адресу Firebase Hosting `web.app`, своего домена нет: «свой домен не нужен закрытой бете по приглашениям, а domain mapping Cloud Run в Preview»; R57 canvas-api — журналы в бакете `default-us-east4` на 30 дней, `_Required` остаётся в `global`, место трасс задано до первой трассы; R45 canvas-api и R58 canvas-api — выкладка после релиза, из его тега: «выкладка идёт, только если `main` всё ещё стоит на этом коммите. Иначе перезапуск CI старого коммита откатил бы prod», «Выкатываются подписанные файлы релиза, а не сборка из тега», после отката — `update-traffic --to-latest`; у environment `prod` и `prod-hosting` только правило ветки `main`, без reviewers (API GitHub, прочитано 2026-11-08); в `infra/terraform/service_api.tf` образ — в `ignore_changes`, и выкладка ставит его по digest из push, мимо Terraform;
+- **Регион, адреса, журналы и выкладка в canvas-api** (разделы 2.1–2.4, 3.2) — [mathtrail/canvas-api](https://github.com/mathtrail/canvas-api/tree/0901af0), коммит 0901af0, прочитано 2026-10-19, а цитаты R45 и R58 canvas-api, его environments, `service_api.tf` и `justfile` — 2026-11-08:
+  - `docs/decisions.md`: R54 canvas-api — весь контур в `us-east4`, потому что в бете только семьи из США; R55 canvas-api — API по адресу `*.run.app`, приложение по адресу Firebase Hosting `web.app`, своего домена нет: «свой домен не нужен закрытой бете по приглашениям, а domain mapping Cloud Run в Preview»; R57 canvas-api — журналы в бакете `default-us-east4` на 30 дней, `_Required` остаётся в `global`, место трасс задано до первой трассы; R45 canvas-api и R58 canvas-api — выкладка после релиза, из его тега: «выкладка идёт, только если `main` всё ещё стоит на этом коммите. Иначе перезапуск CI старого коммита откатил бы prod», «Выкатываются подписанные файлы релиза, а не сборка из тега», после отката — `update-traffic --to-latest`; у environment `prod` и `prod-hosting` только правило ветки `main`, без reviewers (API GitHub, прочитано 2026-11-08); `justfile`, комментарий к `ci-hosting-check`: «a browser that kept it would ask for the files of a release that the next one removed»; в `infra/terraform/service_api.tf` образ — в `ignore_changes`, и выкладка ставит его по digest из push, мимо Terraform;
   - `infra/terraform/logging.tf` — бакет журналов в регионе проекта и sink `_Default`, перенаправленный в него с прежним фильтром; фильтра исключения журналов запросов в нём нет;
   - `docs/privacy.md`, таблица открытых вопросов: «Журналы запросов Cloud Run с IP-адресами» — варианты «оставить 30 дней; исключить часть журналов; сократить срок», рекомендация — «сократить срок хранения журналов запросов до минимума, нужного для безопасности».
