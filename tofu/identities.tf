@@ -124,3 +124,62 @@ resource "google_service_account_iam_member" "deployer_runs_as_api" {
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
+
+# The publisher of app's build on Hosting, and nothing else (R12). Its job runs a large program of
+# somebody else's, the Firebase CLI, so it has an environment and an identity of its own and
+# reaches neither api, nor this configuration, nor the settings of sign-in: who puts
+# <project>.web.app among the authorized domains is decided with sign-in in production (T27).
+resource "google_service_account" "hosting" {
+  account_id   = "hosting-publish"
+  display_name = "Publishes app's build on Firebase Hosting"
+
+  depends_on = [google_project_service.enabled]
+}
+
+resource "google_service_account_iam_member" "hosting_from_github" {
+  service_account_id = google_service_account.hosting.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "${local.github_subject}:environment:${var.hosting_environment}"
+}
+
+# Hosting takes no grant on a site, so its rights are on the project. The ready-made Firebase
+# Hosting Admin role, less the making and the deleting of sites: a release goes through
+# firebasehosting.sites.update, and the site app's address is stays out of the CLI's reach.
+resource "google_project_iam_custom_role" "hosting" {
+  role_id     = "hostingPublisher"
+  title       = "Publishes app's build"
+  description = "Reads the project and its Hosting sites and releases new versions of them. It makes and deletes no site."
+
+  permissions = local.hosting_permissions
+
+  depends_on = [google_project_service.enabled]
+}
+
+# The project's Hosting rights, and the reading of its API keys, which the CLI's deploy asks for
+# (canvas-api).
+resource "google_project_iam_member" "hosting" {
+  # By keys known before any apply: the custom role's name is known only once the role is made.
+  for_each = local.hosting_project_roles
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.hosting.email}"
+}
+
+locals {
+  hosting_permissions = [
+    "firebase.clients.get",
+    "firebase.clients.list",
+    "firebase.projects.get",
+    "firebasehosting.sites.get",
+    "firebasehosting.sites.list",
+    "firebasehosting.sites.update",
+    "resourcemanager.projects.get",
+    "resourcemanager.projects.list",
+  ]
+
+  hosting_project_roles = {
+    hosting  = google_project_iam_custom_role.hosting.name
+    api_keys = "roles/serviceusage.apiKeysViewer"
+  }
+}

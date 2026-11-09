@@ -23,7 +23,7 @@ mock_provider "google-beta" {}
 
 
 # Every sink the project has excludes Cloud Run's request logs, which hold the client's address,
-# the Data Access audit and Identity Platform's activity log: the ones to come too, since they are
+# the Data Access audit, Identity Platform's activity log and Firebase Hosting's request logs: the ones to come too, since they are
 # made from the same list, which tf-check holds every sink to (R07).
 run "every_sink_excludes_what_the_platform_keeps_none_of" {
   command = plan
@@ -38,8 +38,9 @@ run "every_sink_excludes_what_the_platform_keeps_none_of" {
       "LOG_ID(\"run.googleapis.com/requests\")",
       "LOG_ID(\"cloudaudit.googleapis.com/data_access\")",
       "LOG_ID(\"identitytoolkit.googleapis.com/requests\")",
+      "resource.type=\"firebase_domain\"",
     ] : contains([for exclusion in sink.exclusions : exclusion.filter if exclusion.disabled != true], log)]]))
-    error_message = "A sink lets through a log the platform keeps none of: each needs an exclusion, not disabled, of Cloud Run's request logs, of the Data Access audit and of Identity Platform's requests."
+    error_message = "A sink lets through a log the platform keeps none of: each needs an exclusion, not disabled, of Cloud Run's request logs, of the Data Access audit, of Identity Platform's requests and of Firebase Hosting's."
   }
 }
 

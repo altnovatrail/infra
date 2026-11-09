@@ -316,3 +316,20 @@ variable "deploy_environment" {
     error_message = "deploy_environment is the name of a GitHub environment: letters, digits, dots, hyphens and underscores."
   }
 }
+
+variable "hosting_environment" {
+  description = "The GitHub environment whose jobs may borrow the identity that publishes app's build on Hosting: only main may run in it, and none of api's deployment does (R12)."
+  type        = string
+  default     = "production-hosting"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]{1,255}$", var.hosting_environment))
+    error_message = "hosting_environment is the name of a GitHub environment: letters, digits, dots, hyphens and underscores."
+  }
+
+  validation {
+    condition     = lower(var.hosting_environment) != lower(var.deploy_environment)
+    error_message = "hosting_environment is not deploy_environment, in any case of letters, as GitHub compares the names: the publisher of app's build and api's deployment are lent to the jobs of different environments."
+  }
+}

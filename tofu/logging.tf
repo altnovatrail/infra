@@ -6,11 +6,12 @@
 # one. The bucket `_Required` — the audit of who changed what in the project, 400 days — stays
 # where it is: neither it nor its sink can be changed, and it takes no request logs (Д3 in RUN.md).
 #
-# Two more logs are off by Google's own default and nothing here turns them on: the Data Access
-# audit, with the caller's address, and the activity log of Identity Platform, which would hold
-# every sign-in request. Every sink excludes them as well, so that they are not kept even where
-# something else turns them on — a self-hosted copy's organization, a later change (R07, amended
-# 2026-11-09).
+# Three more logs are off and nothing here turns them on: the Data Access audit, with the caller's
+# address, and the activity log of Identity Platform, which would hold every sign-in request, are
+# off by Google's own default, and the export of Firebase Hosting's request logs, with remoteIp,
+# only a button in Firebase's console switches on. Every sink excludes them as well, so that they
+# are not kept even where something else turns them on — a self-hosted copy's organization, a
+# later change, a click (R07, amended twice on 2026-11-09).
 
 locals {
   # What no sink of the project keeps, by the name of each exclusion (R07). Cloud Run's request logs
@@ -28,6 +29,13 @@ locals {
     "identity-platform-requests" = {
       filter      = "LOG_ID(\"identitytoolkit.googleapis.com/requests\")"
       description = "Identity Platform's activity log holds every sign-in request; the platform keeps none (R07)."
+    }
+    # Hosting's request logs, should anyone link them to Cloud Logging in Firebase's console: they
+    # hold remoteIp. By the resource type, since Firebase names the log only as webrequests (R07,
+    # second amendment of 2026-11-09).
+    "firebase-hosting-requests" = {
+      filter      = "resource.type=\"firebase_domain\""
+      description = "Firebase Hosting's request logs hold the client's IP address; the platform keeps none (R06, R07)."
     }
   }
 
