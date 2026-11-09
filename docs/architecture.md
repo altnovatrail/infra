@@ -1,6 +1,6 @@
 # infra — архитектура
 
-> Статус: детализация, эпик E1, закончена 2026-11-08 — разделы 2 и 3; кода ещё нет, его пишет эпик E2 «Первый код» ([RUN.md](../RUN.md)). Каркас — из заготовки `spec`, 2026-10-19.
+> Статус: детализация, эпик E1, закончена 2026-11-08 — разделы 2 и 3; модуля ещё нет — его и выкладку пишет эпик E2 «Первый код», а OpenTofu уже стоит в devcontainer (R09) ([RUN.md](../RUN.md)). Каркас — из заготовки `spec`, 2026-10-19.
 >
 > Что делает компонент, чего не делает и что о нём ещё предстоит решить. Это подробности его карточки — architecture 3.11 spec. Карточка остаётся сводкой: если подробности меняют то, что в ней сказано, она правится в `spec` тем же путём, что и вопросы в его реестры (RULES.md, Across repositories).
 >
@@ -38,7 +38,7 @@
 - общие проверки CI — поиск секретов, DCO, CodeQL, Scorecard и проверку документов — берёт из `.github` ещё до кода; подключила их T21 `spec` (R30 spec; architecture 3.11 spec);
 - файл релиза NovaTrail — бинарник сервиса, его `Dockerfile`, архив сборки `app` — входит в выкладку, только когда его принял рецепт `spec` `release-verify` (RULES.md, Release files are verified; R77 spec). Т-27, что сверяет эта проверка, закрыт им же;
 - его сервисы (architecture 3.12 spec): хостинг сборки `app`, домен и хостинг виджетов на этапе 4, Secret Manager, Artifact Registry, Cloud Logging и Trace, а вместе с `api` — Cloud Scheduler и задания Cloud Run;
-- этап 2, вместе с `tutor`, `canvas`, `api`, `app` и `skill-map` (product 11 spec). Репозиторий заведён раньше кода ради документов, а код ждал П-11 — регион данных, который нужен до первого развёртывания (architecture 3.11 spec; repositories 2.1, 6 spec). П-11 закрыт решением R109 spec (R03). Первое приложение — у автора, локально и без развёртывания, так что строку `infra` в сквозном плане `spec` автор отложил до первого развёртывания (R76 spec). Инструмент встаёт в devcontainer вместе с кодом (T14 `spec`), и это OpenTofu: Т-29, который вырос из вопроса В2 этого репозитория, закрыт поправкой 2026-11-08 к R11 spec по строке В10 (R08).
+- этап 2, вместе с `tutor`, `canvas`, `api`, `app` и `skill-map` (product 11 spec). Репозиторий заведён раньше кода ради документов, а код ждал П-11 — регион данных, который нужен до первого развёртывания (architecture 3.11 spec; repositories 2.1, 6 spec). П-11 закрыт решением R109 spec (R03). Первое приложение — у автора, локально и без развёртывания, так что строку `infra` в сквозном плане `spec` автор отложил до первого развёртывания (R76 spec). Инструмент встаёт в devcontainer вместе с кодом (T14 `spec`), и это OpenTofu: Т-29, который вырос из вопроса В2 этого репозитория, закрыт поправкой 2026-11-08 к R11 spec по строке В10 (R08), а в стадии `toolchain` он стоит с T11 (R09).
 
 ## 2. Решить при детализации
 
@@ -81,7 +81,7 @@
 
 ## 3. Устройство
 
-Здесь — то, что решено по разделу 2: из каких частей компонент состоит, его данные и как он связан с другими репозиториями. Решения — R04–R07 и поправка 2026-11-08 к R11 spec (раздел 3.6); кода ещё нет, и строит его эпик E2 «Первый код» (таблица 1 [RUN.md](../RUN.md)).
+Здесь — то, что решено по разделу 2: из каких частей компонент состоит, его данные и как он связан с другими репозиториями. Решения — R04–R07 и поправка 2026-11-08 к R11 spec (раздел 3.6); кода модуля и выкладки ещё нет, и строит его эпик E2 «Первый код» (таблица 1 [RUN.md](../RUN.md)).
 
 **Из чего состоит репозиторий, когда придёт код:**
 
@@ -298,9 +298,10 @@ Self-hosting — копия платформы, которую оператор 
 
 - **Почему не Terraform:** с версии 1.6.0 он выходит под BUSL 1.1, а поправка 2026-10-22 к R12 spec пускает бесплатные условия только у инструмента, без которого платформу можно развернуть. Terraform 1.5.7, последний под MPL 2.0, — без общедоступного `terraform test` и без `mock_provider`, и больше не развивается.
 - **Что известно на 2026-11-08 (T09):** OpenTofu v1.13.9 от 2026-11-05 — последний релиз, под MPL 2.0; суммы sha256 архивов `linux_amd64` и `linux_arm64` и подпись файла сумм сверены; провайдеры `hashicorp/google` и `hashicorp/google-beta` — в реестре OpenTofu, до 8.10.0, под MPL 2.0; `tofu test` держит `mock_provider`, `override_resource` и `command = plan`, на которых стоят тесты canvas-api.
-- **Против canvas-api меняется:** `tofu` и `tofu test` вместо `terraform`; провайдеры — из реестра OpenTofu, и суммы `.terraform.lock.hcl` — его; инструмент — в стадии `toolchain` devcontainer по `ARG` версии и суммам sha256 (R34 spec), а не на раннере, и CI зовёт его через `spec/tools/toolchain/toolchain.sh` (R30 spec). Код модуля на HCL и тесты переносятся.
-- **Лицензия:** MPL 2.0 — названным исключением в решении `infra`, которое вводит OpenTofu в devcontainer (R12 spec).
-- **Не проверено — первый код:** идёт ли под `tofu` код по образцу canvas-api (T12); проверять ли при установке подпись файла сумм, а не только суммы (T11).
+- **Против canvas-api меняется:** `tofu` и `tofu test` вместо `terraform`; провайдеры — из реестра OpenTofu, и суммы `.terraform.lock.hcl` — его; инструмент — в стадии `toolchain` devcontainer по `ARG` версии и суммам sha256 (R34 spec; R09), а не на раннере, и CI зовёт его через `spec/tools/toolchain/toolchain.sh` (R30 spec). Код модуля на HCL и тесты переносятся.
+- **Установка** (R09): v1.13.9 в стадии `toolchain`; архив сверяется с суммой до распаковки, а подпись файла сумм `gpg` проверяется руками при каждом подъёме версии. Job CI `OpenTofu` сверяет `tofu version -json` с `ARG`.
+- **Лицензия:** MPL 2.0 — названное исключение R09 (R12 spec).
+- **Не проверено — первый код:** идёт ли под `tofu` код по образцу canvas-api (T12); как Dependabot `opentofu` поднимает провайдеры и их суммы в `.terraform.lock.hcl` (T12).
 - **Задачи:** T11 — инструмент в devcontainer и своя проверка в CI; T12 — корневой модуль.
 
 ## 4. Источники
@@ -380,6 +381,8 @@ Self-hosting — копия платформы, которую оператор 
   - [`terraform_1.17.1_SHA256SUMS`](https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_SHA256SUMS): `4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061  terraform_1.17.1_linux_amd64.zip`, `988e950a1c23058093b0e66ab2d5fb53fc18345ecfbd5871acf51dbac9325edd  terraform_1.17.1_linux_arm64.zip`;
   - [реестр OpenTofu](https://registry.opentofu.org/v1/providers/hashicorp/google/versions): `hashicorp/google` и `hashicorp/google-beta` — новейшая версия 8.10.0; `LICENSE` [terraform-provider-google](https://github.com/hashicorp/terraform-provider-google) и terraform-provider-google-beta — «Mozilla Public License Version 2.0»;
   - документация `tofu test` на теге v1.13.9 — [`website/docs/cli/commands/test/index.mdx`](https://github.com/opentofu/opentofu/blob/v1.13.9/website/docs/cli/commands/test/index.mdx), она же [на сайте](https://opentofu.org/docs/cli/commands/test/): «The `mock_provider` blocks (optional): define the providers to be mocked»; «The `override_resource` blocks (optional): define the resources to be overridden»; «You can use the `command = plan` setting to perform a plan instead of an apply»;
+  - прочитано 2026-11-09 (T11; R09): архивы `tofu_1.13.9_linux_amd64.tar.gz` (35 124 830 байт) и `tofu_1.13.9_linux_arm64.tar.gz` скачаны и сверены с суммами выше; в архиве — `tofu`, `LICENSE`, `README.md` и `CHANGELOG.md`; `tofu version -json` — `"terraform_version": "1.13.9"`; подпись `tofu_1.13.9_SHA256SUMS.gpgsig` проверена заново, тот же отпечаток; v1.13.9 — по-прежнему последний релиз;
+  - GitHub, [Supported ecosystems and repositories](https://docs.github.com/en/code-security/dependabot/ecosystems-supported-by-dependabot/supported-ecosystems-and-repositories), даты на странице нет, прочитано 2026-11-09: у экосистемы `opentofu` — обновление версий и закрытые репозитории, но не обновления безопасности и не закрытые реестры;
   - `CHANGELOG.md` Terraform: на теге v1.6.0 — «The `terraform test` command is now generally available»; на теге v1.7.0 — «Providers, modules, resources, and data sources can now be mocked during executions of `terraform test`», с блоком `mock_provider`.
 - **Релиз `api` v0.1.1** (раздел 3.2), прочитано 2026-11-08 через API GitHub: `gh release view v0.1.1 -R altnovatrail/api` — опубликован 2026-11-08T23:15:36Z, неизменяемый; файлы — `api_v0.1.1_linux_amd64` и `api_v0.1.1_linux_arm64`, `Dockerfile`, лицензии и `SHA256SUMS`, у каждого — `.sigstore.json`. `README.md` на теге: «Whoever deploys checks the files with `just -f spec/justfile release-verify api <tag> <file>` and builds the image around the binary: `docker build --target release --build-context binary=<a folder holding the binary as api> .`, with the release's `Dockerfile`»; `cmd/api/main.go` на теге — «serve», «migrate», «version». У v0.1.0 команды `migrate` нет; релизов у `app` нет (`gh release list -R altnovatrail/app`).
 - **Регион, адреса, журналы и выкладка в canvas-api** (разделы 2.1–2.4, 3.2) — [mathtrail/canvas-api](https://github.com/mathtrail/canvas-api/tree/0901af0), коммит 0901af0, прочитано 2026-10-19, а цитаты R45 и R58 canvas-api, его environments, `service_api.tf` и `justfile` — 2026-11-08:

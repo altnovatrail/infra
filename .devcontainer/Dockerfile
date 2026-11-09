@@ -32,11 +32,18 @@ ARG GO_VERSION=1.27.3
 # with this file into the copy of every NovaTrail repository, as Go does, and stays unused in one
 # without contracts: the other repositories take the generated code from a release of spec.
 ARG BUF_VERSION=1.75.0
+# OpenTofu: infra describes the platform's infrastructure with it, as code on the model of
+# canvas-api's infra/, and its checks — tofu fmt, validate and test — run in this stage. It is the
+# one tool this repository's container has beyond spec's, and spec's template does not carry it:
+# a move to a new tag of spec keeps it (R09). It never ships, and its license, MPL 2.0, is the
+# named exception R09 makes (R12 spec).
+ARG OPENTOFU_VERSION=1.13.9
 # The sha256 of every archive, per architecture, as its publisher lists it: SHASUMS256.txt of
 # the Node release, SHA256SUMS of the just release, the sha256 go.dev/dl lists for Go,
-# sha256.txt of the buf release, whose binary comes as it is, with no archive. A sum written here
-# keeps a download from being swapped once it has been read (R34 spec), and is raised together with
-# its version.
+# sha256.txt of the buf release, whose binary comes as it is, with no archive, and
+# tofu_<version>_SHA256SUMS of the OpenTofu release, whose own signature is checked by hand with
+# gpg each time the version is raised (R09). A sum written here keeps a download from being
+# swapped once it has been read (R34 spec), and is raised together with its version.
 ARG NODE_SHA256_AMD64=6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff
 ARG NODE_SHA256_ARM64=724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5
 ARG JUST_SHA256_AMD64=4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d
@@ -45,6 +52,8 @@ ARG GO_SHA256_AMD64=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e37
 ARG GO_SHA256_ARM64=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49
 ARG BUF_SHA256_AMD64=fad1e38d6909bbb583a4da81d8c02a01046e2cd663bde7e337dd24277393764b
 ARG BUF_SHA256_ARM64=00eb190aa82df17f393e05b04889cc60a0b13b3259d336e21a87d5f23ab4fd26
+ARG OPENTOFU_SHA256_AMD64=b34b327cc1ef07178207b6f2cd1f5276537d3e5b7be316500f6dac50d4c0a857
+ARG OPENTOFU_SHA256_ARM64=5dc196dde75b667e4806d358310ec96742774cd0993c54c1237efee5644b69b8
 
 # Every archive comes through one helper, so that every download is retried the same way and
 # checked against its sum before anything unpacks it. --retry-all-errors is the point of it: a
@@ -54,10 +63,10 @@ RUN arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
         amd64) node_arch=x64; gnu_arch=x86_64; \
             node_sha256="$NODE_SHA256_AMD64"; just_sha256="$JUST_SHA256_AMD64"; go_sha256="$GO_SHA256_AMD64"; \
-            buf_sha256="$BUF_SHA256_AMD64" ;; \
+            buf_sha256="$BUF_SHA256_AMD64"; tofu_sha256="$OPENTOFU_SHA256_AMD64" ;; \
         arm64) node_arch=arm64; gnu_arch=aarch64; \
             node_sha256="$NODE_SHA256_ARM64"; just_sha256="$JUST_SHA256_ARM64"; go_sha256="$GO_SHA256_ARM64"; \
-            buf_sha256="$BUF_SHA256_ARM64" ;; \
+            buf_sha256="$BUF_SHA256_ARM64"; tofu_sha256="$OPENTOFU_SHA256_ARM64" ;; \
         *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
     esac; \
     workdir="$(mktemp -d)"; \
@@ -91,6 +100,13 @@ RUN arch="$(dpkg --print-architecture)"; \
         "$workdir/buf-${BUF_VERSION}-${gnu_arch}" "$buf_sha256"; \
     install -m 0755 "$workdir/buf-${BUF_VERSION}-${gnu_arch}" /usr/local/bin/buf; \
     buf --version; \
+    \
+    echo "opentofu ${OPENTOFU_VERSION}"; \
+    fetch "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_${arch}.tar.gz" \
+        "$workdir/tofu-${OPENTOFU_VERSION}-${arch}.tar.gz" "$tofu_sha256"; \
+    tar -C "$workdir" -xzf "$workdir/tofu-${OPENTOFU_VERSION}-${arch}.tar.gz" tofu; \
+    install -m 0755 "$workdir/tofu" /usr/local/bin/tofu; \
+    tofu version; \
     \
     rm -rf "$workdir"
 
