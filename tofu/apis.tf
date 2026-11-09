@@ -5,8 +5,9 @@
 # Firebase and sign-in (R13); those that the configuration stands on too are named here as well, because
 # this is the list of what it stands on.
 #
-# Cloud Trace is not here, on purpose: with its API off, no trace is written, and the platform's
-# first slice keeps none (R07).
+# Cloud Trace is not here: the platform writes no traces of its own. Google turns its API on in a
+# new project, and Cloud Scheduler, which depends on it, keeps it on, so Cloud Run's own traces of
+# some requests may come (R07, its third amendment of 2026-11-09).
 
 locals {
   apis = [

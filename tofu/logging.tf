@@ -105,8 +105,9 @@ resource "google_logging_project_sink" "sinks" {
 # Where traces are kept: the bucket _Trace, which the system makes with the first trace, in the
 # place the project's settings for observability buckets name. The setting comes before any trace:
 # a bucket keeps its place for good, and only a reprovision that erases the traces could move it
-# (R04, amended 2026-11-09). The platform writes no traces — Cloud Trace's API is off (R07) — but
-# Cloud Run samples some requests by itself, and the place is set for whatever comes.
+# (R04, amended 2026-11-09). The platform writes no traces of its own, but Cloud Trace's API stays
+# on beside Cloud Scheduler and Cloud Run samples some requests by itself (R07, its third amendment
+# of 2026-11-09), and the place is set for whatever comes.
 #
 # The setting, not the bucket: the provider sets it with a PATCH that a second apply repeats
 # harmlessly, while it creates the bucket with a POST that fails wherever _Trace already is, and

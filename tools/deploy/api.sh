@@ -241,6 +241,7 @@ case "$command" in
 
     release)
         ((${#migrate_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part migrate, and a release does not go without its migrations"
+        ((${#check_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part check, and a release does not go without api's check of its facts and rung before the migrations (R05; the second 2026-11-08 amendment to R106 spec)"
         described="$(describe_service)"
         if [[ -n "$described" ]]; then
             serving_image="$(serving_digest "$described")"
