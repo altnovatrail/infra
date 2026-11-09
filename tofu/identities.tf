@@ -106,10 +106,11 @@ resource "google_service_account_iam_member" "deployer_runs_as_api" {
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# The publisher of app's build on Hosting, and nothing else (R12). Its job runs a large program of
-# somebody else's, the Firebase CLI, so it has an environment and an identity of its own and
-# reaches neither api, nor this configuration, nor the settings of sign-in: <project>.web.app is
-# put among the authorized domains by the configuration itself (sign_in.tf; R16).
+# The publisher of app's build on Hosting, and nothing else (R12). Its job releases a build that
+# came from elsewhere through Hosting's REST API (R17), so it has an environment and an identity
+# of its own and reaches neither api, nor this configuration, nor the settings of sign-in:
+# <project>.web.app is put among the authorized domains by the configuration itself (sign_in.tf;
+# R16).
 resource "google_service_account" "hosting" {
   account_id   = "hosting-publish"
   display_name = "Publishes app's build on Firebase Hosting"

@@ -205,6 +205,14 @@ test("a tag of the serving image that is not an exact release is refused, not ta
   assert.deepEqual(steps(w.calls()), []);
 });
 
+test("a list of jobs with no check is refused before anything runs: the migrations do not go before api's check of its configuration", () => {
+  const w = world({ outputs: (o) => (o.api_jobs = { migrate: jobs.migrate, daily: jobs.daily }) });
+  const r = w.run("release");
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /name no job of the part check/);
+  assert.deepEqual(steps(w.calls()), []);
+});
+
 test("a list of jobs with no migrate is refused before anything runs", () => {
   const w = world({ outputs: (o) => (o.api_jobs = { check: jobs.check, daily: jobs.daily }) });
   const r = w.run("release");

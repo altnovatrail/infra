@@ -5,7 +5,7 @@
 project_id = "novatrail"
 region     = "us-east4"
 
-# An alert, not a cap: nothing stops the project at this number (R07).
+# An alert, not a cap: nothing stops the project at this number (R06).
 budget_amount   = "5"
 budget_currency = "USD"
 
