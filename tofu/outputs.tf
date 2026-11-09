@@ -55,3 +55,20 @@ output "hosting_service_account" {
   description = "The identity app's build is published with."
   value       = google_service_account.hosting.email
 }
+
+# What api's deployment works on, read with tofu output -json in the deployment's job after the
+# apply (R15): the service, the jobs with their part in the deployment, and the file of the facts.
+output "api_service_name" {
+  description = "The name of api's Cloud Run service, whether it is made yet or not."
+  value       = var.api_service_name
+}
+
+output "api_jobs" {
+  description = "api's jobs that are made, by their name in the list: the Cloud Run job, and its part in the deployment — check, migrate, after, or null for a job of the clock."
+  value       = { for name, job in google_cloud_run_v2_job.api : name => { job = job.name, deploy = var.api_jobs[name].deploy } }
+}
+
+output "admission_facts_file" {
+  description = "Where api's revision reads the deployment facts, the file of the secret's version mounted as a volume: the path in API_ADMISSION_FACTS_FILE."
+  value       = "${local.admission_dir}/${local.admission_file}"
+}
