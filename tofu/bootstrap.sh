@@ -2,8 +2,9 @@
 # Makes, once and with the operator's own rights, what the configuration in this directory cannot
 # make for itself (R13): the project and its link to the billing account, the bucket the state
 # lives in, the federated pool that CI signs in through and its provider, the identity the
-# configuration is applied as and what that identity may do, and the three custom roles the
-# configuration grants. Everything else is the configuration's, and CI applies it.
+# configuration is applied as and what that identity may do, the three custom roles the
+# configuration grants, and the pool github-eval with its provider, which the eval jobs of modules
+# and tutor read the keys for eval through (R120 spec; R20). Everything else is the configuration's, and CI applies it.
 #
 # Safe to run again: every step looks before it makes, and what is written here is brought back
 # where it has drifted — the provider's condition, the custom roles' permissions, what the
@@ -38,6 +39,23 @@ hcl_value() {
     local name="$1" file="$2"
     [[ -f "$file" ]] || return 0
     sed -n "s/^[[:space:]]*${name}[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$file" | head -1
+}
+
+# A list out of an HCL file, written on its one line, `name = ["a", "b"]`: its values, one a line,
+# or nothing when the file does not name it. A list of another form is refused rather than misread.
+hcl_list() {
+    local name="$1" file="$2" line rest item more
+    [[ -f "$file" ]] || return 0
+    line="$(sed -n "/^[[:space:]]*${name}[[:space:]]*=/{p;q;}" "$file")"
+    [[ -n "$line" ]] || return 0
+    [[ "$line" =~ =[[:space:]]*\[([^]#]*)\][[:space:]]*(#.*)?$ ]] || fail "${name} in ${file##*/} is not a list on one line, [\"…\", \"…\"], the one form this script reads"
+    rest="${BASH_REMATCH[1]}"
+    while [[ "$rest" =~ ^[[:space:]]*\"([^\"]*)\"[[:space:]]*(,?)(.*)$ ]]; do
+        item="${BASH_REMATCH[1]}" more="${BASH_REMATCH[2]}" rest="${BASH_REMATCH[3]}"
+        printf '%s\n' "$item"
+        [[ -n "$more" ]] || break
+    done
+    [[ "$rest" =~ ^[[:space:]]*$ ]] || fail "${name} in ${file##*/} is not a list on one line, [\"…\", \"…\"], the one form this script reads"
 }
 
 # A value the script cannot go on without, in the form the configuration takes it.
@@ -113,6 +131,25 @@ require bucket "$bucket" '^[a-z0-9][a-z0-9_.-]{1,61}[a-z0-9]$'
 [[ "$subject_prefix" =~ ^repo:[^/@:]+@([0-9]+)/[^/@:]+@([0-9]+)$ ]]
 owner_id="${BASH_REMATCH[1]}"
 repository_id="${BASH_REMATCH[2]}"
+
+# The repositories whose jobs of the environment eval read the keys for eval, by the same numbers,
+# all of one owner, as the configuration takes them (R120 spec; R20). The pool's id is the one the
+# configuration's grants name.
+eval_pool=github-eval
+[[ "$pool" != "$eval_pool" ]] || fail "workload_identity_pool_id is ${eval_pool}, the pool of eval: the pool the configuration signs in through is another"
+eval_list="$(hcl_list eval_github_subject_prefixes "$tfvars")"
+eval_owner_id=""
+eval_repository_ids=()
+while IFS= read -r eval_prefix; do
+    [[ -n "$eval_prefix" ]] || continue
+    [[ "$eval_prefix" =~ ^repo:[^/@:]+@([0-9]+)/[^/@:]+@([0-9]+)$ ]] || fail "eval_github_subject_prefixes holds ${eval_prefix}, not of the form the configuration takes: repo:OWNER@OWNER_ID/NAME@REPOSITORY_ID"
+    [[ -z "$eval_owner_id" || "$eval_owner_id" == "${BASH_REMATCH[1]}" ]] || fail "eval_github_subject_prefixes are of more than one owner, and the condition of ${eval_pool} names one"
+    eval_owner_id="${BASH_REMATCH[1]}"
+    for known in "${eval_repository_ids[@]}"; do
+        [[ "$known" != "${BASH_REMATCH[2]}" ]] || fail "eval_github_subject_prefixes names the repository ${BASH_REMATCH[2]} twice, which the configuration refuses"
+    done
+    eval_repository_ids+=("${BASH_REMATCH[2]}")
+done <<< "$eval_list"
 
 # The jobs that apply the configuration run in an environment of their own, which only main may
 # run in, and no other job borrows the identity: not api's deployment, not the publisher of app's
@@ -202,8 +239,9 @@ sign_in_permissions=(
 # Enumerated rather than Owner: enough to make everything the configuration describes, and nothing
 # beyond this project. Each line is a role and the types of resource and data in tofu/ it is held
 # for, and just tf-check refuses a type of the configuration that no line names, or a line that
-# names a type no longer there. The pool and its provider are not among them: what the identity
-# signs in through is not its to change. Nor is iam.roleAdmin (above).
+# names a type no longer there. The pools and their providers are not among them: what the identity
+# signs in through is not its to change, and no condition of IAM narrows a right over pools to one,
+# so this script makes both pools. Nor is iam.roleAdmin (above).
 project_roles=(
     "roles/serviceusage.serviceUsageAdmin google_project_service"
     "roles/browser data.google_project"
@@ -251,24 +289,25 @@ make_bucket() {
         --public-access-prevention
 }
 
-pool_exists() { gcloud iam workload-identity-pools describe "$pool" --project="$project" --location=global; }
+# The pool at hand, at_pool, and its provider, by federated_pool below.
+pool_exists() { gcloud iam workload-identity-pools describe "$at_pool" --project="$project" --location=global; }
 make_pool() {
-    gcloud iam workload-identity-pools create "$pool" \
+    gcloud iam workload-identity-pools create "$at_pool" \
         --project="$project" \
         --location=global \
-        --display-name="GitHub Actions"
+        --display-name="$at_name"
 }
 
 provider_exists() {
     gcloud iam workload-identity-pools providers describe github \
-        --project="$project" --location=global --workload-identity-pool="$pool"
+        --project="$project" --location=global --workload-identity-pool="$at_pool"
 }
 make_provider() {
     gcloud iam workload-identity-pools providers create-oidc github \
         --project="$project" \
         --location=global \
-        --workload-identity-pool="$pool" \
-        --display-name="GitHub Actions" \
+        --workload-identity-pool="$at_pool" \
+        --display-name="$at_name" \
         --issuer-uri="https://token.actions.githubusercontent.com" \
         --attribute-mapping="$mapping" \
         --attribute-condition="$condition"
@@ -379,36 +418,64 @@ ensure bucket_exists make_bucket
 # Versions are what let a state file that was written badly be rolled back.
 retry gcloud storage buckets update "gs://${bucket}" --versioning
 
-# Who may sign in through the pool at all: the jobs of infra's repository, by the numbers of its
-# owner and of the repository, and nobody else's (R13). Which identity a job may borrow is said by
-# each identity, by the environment GitHub names in the job's subject. A pool or a provider deleted
-# not long ago is still found, and is undeleted; one that exists is given this condition again, so
-# that what is written here is what holds.
-echo "==> federated pool ${pool}"
-ensure pool_exists make_pool
-if [[ "$(retry_read gcloud iam workload-identity-pools describe "$pool" --project="$project" --location=global --format='value(state)')" == DELETED ]]; then
-    retry gcloud iam workload-identity-pools undelete "$pool" --project="$project" --location=global
-    echo "    undeleted"
-fi
-
-echo "==> pool provider github"
-mapping="google.subject=assertion.sub"
-condition="assertion.repository_owner_id=='${owner_id}' && assertion.repository_id=='${repository_id}'"
-if provider_exists > /dev/null 2>&1; then
-    if [[ "$(retry_read gcloud iam workload-identity-pools providers describe github --project="$project" --location=global --workload-identity-pool="$pool" --format='value(state)')" == DELETED ]]; then
-        retry gcloud iam workload-identity-pools providers undelete github \
-            --project="$project" --location=global --workload-identity-pool="$pool"
+# Who may sign in through a pool at all, said by its provider's condition. A pool or a provider
+# deleted not long ago is still found, and is undeleted; one that exists is given its condition
+# again, so that what is written here is what holds.
+federated_pool() {
+    at_pool="$1" at_name="$2" condition="$3"
+    echo "==> federated pool ${at_pool}"
+    ensure pool_exists make_pool
+    if [[ "$(retry_read gcloud iam workload-identity-pools describe "$at_pool" --project="$project" --location=global --format='value(state)')" == DELETED ]]; then
+        retry gcloud iam workload-identity-pools undelete "$at_pool" --project="$project" --location=global
         echo "    undeleted"
     fi
-    retry gcloud iam workload-identity-pools providers update-oidc github \
-        --project="$project" \
-        --location=global \
-        --workload-identity-pool="$pool" \
-        --issuer-uri="https://token.actions.githubusercontent.com" \
-        --attribute-mapping="$mapping" \
-        --attribute-condition="$condition"
+
+    echo "==> pool provider github of ${at_pool}"
+    if provider_exists > /dev/null 2>&1; then
+        if [[ "$(retry_read gcloud iam workload-identity-pools providers describe github --project="$project" --location=global --workload-identity-pool="$at_pool" --format='value(state)')" == DELETED ]]; then
+            retry gcloud iam workload-identity-pools providers undelete github \
+                --project="$project" --location=global --workload-identity-pool="$at_pool"
+            echo "    undeleted"
+        fi
+        retry gcloud iam workload-identity-pools providers update-oidc github \
+            --project="$project" \
+            --location=global \
+            --workload-identity-pool="$at_pool" \
+            --issuer-uri="https://token.actions.githubusercontent.com" \
+            --attribute-mapping="$mapping" \
+            --attribute-condition="$condition"
+    else
+        ensure provider_exists make_provider
+    fi
+}
+
+# The jobs of infra's repository, by the numbers of its owner and of the repository, and nobody
+# else's (R13). Which identity a job may borrow is said by each identity, by the environment GitHub
+# names in the job's subject.
+mapping="google.subject=assertion.sub"
+federated_pool "$pool" "GitHub Actions" "assertion.repository_owner_id=='${owner_id}' && assertion.repository_id=='${repository_id}'"
+
+# The jobs of the environment eval of modules and tutor, which read the platform's keys for eval and
+# nothing else: no identity is lent through this pool, and the module grants its principals the
+# secrets of eval alone. Dependabot's are not let in, though its workflows may ask for a token
+# (R120 spec). The pool is made here and not by the configuration, which would need the right to
+# change every pool of the project, the one it signs in through among them (R20). With no
+# repository of eval, it is not made; one made before is kept, as a pool's id is not taken again
+# for 30 days after it is deleted, and its provider is given the condition false, which admits
+# nobody.
+if ((${#eval_repository_ids[@]})); then
+    eval_repositories="$(printf " || assertion.repository_id=='%s'" "${eval_repository_ids[@]}")"
+    federated_pool "$eval_pool" "GitHub Actions, eval" "assertion.repository_owner_id=='${eval_owner_id}' && (${eval_repositories# || }) && assertion.environment=='eval' && assertion.actor!='dependabot[bot]'"
 else
-    ensure provider_exists make_provider
+    at_pool="$eval_pool"
+    if pool_exists > /dev/null 2>&1 && provider_exists > /dev/null 2>&1; then
+        echo "==> pool provider github of ${eval_pool}: no repository of eval, so it admits nobody"
+        retry gcloud iam workload-identity-pools providers update-oidc github \
+            --project="$project" \
+            --location=global \
+            --workload-identity-pool="$eval_pool" \
+            --attribute-condition="false"
+    fi
 fi
 
 echo "==> identity ${service_account}"
@@ -553,6 +620,15 @@ echo "    ${borrower##*/subject/}"
 
 provider="projects/${project_number}/locations/global/workloadIdentityPools/${pool}/providers/github"
 
+eval_summary=""
+if ((${#eval_repository_ids[@]})); then
+    eval_summary="The eval jobs of modules and tutor sign in through this provider, with no service account:
+
+GCP_EVAL_WORKLOAD_IDENTITY_PROVIDER=projects/${project_number}/locations/global/workloadIdentityPools/${eval_pool}/providers/github
+
+"
+fi
+
 cat << SUMMARY
 
 Done. A workflow signs in with these two lines; neither is a secret:
@@ -560,7 +636,7 @@ Done. A workflow signs in with these two lines; neither is a secret:
 GCP_WORKLOAD_IDENTITY_PROVIDER=${provider}
 GCP_CONFIG_SERVICE_ACCOUNT=${service_account}
 
-Left to do once, in the repository's settings rather than here: the environment
+${eval_summary}Left to do once, in the repository's settings rather than here: the environment
 ${config_environment}, which only main may run in, and its secrets TF_VAR_billing_account,
 the same id this script was given, and TF_VAR_operator_email, without which no alert is made.
 SUMMARY

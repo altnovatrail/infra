@@ -4,7 +4,7 @@
 >
 > **Правило:** не предлагать повторно отвергнутое без новых фактов. Если решение нужно поменять, спросить автора и обновить этот файл. Запись не переписывается: её правит поправка с датой в конце записи или заменяет новая запись, а старая остаётся на месте с пометкой «Заменено».
 >
-> Репозиторий заведён 2026-10-19 из заготовки `spec` v0.1.0 (R21 spec), 2026-10-20 перешёл на `spec` v0.2.9 (R01), а 2026-11-08 — на v0.9.11 (R02), на v0.9.13 (R03) и на v0.9.16 (R08), а 2026-11-09 — на v0.12.0 (R19). Чем он со временем отличается от заготовки — инструментами в devcontainer, правилами в RUN.md, — записывается здесь решением, как R46 canvas-api записал отличия от своего образца: OpenTofu, ShellCheck и actionlint в devcontainer — R09 с поправками 2026-11-09. Следующий номер — R20.
+> Репозиторий заведён 2026-10-19 из заготовки `spec` v0.1.0 (R21 spec), 2026-10-20 перешёл на `spec` v0.2.9 (R01), а 2026-11-08 — на v0.9.11 (R02), на v0.9.13 (R03) и на v0.9.16 (R08), а 2026-11-09 — на v0.12.0 (R19). Чем он со временем отличается от заготовки — инструментами в devcontainer, правилами в RUN.md, — записывается здесь решением, как R46 canvas-api записал отличия от своего образца: OpenTofu, ShellCheck и actionlint в devcontainer — R09 с поправками 2026-11-09. Следующий номер — R21.
 >
 > Здесь записи цитируются как `R03`, в других репозиториях — как `R03 infra`. Решения `spec` цитируются как «R18 spec», решения MathTrail — как «R37 canvas-api», а списком — «canvas-api: R37, R38». У каждого журнала свои номера.
 >
@@ -464,6 +464,8 @@
 — *Третья поправка 2026-11-09:* **две строки, которые печатает скрипт, — `GCP_WORKLOAD_IDENTITY_PROVIDER` и `GCP_CONFIG_SERVICE_ACCOUNT`, — ложатся в закоммиченный `tofu/ci.env`, и workflow выкладки читает их оттуда (R18).** Решение автора при планировании T21. — *Почему:* ни одна из них не секрет, а в файле их видит ревью, как у canvas-api (`infra/ci.env`). — *Отвергнуто:* переменные GitHub — значения жили бы в настройках, мимо ревью — решение автора.
 
 
+— *Четвёртая поправка 2026-11-09:* **скрипт делает и второй пул, `github-eval`, с провайдером `github` и условием R120 spec, когда `production.auto.tfvars` называет репозитории eval; учётных записей в нём нет; список пуст — провайдер сделанного пула получает условие `false`, а правка списка — повторный запуск скрипта до мержа. Прав на пулы у `infra-config` по-прежнему нет: условия IAM пулы не сужают, и право на один было бы правом на тот, через который он входит (R20).** Решение автора при планировании T22. — *Следствие:* шаги пула и провайдера — функция `federated_pool` для обоих пулов; `tofu/tests/bootstrap.test.mjs`.
+
 ## Проверки списка выкатки
 
 **R14. Список выкатки проверяют схема `deploy/schema/production.schema.json` и проверка `tools/deploy-check/` на Node: шесть пунктов R05 — схема, файлы релизов — `release-verify` и sha256, `deployment.json` — схемой своей сборки, факты — словарём таблицы допуска `spec`, ступень `full`, тег `api` не ниже, чем на `main`, — и ещё имя бинарника `api`, которого схеме не выразить. В CI job `Deploy` гоняет её тесты в каждом pull request, а сам список — когда pull request меняет то, чем он проверяется. Одна зависимость — ajv 8.20.0 по lock-файлу `tools/`.** Решения автора при планировании T18, 2026-11-09 (RUN.md, T18).
@@ -724,3 +726,41 @@
 - копия векторов в `infra`: она отстала бы от тега, а подмодуль даёт векторы того же тега, что и схему.
 
 — *Следствие:* T22 — по R120 spec: пул `github-eval`, секреты и привязки — в модуле, `bootstrap.sh` и R13 не меняются. T24 пишет `production/deployment.json` формата 1. Д7 — CodeQL для JavaScript. Копию схемы `spec` в своей сборке несёт `app` (Д142), а не `infra`. — RUN.md, T22, T26 и таблицы 1, 3 и 4; CLAUDE.md; README.md; `tools/deploy-check/`, `tools/deploy/app.mjs`, `tools/deploy/test/app.test.mjs`, `tools/package.json`, `justfile`; [architecture.md](architecture.md), разделы 1, 3, 3.1, 3.2 и 4.
+
+— *Поправка 2026-11-09:* **пул `github-eval` и его провайдер делает не модуль, а `bootstrap.sh`; секреты и права на них — модуль (R20).** Решение автора при планировании T22. Модуль, как сказал R120 spec, требовал бы у `infra-config` права на все пулы проекта. — *Следствие:* строка «В реестр spec» В15.
+
+## Ключи eval
+
+**R20. Ключи платформы для eval — секреты модуля `eval-key-<код поставщика>`, по одному на код `eval_providers`: `eval-key-anthropic` и `eval-key-openai`. Читает их только job окружения GitHub `eval` репозиториев `eval_github_subject_prefixes` — `modules` и `tutor`, — каждый своим principal пула `github-eval`, с `roles/secretmanager.secretAccessor` и без учётной записи-посредника (R120 spec). Пул `github-eval` и его провайдер `github` с условием R120 spec делает `bootstrap.sh`, а не модуль, как сказал R120 spec: у `infra-config` прав на пулы нет. Без репозиториев eval нет ни секретов, ни пула, а пул, сделанный прежде, никого не пускает.** Решение автора при планировании T22, 2026-11-09 (RUN.md, T22): кто делает пул.
+- **Секреты** — `tofu/secrets.tf`, рядом с остальными секретами модуля, а кто их читает — `tofu/eval.tf`:
+  - репликация по выбору, `var.region`, как у всех секретов модуля (R04): региональный секрет читается только из своего региона, а runner GitHub — не там (R120 spec);
+  - `labels.purpose = "eval-key"`;
+  - `deletion_policy = "ABANDON"`, как у секретов заданий `api`: поставщик, которого список перестал называть, модуль забывает, а значение остаётся у автора;
+  - значения кладёт автор, `gcloud secrets versions add`, не код (RULES.md, Hard rules). Лимиты трат у поставщиков ставит он же (R120 spec).
+- **Кто читает** — каждому секрету `secretAccessor` для `principal://iam.googleapis.com/projects/<номер>/locations/global/workloadIdentityPools/github-eval/subject/<префикс>:environment:eval`:
+  - префиксы — `eval_github_subject_prefixes`, вида `repo:OWNER@OWNER_ID/NAME@REPOSITORY_ID`, одного владельца, каждый один раз. Для платформы это `repo:altnovatrail@344507087/modules@1425775415` и `repo:altnovatrail@344507087/tutor@1425813274` (`gh api repos/altnovatrail/<имя>/actions/oidc/customization/sub`, 2026-11-09: `use_immutable_subject: true`);
+  - по умолчанию список пуст: копии self-hosting eval не нужен;
+  - платформа пишет его в `tofu/production.auto.tfvars` (T23).
+- **Пул и провайдер** — `bootstrap.sh`, функцией `federated_pool`, общей с пулом `infra`:
+  - сопоставление — `google.subject=assertion.sub`;
+  - условие — `assertion.repository_owner_id=='<владелец>' && (assertion.repository_id=='<id>' || …) && assertion.environment=='eval' && assertion.actor!='dependabot[bot]'`, при повторе возвращается;
+  - список скрипт читает из той же строки `production.auto.tfvars`, а список на нескольких строках — отказ до первого вызова `gcloud`;
+  - пустой список — пула не делает. Сделанный прежде оставляет — id удалённого пула 30 дней не взять снова, — но даёт его провайдеру условие `false`, которое никого не пускает;
+  - правка списка — повторный запуск `bootstrap.sh` до мержа, как правка самого скрипта (R13): иначе модуль дал бы секреты principal, которого условие провайдера не пускает;
+  - id пула, `github-eval`, — константа `eval_pool=` скрипта и `local.eval_pool` модуля, а id провайдера — `github` в строке итога скрипта и `local.eval_provider`; их равенство держит `tofu test`, а свой пул под этим id модуль и скрипт отклоняют;
+  - в пуле нет ни одной учётной записи: его principal получает только секреты eval.
+- **Вывод** `eval_access` — полное имя провайдера и секреты по поставщику, то, с чем входят `modules` и `tutor`; скрипт печатает и строку `GCP_EVAL_WORKLOAD_IDENTITY_PROVIDER`. Без eval вывод — `null`.
+- **Тесты:**
+  - `tofu/tests/eval.tftest.hcl` — без репозиториев нет ничего; с репозиториями платформы — два секрета, четыре `secretAccessor` с точными principal и вывод; репозитории без поставщиков — вывод без секретов; отказы формы, двух владельцев, кода поставщика и чужого id пула; id пула и провайдера — те же, что у скрипта;
+  - `tofu/tests/bootstrap.test.mjs` — условие строка в строку, пул `infra` по-прежнему пускает один `infra`, без списка пул eval не делается, а сделанный получает `false`, повтор возвращает условие, комментарий после списка, отказы формы списка, повтора репозитория и двух владельцев.
+
+— *Почему не модуль:* условия IAM пулы не сужают — «Resource attributes are available for the Google Cloud services and resource types that are listed on this page. Other services and resource types do not recognize resource attributes» ([IAM Conditions, resource attributes](https://docs.cloud.google.com/iam/docs/conditions-resource-attributes), обновлено 2026-11-07), а `iam.googleapis.com` в списке нет. Право сделать пул `github-eval` было бы правом поменять условие пула `bootstrap.sh`, через который `infra-config` входит сам. А учётные записи выкладки он уже одалживает кому угодно в пуле (`iam.serviceAccountAdmin`), так что открыл бы production любому репозиторию. R13 этого не даёт: «what the identity signs in through is not its to change». Довод R120 spec за свой пул — отделить job pull request двух репозиториев от учётных записей выкладки — держится и так.
+
+— *Отвергнуто:*
+- пул в модуле, с `roles/iam.workloadIdentityPoolAdmin` у `infra-config` на проекте, как в R120 spec, — см. выше; условие провайдера вернул бы только повторный запуск `bootstrap.sh`;
+- своя роль `bootstrap.sh` только с правами на пулы и провайдеры — права всё равно на весь проект, и риск тот же;
+- права на сам пул (`setIamPolicy` пула): пул всё равно должен сделать кто-то до `apply`, то есть `bootstrap.sh`, а провайдер тогда держали бы двое;
+- секреты и при пустом списке — их некому было бы читать;
+- ID репозиториев — константами в коде: копия self-hosting не убрала бы eval без правки модуля.
+
+— *Следствие:* строка «В реестр spec» В15 — к R120 spec: пул делает `bootstrap.sh`. T23 — `eval_github_subject_prefixes` в `production.auto.tfvars`, значения ключей и лимиты трат; после T23 `modules` и `tutor` получают имя провайдера и секретов. — RUN.md, T22 и таблица 3; `tofu/eval.tf`, `tofu/variables.tf`, `tofu/outputs.tf`, `tofu/bootstrap.sh`, `tofu/tests/eval.tftest.hcl`, `tofu/tests/bootstrap.test.mjs`; [architecture.md](architecture.md), разделы 3, 3.1 и 4.

@@ -302,6 +302,11 @@ variable "workload_identity_pool_id" {
     condition     = can(regex("^[a-z0-9-]{4,32}$", var.workload_identity_pool_id))
     error_message = "workload_identity_pool_id is 4 to 32 lowercase letters, digits and hyphens."
   }
+
+  validation {
+    condition     = var.workload_identity_pool_id != "github-eval"
+    error_message = "workload_identity_pool_id is not github-eval: that is the pool of eval, which bootstrap.sh makes beside this one (R20)."
+  }
 }
 
 variable "github_oidc_subject_prefix" {
@@ -352,5 +357,39 @@ variable "hosting_environment" {
   validation {
     condition     = lower(var.hosting_environment) != "production-config"
     error_message = "hosting_environment is not production-config, in any case of letters: that environment's jobs apply this configuration, and no other identity is lent to them."
+  }
+}
+
+variable "eval_github_subject_prefixes" {
+  description = "The repositories whose jobs of the GitHub environment eval read the platform's keys for eval, each as GitHub begins the subject of its tokens, repo:OWNER@OWNER_ID/NAME@REPOSITORY_ID: for the platform, modules and tutor (R120 spec). bootstrap.sh reads the same list, on one line, for the condition of the pool github-eval it makes, which names one owner: a change of the list is a run of bootstrap.sh again before the merge, as a change of the script is (R13). Empty, there is no eval: no secret, and the pool, if made, admits nobody."
+  type        = list(string)
+  default     = []
+  nullable    = false
+
+  validation {
+    condition     = alltrue([for prefix in var.eval_github_subject_prefixes : can(regex("^repo:[^/@:]+@[0-9]+/[^/@:]+@[0-9]+$", prefix))])
+    error_message = "Each of eval_github_subject_prefixes is repo:OWNER@OWNER_ID/NAME@REPOSITORY_ID."
+  }
+
+  validation {
+    condition     = length(distinct([for prefix in var.eval_github_subject_prefixes : try(regex("^repo:[^/@:]+@([0-9]+)/", prefix)[0], prefix)])) <= 1
+    error_message = "eval_github_subject_prefixes are of one owner: the condition of the pool github-eval names one."
+  }
+
+  validation {
+    condition     = length(distinct(var.eval_github_subject_prefixes)) == length(var.eval_github_subject_prefixes)
+    error_message = "eval_github_subject_prefixes names each repository once."
+  }
+}
+
+variable "eval_providers" {
+  description = "The AI providers eval has a key of, each by its code in spec's admission table (R96 spec): a secret eval-key-<code> each (R120 spec). A new provider of eval is a new code here."
+  type        = list(string)
+  default     = ["anthropic", "openai"]
+  nullable    = false
+
+  validation {
+    condition     = alltrue([for code in var.eval_providers : can(regex("^[a-z][a-z0-9]*$", code))]) && length(distinct(var.eval_providers)) == length(var.eval_providers)
+    error_message = "eval_providers are codes of the admission table, lowercase letters and digits, each once."
   }
 }

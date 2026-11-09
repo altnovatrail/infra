@@ -55,3 +55,29 @@ resource "google_secret_manager_secret" "api_job" {
 
   depends_on = [google_project_service.enabled]
 }
+
+# The platform's keys for eval, one a provider, for the eval jobs of modules and tutor to read
+# (eval.tf; R120 spec; R20). Replicated to the region alone too: a regional secret is read only from
+# its region, and GitHub's runners are elsewhere. A provider the list stops naming is let
+# go rather than deleted: its value stays, for the author to delete.
+resource "google_secret_manager_secret" "eval" {
+  for_each = local.eval_secrets
+
+  secret_id = "eval-key-${each.value}"
+
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+
+  labels = {
+    purpose = "eval-key"
+  }
+
+  deletion_policy = "ABANDON"
+
+  depends_on = [google_project_service.enabled]
+}
