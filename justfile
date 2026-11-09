@@ -7,6 +7,19 @@
 # The Dockerfile whose ARGs ci-tofu and ci-shellcheck read; their tests point it at broken copies.
 dockerfile := env("INFRA_DOCKERFILE", ".devcontainer/Dockerfile")
 
+# One ARG of the Dockerfile, as Docker reads it — quotes, a carriage return and trailing blanks are
+# not part of it — and only if it is one exact version: what ci-tofu, ci-shellcheck and ci-actionlint
+# hold their tool to.
+_arg name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    value=$(sed -n 's/^ARG {{ name }}=//p' {{ quote(dockerfile) }} | tr -d '"\r' | sed 's/[[:space:]]*$//')
+    if ! [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "{{ dockerfile }} names no single exact ARG {{ name }}" >&2
+        exit 1
+    fi
+    echo "$value"
+
 # The OpenTofu on PATH is the one the toolchain stage installs, at the version its ARG names (R09).
 # In the devcontainer it stops a container not rebuilt since the ARG was raised. In CI, where the
 # stage is built from the same Dockerfile, it says that the stage installed tofu and that tofu runs;
@@ -15,11 +28,7 @@ ci-tofu:
     #!/usr/bin/env bash
     set -euo pipefail
     # The value as Docker reads it: quotes, a carriage return and trailing blanks are not part of it.
-    want=$(sed -n 's/^ARG OPENTOFU_VERSION=//p' {{quote(dockerfile)}} | tr -d '"\r' | sed 's/[[:space:]]*$//')
-    if ! [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "ci-tofu: {{dockerfile}} names no single exact ARG OPENTOFU_VERSION" >&2
-        exit 1
-    fi
+    want=$({{ quote(just_executable()) }} -f {{ quote(justfile()) }} _arg OPENTOFU_VERSION)
     if ! command -v tofu >/dev/null; then
         echo "ci-tofu: no tofu on PATH: the toolchain stage installs it, at ${want}" >&2
         exit 1
@@ -84,17 +93,13 @@ ci-tofu-test:
     env PATH="$work/bin:$PATH" "$just" ci-tofu >"$work/out" 2>&1 || { echo "ci-tofu-test: ci-tofu refused tofu ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-tofu-test: ok"
 
-# ShellCheck over the repository's scripts, tofu/bootstrap.sh and tools/deploy/*.sh, by the
+# ShellCheck over the repository's scripts — tofu/bootstrap.sh, tools/deploy/*.sh and tools/ci/*.sh — by the
 # ShellCheck the toolchain stage installs, at the version its ARG names (the 2026-11-09 amendment to
 # R09).
 ci-shellcheck:
     #!/usr/bin/env bash
     set -euo pipefail
-    want=$(sed -n 's/^ARG SHELLCHECK_VERSION=//p' {{quote(dockerfile)}} | tr -d '"\r' | sed 's/[[:space:]]*$//')
-    if ! [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "ci-shellcheck: {{dockerfile}} names no single exact ARG SHELLCHECK_VERSION" >&2
-        exit 1
-    fi
+    want=$({{ quote(just_executable()) }} -f {{ quote(justfile()) }} _arg SHELLCHECK_VERSION)
     if ! command -v shellcheck >/dev/null; then
         echo "ci-shellcheck: no shellcheck on PATH: the toolchain stage installs it, at ${want}" >&2
         exit 1
@@ -104,8 +109,8 @@ ci-shellcheck:
         echo "ci-shellcheck: shellcheck is ${got:-of no version}, and {{dockerfile}} names ${want}" >&2
         exit 1
     fi
-    shellcheck {{ quote(tofu_dir) }}/bootstrap.sh tools/deploy/*.sh
-    echo "ci-shellcheck: ShellCheck ${got}, {{ tofu_dir }}/bootstrap.sh and tools/deploy/*.sh clean"
+    shellcheck {{ quote(tofu_dir) }}/bootstrap.sh tools/deploy/*.sh tools/ci/*.sh
+    echo "ci-shellcheck: ShellCheck ${got}, {{ tofu_dir }}/bootstrap.sh, tools/deploy/*.sh and tools/ci/*.sh clean"
 
 # ci-shellcheck's own test, with no real shellcheck: a stand-in ahead on PATH, of another version,
 # of none and of the right one, which finds a script clean or not as it is told.
@@ -144,6 +149,69 @@ ci-shellcheck-test:
     stub "version: ${want}"
     env PATH="$work/bin:$PATH" "$just" ci-shellcheck >"$work/out" 2>&1 || { echo "ci-shellcheck-test: ci-shellcheck refused shellcheck ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-shellcheck-test: ok"
+
+# actionlint over the workflows, .github/workflows, by the actionlint the toolchain stage installs, at
+# the version its ARG names, with the stage's ShellCheck for their scripts (the second 2026-11-09
+# amendment to R09). The deployment's workflow runs only after a merge, so this is where its mistakes
+# show before one (R18).
+ci-actionlint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    want=$({{ quote(just_executable()) }} -f {{ quote(justfile()) }} _arg ACTIONLINT_VERSION)
+    if ! command -v actionlint >/dev/null; then
+        echo "ci-actionlint: no actionlint on PATH: the toolchain stage installs it, at ${want}" >&2
+        exit 1
+    fi
+    got=$(actionlint -version | head -n 1)
+    if [ "$got" != "$want" ]; then
+        echo "ci-actionlint: actionlint is ${got:-of no version}, and {{dockerfile}} names ${want}" >&2
+        exit 1
+    fi
+    # Without ShellCheck actionlint would skip the workflows' scripts and still say clean.
+    if ! shellcheck="$(command -v shellcheck)"; then
+        echo "ci-actionlint: no shellcheck on PATH: the toolchain stage installs it, and actionlint checks the workflows' scripts with it" >&2
+        exit 1
+    fi
+    actionlint -shellcheck="$shellcheck"
+    echo "ci-actionlint: actionlint ${got}, .github/workflows clean"
+
+# ci-actionlint's own test, with no real actionlint: a stand-in ahead on PATH, of another version,
+# of none and of the right one, which finds the workflows clean or not as it is told.
+ci-actionlint-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work=$(mktemp -d)
+    trap 'rm -rf "$work"' EXIT
+    mkdir "$work/bin"
+    want=$(sed -n 's/^ARG ACTIONLINT_VERSION=//p' {{quote(dockerfile)}})
+    just={{quote(just_executable())}}
+    stub() {
+    cat > "$work/bin/actionlint" <<STUB
+    #!/bin/sh
+    if [ "\$1" = -version ]; then printf '%s\n' '$1' 'installed by downloading from release page'; exit 0; fi
+    echo ".github/workflows/deploy.yml:1:1: unexpected key [syntax-check]"
+    exit ${2:-0}
+    STUB
+        chmod +x "$work/bin/actionlint"
+    }
+    refuses() {
+        local reason="$1"; shift
+        if "$@" >"$work/out" 2>&1; then
+            echo "ci-actionlint-test: ci-actionlint passed where it must refuse: ${reason}" >&2; exit 1
+        fi
+        grep -qF "$reason" "$work/out" || { echo "ci-actionlint-test: the refusal does not say \"${reason}\":" >&2; cat "$work/out" >&2; exit 1; }
+    }
+    stub '0.0.1'
+    refuses "actionlint is 0.0.1" env PATH="$work/bin:$PATH" "$just" ci-actionlint
+    stub ''
+    refuses "actionlint is of no version" env PATH="$work/bin:$PATH" "$just" ci-actionlint
+    stub "${want}" 1
+    refuses "syntax-check" env PATH="$work/bin:$PATH" "$just" ci-actionlint
+    sed 's/^ARG ACTIONLINT_VERSION=.*/ARG ACTIONLINT_VERSION=latest/' {{quote(dockerfile)}} > "$work/latest"
+    refuses "names no single exact ARG" env INFRA_DOCKERFILE="$work/latest" PATH="$work/bin:$PATH" "$just" ci-actionlint
+    stub "${want}"
+    env PATH="$work/bin:$PATH" "$just" ci-actionlint >"$work/out" 2>&1 || { echo "ci-actionlint-test: ci-actionlint refused actionlint ${want}:" >&2; cat "$work/out" >&2; exit 1; }
+    echo "ci-actionlint-test: ok"
 
 # The root module in tofu/, by the OpenTofu of the toolchain stage (R10).
 tofu_dir := "tofu"
@@ -312,3 +380,62 @@ deploy-app-check outputs: _tools
 # stand-in for the site: no cloud, no network.
 deploy-app-test: _tools
     node --test tools/deploy/test/app.test.mjs
+
+# The workflow of the deployment, .github/workflows/deploy.yml, runs these (R18); each also runs
+# by hand, where the repository is checked out with its origin.
+# What a run delivers, as key=value lines for $GITHUB_OUTPUT: given --by-hand=<parts>, the parts a
+# run started by hand names
+ci-deploy-target commit flag="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -n {{ quote(flag) }} ]; then
+        node tools/deploy/target.mjs target {{ quote(commit) }} {{ quote(flag) }}
+    else
+        node tools/deploy/target.mjs target {{ quote(commit) }}
+    fi
+
+# Whether main still stands on the commit, before a job run again deploys it
+ci-deploy-current commit:
+    node tools/deploy/target.mjs current {{ quote(commit) }}
+
+# The provider of the federated pool and the configuration's identity, from tofu/ci.env
+ci-deploy-identity:
+    node tools/deploy/target.mjs identity
+
+# The configuration applied, by the lock file and the backend of the deployment, with the billing
+# account and the operator's address kept out of what it prints: the budget's name holds the first,
+# and a refresh prints it (canvas-api).
+ci-tf-apply:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    redact() {
+        local line
+        while IFS= read -r line || [ -n "$line" ]; do
+            if [ -n "${TF_VAR_billing_account:-}" ]; then line="${line//"$TF_VAR_billing_account"/<billing account>}"; fi
+            if [ -n "${TF_VAR_operator_email:-}" ]; then line="${line//"$TF_VAR_operator_email"/<operator email>}"; fi
+            printf '%s\n' "$line"
+        done
+    }
+    tofu -chdir={{ quote(tofu_dir) }} init -backend-config=backend.hcl -input=false -lockfile=readonly -no-color 2>&1 | redact
+    tofu -chdir={{ quote(tofu_dir) }} apply -auto-approve -input=false -no-color -lock-timeout=5m 2>&1 | redact
+
+# The configuration's outputs into a file, as `tofu output -json` prints them, for the recipes of the
+# deployment, and the two identities the later jobs sign in as, for $GITHUB_OUTPUT
+ci-tf-outputs out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    out={{ quote(out) }}
+    tofu -chdir={{ quote(tofu_dir) }} output -json > "$out"
+    deploy="$(jq -er '.deploy_service_account.value' "$out")"
+    hosting="$(jq -er '.hosting_service_account.value' "$out")"
+    echo "deploy_service_account=${deploy}"
+    echo "hosting_service_account=${hosting}"
+
+# tools/deploy/target.mjs against repositories made here and a stand-in for GitHub's API, and the
+# workflow's own shape: no network.
+deploy-target-test:
+    node --test tools/deploy/test/target.test.mjs
+
+# tools/ci/install.sh against stand-ins for curl and docker: no network.
+tools-install-test:
+    node --test tools/ci/test/install.test.mjs

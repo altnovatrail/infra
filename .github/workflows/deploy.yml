@@ -1,0 +1,262 @@
+# The deployment after a merge to main, by the list (R05, R18): only while main still stands on the
+# commit, the cloud's configuration on every run, then only the parts of the list that changed.
+#
+#   target   decides, with no access to anything: whether main still stands on the commit, whether
+#            the project is set up (tofu/ci.env, T23), and which parts changed against the last run
+#            that delivered (tools/deploy/target.mjs);
+#   config   applies the configuration as infra-config, in the environment production-config, and
+#            hands its outputs on;
+#   api      api's image, release or facts as api-deploy, in production (R15);
+#   app      app's build as hosting-publish, in production-hosting, once api is through (R17).
+#
+# Each job signs in to Google through the federated pool, as the identity its environment alone may
+# borrow (R11, R12, R13); none of the environments asks for an approval, the review of the pull
+# request is the approval (R05). "Re-run failed jobs" keeps what the jobs before decided, so on a
+# later attempt each job asks first whether main still stands on the commit (R45 canvas-api). A
+# deployment that did not go through is run again so, or mended forward; a run started by hand
+# delivers the configuration and the parts it names.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/**"
+      - "tofu/**"
+      - "!tofu/tests/**"
+      - "tools/ci/**"
+      - "tools/deploy/**"
+      - "tools/deploy-check/**"
+      - "tools/package.json"
+      - "tools/package-lock.json"
+      - "justfile"
+      - ".devcontainer/Dockerfile"
+      - "spec"
+      - ".github/workflows/deploy.yml"
+      - ".github/actions/tools/**"
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "api's image of the list's release, pushed, before api's jobs exist (R11)"
+        type: boolean
+        default: false
+      api:
+        description: "api's release by the list: image, jobs, revision and traffic"
+        type: boolean
+        default: false
+      facts:
+        description: "a new version of the deployment facts for api's revision"
+        type: boolean
+        default: false
+      app:
+        description: "app's build by the list on Hosting"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One deployment at a time, and none stopped halfway; a newer one waiting takes the place of an
+# older one waiting, which loses nothing: the parts are counted from the last run that delivered.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  target:
+    name: Target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      deliver: ${{ steps.target.outputs.deliver }}
+      commit: ${{ steps.target.outputs.commit }}
+      image: ${{ steps.target.outputs.image }}
+      api: ${{ steps.target.outputs.api }}
+      facts: ${{ steps.target.outputs.facts }}
+      app: ${{ steps.target.outputs.app }}
+    steps:
+      # The whole history, so that the list of the last run that delivered is there to compare.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/tools
+        with:
+          tools: node just
+
+      # A run started by hand names its parts by its inputs, which target.mjs reads itself.
+      - name: What this run delivers
+        id: target
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          INPUT_IMAGE: ${{ inputs.image }}
+          INPUT_API: ${{ inputs.api }}
+          INPUT_FACTS: ${{ inputs.facts }}
+          INPUT_APP: ${{ inputs.app }}
+        run: just ci-deploy-target "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Nothing to deliver
+        if: steps.target.outputs.deliver != 'true'
+        run: echo "::notice::This run delivers nothing; the step above says why."
+
+  config:
+    name: Configuration
+    needs: target
+    if: needs.target.outputs.deliver == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production-config
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      deploy_service_account: ${{ steps.outputs.outputs.deploy_service_account }}
+      hosting_service_account: ${{ steps.outputs.outputs.hosting_service_account }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.target.outputs.commit }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/tools
+        with:
+          tools: node just tofu jq
+
+      - name: Whether main still stands on the commit
+        if: github.run_attempt != '1'
+        env:
+          COMMIT: ${{ needs.target.outputs.commit }}
+        run: just ci-deploy-current "$COMMIT"
+
+      - name: The identity
+        id: identity
+        run: just ci-deploy-identity >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ steps.identity.outputs.provider }}
+          service_account: ${{ steps.identity.outputs.config_service_account }}
+
+      - name: Apply
+        env:
+          TF_VAR_billing_account: ${{ secrets.TF_VAR_billing_account }}
+          TF_VAR_operator_email: ${{ secrets.TF_VAR_operator_email }}
+        run: just ci-tf-apply
+
+      - name: Outputs
+        id: outputs
+        run: just ci-tf-outputs "$RUNNER_TEMP/outputs.json" >> "$GITHUB_OUTPUT"
+
+      # What the later jobs deploy on, as `tofu output -json` prints it; a job run again takes the
+      # same file, and one applied again replaces it. Kept as long as GitHub lets a run be run again.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ runner.temp }}/outputs.json
+          archive: false
+          overwrite: true
+          retention-days: 30
+
+  api:
+    name: api
+    needs: [target, config]
+    if: needs.target.outputs.image == 'true' || needs.target.outputs.api == 'true' || needs.target.outputs.facts == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.target.outputs.commit }}
+          submodules: true
+          persist-credentials: false
+
+      - uses: ./.github/actions/tools
+        with:
+          tools: node just gcloud jq buildx docker
+
+      - name: Whether main still stands on the commit
+        if: github.run_attempt != '1'
+        env:
+          COMMIT: ${{ needs.target.outputs.commit }}
+        run: just ci-deploy-current "$COMMIT"
+
+      - name: The identity
+        id: identity
+        run: just ci-deploy-identity >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ steps.identity.outputs.provider }}
+          service_account: ${{ needs.config.outputs.deploy_service_account }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: outputs.json
+          path: ${{ runner.temp }}
+
+      # A release builds its own image, so the image alone goes only where no release does.
+      - name: Deploy
+        env:
+          IMAGE: ${{ needs.target.outputs.image }}
+          API: ${{ needs.target.outputs.api }}
+          FACTS: ${{ needs.target.outputs.facts }}
+        run: |
+          if [ "$API" = true ]; then
+            just deploy-api "$RUNNER_TEMP/outputs.json"
+          else
+            if [ "$IMAGE" = true ]; then just deploy-api-image "$RUNNER_TEMP/outputs.json"; fi
+            if [ "$FACTS" = true ]; then just deploy-api-facts "$RUNNER_TEMP/outputs.json"; fi
+          fi
+
+  app:
+    name: app
+    needs: [target, config, api]
+    if: >-
+      !cancelled() && needs.config.result == 'success' && needs.target.outputs.app == 'true' &&
+      (needs.api.result == 'success' || needs.api.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production-hosting
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.target.outputs.commit }}
+          submodules: true
+          persist-credentials: false
+
+      - uses: ./.github/actions/tools
+        with:
+          tools: node just gcloud
+
+      - name: Whether main still stands on the commit
+        if: github.run_attempt != '1'
+        env:
+          COMMIT: ${{ needs.target.outputs.commit }}
+        run: just ci-deploy-current "$COMMIT"
+
+      - name: The identity
+        id: identity
+        run: just ci-deploy-identity >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ steps.identity.outputs.provider }}
+          service_account: ${{ needs.config.outputs.hosting_service_account }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: outputs.json
+          path: ${{ runner.temp }}
+
+      - name: Deploy
+        run: just deploy-app "$RUNNER_TEMP/outputs.json"

@@ -8,3 +8,6 @@ crash.log
 
 # The packages npm ci installs from tools/package-lock.json, for the checks of the deployment's list.
 tools/node_modules/
+
+# The credentials file google-github-actions/auth writes into the checkout in the deployment's jobs.
+gha-creds-*.json

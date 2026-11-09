@@ -1,0 +1,23 @@
+# The tools a job of the deployment runs, each at its exact version and of its sha256, put on the
+# job's PATH by tools/ci/install.sh (R18): what it installs and from where is written there and in
+# tools/ci/versions.env, and nowhere here. Needs the repository checked out.
+name: Deployment tools
+description: Installs the deployment's tools at the versions and sums the repository names.
+
+inputs:
+  tools:
+    description: "The tools, apart by spaces: tofu, just, node, gcloud, jq, buildx, docker (the last checks the runner's engine)."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Tools
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+        CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
+      # The list goes to the script as words of the environment, never as text of this script.
+      run: |
+        read -r -a tools <<< "$TOOLS"
+        "$GITHUB_WORKSPACE/tools/ci/install.sh" "$RUNNER_TEMP/deployment-tools" "${tools[@]}"
