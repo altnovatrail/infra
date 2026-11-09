@@ -60,7 +60,7 @@ function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, 
   fs.writeFileSync(path.join(build, "index.html"), "<!doctype html>");
   if (schema) fs.writeFileSync(path.join(build, "deployment.schema.json"), JSON.stringify(schema));
   const archivePath = path.join(dir, "app_v0.3.0.tar.gz");
-  assert.equal(spawnSync("tar", ["-czf", archivePath, "-C", build, "."]).status, 0);
+  assert.equal(spawnSync("/usr/bin/tar", ["-czf", archivePath, "-C", build, "."]).status, 0);
   const archive = put("app", "v0.3.0", "app_v0.3.0.tar.gz", fs.readFileSync(archivePath));
 
   const deploymentText = JSON.stringify({ format: 1, api: "https://api-example.a.run.app" }, null, 2) + "\n";
@@ -74,7 +74,7 @@ function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, 
     admission: { rung: "full" },
   });
 
-  const g = (...args) => assert.equal(spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" }).status, 0, args.join(" "));
+  const g = (...args) => assert.equal(spawnSync("/usr/bin/git", ["-C", repo, ...args], { encoding: "utf8" }).status, 0, args.join(" "));
   g("init", "-q", "-b", "main");
   g("config", "user.email", "test@example.com");
   g("config", "user.name", "test");
@@ -103,7 +103,7 @@ function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, 
     // What run() found: a pass, with its lines, or a failure, with every refusal as one text.
     async check({ base = "main", refuse = "//" } = {}) {
       try {
-        const { lines, refusals } = await run(deploy, base, { releases, verifier: ["sh", verify, refuse] });
+        const { lines, refusals } = await run(deploy, base, { releases, verifier: ["/bin/sh", verify, refuse] });
         return { ok: refusals.length === 0, stdout: lines.join("\n"), stderr: refusals.join("\n"), output: [...lines, ...refusals].join("\n") };
       } catch (error) {
         if (!(error instanceof Refusal)) throw error;

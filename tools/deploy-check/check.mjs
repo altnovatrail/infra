@@ -37,6 +37,18 @@ const ORGANIZATION = "altnovatrail";
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
+// The programs the checks run, by absolute path, as spec's tools run theirs (spec/tools/shared.mjs):
+// no directory on PATH decides which program runs. just is the toolchain stage's, in /usr/local/bin;
+// git the devcontainers base image's, or else the system's; tar the system's.
+const JUST = first(["/usr/local/bin/just"]);
+const GIT = first(["/usr/local/bin/git", "/usr/bin/git", "/bin/git"]);
+const TAR = first(["/usr/bin/tar", "/bin/tar"]);
+
+// The first of the paths that exists, or the first of them, which then fails by its own name.
+function first(paths) {
+  return paths.find((program) => fs.existsSync(program)) ?? paths[0];
+}
+
 export class Refusal extends Error {}
 
 function readJson(file, what) {
@@ -104,7 +116,7 @@ async function fetchRelease(repository, tag, name, work, releases) {
 
 // spec's release-verify, as RULES.md has a repository run it, or, for the tests, a command that
 // stands in for it with the same arguments.
-export function verify(repository, tag, file, command = ["just", "-f", path.join(SPEC, "justfile"), "release-verify"]) {
+export function verify(repository, tag, file, command = [JUST, "-f", path.join(SPEC, "justfile"), "release-verify"]) {
   const run = spawnSync(command[0], [...command.slice(1), repository, tag, file], { encoding: "utf8" });
   if (run.error) throw new Refusal(`${command[0]} cannot be run: ${run.error.message}`);
   if (run.status !== 0) throw new Refusal(`release-verify refused ${path.basename(file)} of ${repository} ${tag}: ${(run.stderr || run.stdout).trim()}`);
@@ -120,7 +132,7 @@ export async function releaseFile(repository, tag, name, want, work, { releases,
 }
 
 function git(cwd, args) {
-  return spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+  return spawnSync(GIT, ["-C", cwd, ...args], { encoding: "utf8" });
 }
 
 // The list at the base, or null when the base has none.
@@ -145,7 +157,7 @@ function baseList(base, deployDir) {
 function deploymentHoldsToItsBuild(archive, archiveName, deploymentFile, work) {
   const unpacked = path.join(work, "app-build");
   fs.mkdirSync(unpacked);
-  const tar = spawnSync("tar", ["-xzf", archive, "-C", unpacked, "--no-same-owner", "--no-same-permissions"], { encoding: "utf8" });
+  const tar = spawnSync(TAR, ["-xzf", archive, "-C", unpacked, "--no-same-owner", "--no-same-permissions"], { encoding: "utf8" });
   if (tar.status !== 0) throw new Refusal(`${archiveName} cannot be unpacked: ${tar.stderr.trim()}`);
   const schemaFile = path.join(unpacked, "deployment.schema.json");
   if (!fs.existsSync(schemaFile)) throw new Refusal(`${archiveName} holds no deployment.schema.json at its root`);
