@@ -74,7 +74,7 @@ run "the_publisher_holds_hosting_alone" {
   }
 
   assert {
-    condition     = toset([for m in google_project_iam_member.hosting : m.role]) == toset(["projects/novatrail-test-0/roles/hostingPublisher", "roles/serviceusage.apiKeysViewer"])
+    condition     = toset([for g in google_project_iam_member.grants : g.role if g.member == "serviceAccount:hosting-publish@novatrail-test-0.iam.gserviceaccount.com"]) == toset(["projects/novatrail-test-0/roles/hostingPublisher", "roles/serviceusage.apiKeysViewer"])
     error_message = "On the project the publisher holds bootstrap.sh's role hostingPublisher and the reading of API keys, and no other role."
   }
 

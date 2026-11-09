@@ -1,8 +1,8 @@
 # The APIs this project is allowed to use (R10). Service Usage and Resource Manager are not in the
 # list: they are what enables the rest. bootstrap.sh turns them on before this configuration can be
 # applied at all, and with them whatever it needs for what it creates itself — the state bucket,
-# the federated pool CI signs in through and the custom roles, whose permissions are of Cloud Run
-# and Firebase (R13); those that the configuration stands on too are named here as well, because
+# the federated pool CI signs in through and the custom roles, whose permissions are of Cloud Run,
+# Firebase and sign-in (R13); those that the configuration stands on too are named here as well, because
 # this is the list of what it stands on.
 #
 # Cloud Trace is not here, on purpose: with its API off, no trace is written, and the platform's
@@ -26,6 +26,9 @@ locals {
     # Firebase in the project, and the Hosting site the app's build is served from (R06).
     "firebase.googleapis.com",
     "firebasehosting.googleapis.com",
+    # Sign-in: Identity Platform, which Firebase Authentication runs on, and whose settings the
+    # configuration holds (R16).
+    "identitytoolkit.googleapis.com",
     # The spend alert, and the alerts on Cloud Run's built-in metrics (R06, R07).
     "billingbudgets.googleapis.com",
     "monitoring.googleapis.com",

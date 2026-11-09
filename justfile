@@ -155,7 +155,7 @@ tf-fmt:
 # What CI runs on the module: its format, an init with no backend that installs the providers by
 # the lock file and refuses one the lock file does not name, a validate, and the tests, which run
 # against mock providers and need no credential.
-tf-check: _tf-sinks _tf-roles
+tf-check: _tf-sinks _tf-grants _tf-roles
     tofu -chdir={{ tofu_dir }} fmt -check -recursive -diff
     tofu -chdir={{ tofu_dir }} init -backend=false -input=false -lockfile=readonly
     tofu -chdir={{ tofu_dir }} validate
@@ -170,6 +170,20 @@ _tf-sinks:
     stray=$(grep -rnE '^[[:space:]]*resource[[:space:]]+"google_(logging_(project|folder|organization|billing_account)_sink|logging_project_exclusion)"' {{ quote(tofu_dir) }} --include='*.tf' | grep -vE ':[[:space:]]*resource[[:space:]]+"google_logging_project_sink"[[:space:]]+"sinks"[[:space:]]*\{' || true)
     if [ -n "$stray" ]; then
         echo "tf-check: a log sink or exclusion outside google_logging_project_sink.sinks in tofu/logging.tf (R07):" >&2
+        echo "$stray" >&2
+        exit 1
+    fi
+
+# Every grant on the project is in the one list of tofu/identities.tf, google_project_iam_member.grants,
+# so that the test holds each against the roles bootstrap.sh's condition lets the configuration's
+# identity grant there (R13): a grant declared anywhere else would pass it by and be refused at the
+# apply, after the merge.
+_tf-grants:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    stray=$(grep -rnE '^[[:space:]]*resource[[:space:]]+"google_project_iam_(member|binding|policy)"' {{ quote(tofu_dir) }} --include='*.tf' | grep -vE ':[[:space:]]*resource[[:space:]]+"google_project_iam_member"[[:space:]]+"grants"[[:space:]]*\{' || true)
+    if [ -n "$stray" ]; then
+        echo "tf-check: a grant on the project outside google_project_iam_member.grants in tofu/identities.tf (R13):" >&2
         echo "$stray" >&2
         exit 1
     fi

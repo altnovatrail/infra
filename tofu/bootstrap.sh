@@ -2,7 +2,7 @@
 # Makes, once and with the operator's own rights, what the configuration in this directory cannot
 # make for itself (R13): the project and its link to the billing account, the bucket the state
 # lives in, the federated pool that CI signs in through and its provider, the identity the
-# configuration is applied as and what that identity may do, and the two custom roles the
+# configuration is applied as and what that identity may do, and the three custom roles the
 # configuration grants. Everything else is the configuration's, and CI applies it.
 #
 # Safe to run again: every step looks before it makes, and what is written here is brought back
@@ -147,8 +147,8 @@ service_account="infra-config@${project}.iam.gserviceaccount.com"
 # -- the custom roles the configuration grants ----------------------------------
 #
 # They are made here, not by the configuration: the configuration's identity may grant
-# hostingPublisher on the project, and IAM's limit on that grant holds only if the identity cannot
-# change the role it grants ("Don't include ... Custom roles that the limited IAM admin can
+# hostingPublisher and signInUsers on the project, and IAM's limit on that grant holds only if the
+# identity cannot change the role it grants ("Don't include ... Custom roles that the limited IAM admin can
 # modify", IAM, Set limits on granting roles). So that identity holds no right to change any role,
 # and a change to a role's permissions is a change here, run again before the merge (R13).
 
@@ -185,6 +185,18 @@ publisher_permissions=(
     resourcemanager.projects.list
 )
 
+# api's own identity, granted on the project, since sign-in takes no grant on anything smaller: it
+# reads a user — the check of a token for revocation and the list the operator's job goes through —,
+# revokes a user's tokens and deletes the user, and nothing else (R16). Firebase Authentication
+# Admin would hand api firebaseauth.configs.update too, and with it the settings of sign-in that
+# the configuration holds.
+sign_in_role=signInUsers
+sign_in_permissions=(
+    firebaseauth.users.get
+    firebaseauth.users.update
+    firebaseauth.users.delete
+)
+
 # -- what the configuration's identity may do -------------------------------------
 #
 # Enumerated rather than Owner: enough to make everything the configuration describes, and nothing
@@ -201,7 +213,7 @@ project_roles=(
     "roles/iam.serviceAccountUser google_cloud_run_v2_service google_cloud_run_v2_job google_cloud_scheduler_job"
     "roles/secretmanager.admin google_secret_manager_secret google_secret_manager_secret_iam_member"
     "roles/cloudscheduler.admin google_cloud_scheduler_job"
-    "roles/firebase.admin google_firebase_project google_firebase_hosting_site"
+    "roles/firebase.admin google_firebase_project google_firebase_hosting_site google_identity_platform_config"
     "roles/monitoring.notificationChannelEditor google_monitoring_notification_channel"
     "roles/monitoring.alertPolicyEditor google_monitoring_alert_policy"
     "roles/logging.configWriter google_logging_project_bucket_config google_logging_project_sink"
@@ -213,13 +225,13 @@ billing_roles=(
     "roles/billing.costsManager google_billing_budget"
 )
 
-# Who holds what in the project may be changed for two roles alone, the ones the publisher holds:
-# without the condition this role would make the identity the project's owner in all but name.
+# Who holds what in the project may be changed for three roles alone, the publisher's two and api's
+# role of sign-in: without the condition this role would make the identity the project's owner in all but name.
 admin_roles=(
     "roles/resourcemanager.projectIamAdmin google_project_iam_member"
 )
 admin_role="${admin_roles[0]%% *}"
-expression="api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/${publisher_role}', 'roles/serviceusage.apiKeysViewer'])"
+expression="api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/${publisher_role}', 'roles/serviceusage.apiKeysViewer', 'projects/${project}/roles/${sign_in_role}'])"
 
 # -- the steps ------------------------------------------------------------------
 
@@ -332,7 +344,7 @@ fi
 # Without the first six nothing below can be made, and they are why this script exists rather than
 # one more file of the configuration. Observability is here because its settings refuse requests
 # for a while after the API is enabled, so it goes on long before the apply that says where the
-# traces are kept (canvas-api). The last three are the services the custom roles name permissions
+# traces are kept (canvas-api). The last four are the services the custom roles name permissions
 # of: a permission "might not be available for use in custom roles if you have not enabled the API
 # for the service" (IAM, Create and manage custom roles).
 echo "==> the APIs this script and the first apply need"
@@ -347,6 +359,7 @@ retry gcloud services enable \
     run.googleapis.com \
     firebase.googleapis.com \
     firebasehosting.googleapis.com \
+    identitytoolkit.googleapis.com \
     --project="$project"
 
 echo "==> custom roles"
@@ -356,6 +369,9 @@ custom_role "$deployer_role" "Deploys api" \
 custom_role "$publisher_role" "Publishes app's build" \
     "Reads the project and its Hosting sites and releases new versions of them. It makes and deletes no site." \
     "${publisher_permissions[@]}"
+custom_role "$sign_in_role" "Manages api's users of sign-in" \
+    "Reads users of sign-in, revokes their tokens and deletes them. It changes no setting of sign-in." \
+    "${sign_in_permissions[@]}"
 
 echo "==> state bucket gs://${bucket}"
 ensure bucket_exists make_bucket
@@ -475,8 +491,8 @@ done
 # commas in it would split it on the command line.
 cat > "$work/condition" << CONDITION
 expression: ${expression}
-title: The publisher's roles alone
-description: Grants and revokes on the project only the roles the publisher of app's build holds.
+title: The publisher's roles and api's of sign-in alone
+description: Grants and revokes on the project only the roles the publisher of app's build and api's sign-in hold.
 CONDITION
 held="$(held_by "$member" "$policy" | awk -F '\t' -v role="$admin_role" 'index($1, role) == 1 { print "held under: " $2 }')"
 if [[ "$held" != "held under: ${expression}" ]]; then
@@ -488,7 +504,7 @@ if [[ "$held" != "held under: ${expression}" ]]; then
     retry gcloud projects add-iam-policy-binding "$project" \
         --member="$member" --role="$admin_role" --condition-from-file="$work/condition" --quiet
 fi
-echo "    ${admin_role}, for the publisher's two roles alone"
+echo "    ${admin_role}, for the publisher's two roles and api's of sign-in alone"
 
 # The identity may act as any service account of the project: it makes them, and the right to say
 # who may act as them is the right to act as them, for each of them. So none of the project's own

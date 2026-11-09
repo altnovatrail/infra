@@ -96,6 +96,12 @@ resource "google_cloud_run_v2_service" "api" {
         value = "${local.admission_dir}/${local.admission_file}"
       }
 
+      # The Firebase project whose ID tokens api accepts: the platform's own (R16).
+      env {
+        name  = "API_FIREBASE_PROJECT_ID"
+        value = var.project_id
+      }
+
       # The runtime is told nine tenths of the memory as the heap its collector keeps under.
       env {
         name  = "GOMEMLIMIT"
@@ -186,6 +192,13 @@ resource "google_cloud_run_v2_job" "api" {
             cpu    = var.api_cpu
             memory = var.api_memory
           }
+        }
+
+        # The same Firebase project as the service's, for a job that goes through api's users of
+        # sign-in (R16).
+        env {
+          name  = "API_FIREBASE_PROJECT_ID"
+          value = var.project_id
         }
 
         dynamic "env" {
