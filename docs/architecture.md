@@ -1,6 +1,6 @@
 # infra — архитектура
 
-> Статус: детализация, эпик E1, закончена 2026-11-08 — разделы 2 и 3; кода ещё нет. Каркас — из заготовки `spec`, 2026-10-19.
+> Статус: детализация, эпик E1, закончена 2026-11-08 — разделы 2 и 3; кода ещё нет, его пишет эпик E2 «Первый код» ([RUN.md](../RUN.md)). Каркас — из заготовки `spec`, 2026-10-19.
 >
 > Что делает компонент, чего не делает и что о нём ещё предстоит решить. Это подробности его карточки — architecture 3.11 spec. Карточка остаётся сводкой: если подробности меняют то, что в ней сказано, она правится в `spec` тем же путём, что и вопросы в его реестры (RULES.md, Across repositories).
 >
@@ -9,16 +9,16 @@
 ## 1. Назначение и границы
 
 **Делает:**
-- описывает кодом общую основу платформы: проекты в облаке, Workload Identity Federation для CI, Artifact Registry, домены, Secret Manager и бюджеты (architecture 3.11 spec). Основа — технологическая база MathTrail Canvas: Cloud Run и управляемые сервисы с масштабированием до нуля, Terraform (R11 spec). Образец — `infra/` canvas-api: `bootstrap.sh` и один корневой модуль Terraform. Будет ли это Terraform или его открытый форк OpenTofu, решит первый код `infra` (architecture 3.11 spec; Т-29);
+- описывает кодом общую основу платформы: проекты в облаке, Workload Identity Federation для CI, Artifact Registry, домены, Secret Manager и бюджеты (architecture 3.11 spec). Основа — технологическая база MathTrail Canvas: Cloud Run и управляемые сервисы с масштабированием до нуля, Terraform (R11 spec), а инструмент — его открытый форк OpenTofu, по точной версии (поправка 2026-11-08 к R11 spec; Т-29 закрыт; раздел 3.6). Образец — `infra/` canvas-api: `bootstrap.sh` и один корневой модуль на HCL (architecture 3.11 spec);
 - настраивает журналы и трассы платформы — Cloud Logging и Trace (architecture 3.12 spec):
   - журналы запросов Cloud Run исключаются в Cloud Logging. Cloud Run пишет их сам, и в их поле `httpRequest` есть IP-адрес клиента, а COPPA относит IP-адрес к персональной информации (architecture 1 spec; privacy 4 spec). Исключаются все, фильтром в каждом sink, а трасс у первого среза нет (R07; раздел 3.4);
   - регион журналов — `us-east4`, а бакет `_Required` — в `global`, пока нет организации Google Cloud (R04; R109 spec);
-- выбирает и настраивает хостинг сборки `app` — Firebase Hosting, а своего домена у первого развёртывания нет (R06; раздел 3.3), а к этапу 4 — домен виджетов, отдельный регистрируемый (R16 spec), и хостинг виджетов (architecture 3.12 spec; Т-17). Платформе годится только хостинг, который шлёт свои заголовки ответа — CSP по `csp.json` сборки и кеш, — и отдаёт `/deployment.json` вне архива сборки (Т-17; architecture 3.12 spec). На хостинг сборки `app` потом переезжает и страница образцов `canvas` (R25 spec);
+- выбирает и настраивает хостинг сборки `app` — Firebase Hosting, а своего домена у первого развёртывания нет (R06; раздел 3.3), а к этапу 4 — домен виджетов, отдельный регистрируемый (R16 spec), и хостинг виджетов (architecture 3.12 spec; Т-17). Платформе годится только хостинг, который шлёт свои заголовки ответа — CSP по `csp.json` сборки и кеш, — и отдаёт `/deployment.json` вне архива сборки (Т-17; architecture 3.12 spec). Страница образцов `canvas` переедет на Firebase Hosting отдельным сайтом проекта со своим origin, когда так решит автор после ответа юриста о сроке IP-адресов Hosting (вторая поправка 2026-11-08 к R25 spec; П-9);
 - выкатывает сервисы и сборку `app` по одному списку точных версий и дайджестов — это решил R106 spec, и Т-19 закрыт. На схеме зависимостей `infra` выкатывает релизы `api` и `app` (repositories 3 spec). Как идёт выкладка (R105 spec, R106 spec; architecture 3.11 spec):
-  - образ сервиса собирает выкладка `infra`: берёт из релиза сервиса бинарник и `Dockerfile`, проверяет их рецептом `spec` `release-verify` (R77 spec), собирает образ на базе `gcr.io/distroless/static-debian13:nonroot` по digest, кладёт его в закрытый Artifact Registry `infra` и выкатывает ревизию Cloud Run по digest образа. Что сервис кладёт в образ сверх бинарника, делает его собственный код на стадии сборки: у `api` это пакеты модулей. Образов NovaTrail не публикует (RULES.md, Production images);
-  - сборку `app` выкатка проверяет по подписи архива, пишет `/deployment.json` из списка выкатки, проверив его по `deployment.schema.json` этой сборки, собирает заголовок CSP по её `csp.json` и выпускает сборку, файл и заголовок одним выпуском хостинга (R85 spec). Список называет рядом с дайджестом сборки дайджест её `/deployment.json` (Т-19);
+  - образ сервиса собирает выкладка `infra`: берёт из релиза сервиса бинарник и `Dockerfile`, проверяет их рецептом `spec` `release-verify` (R77 spec), собирает образ на базе `gcr.io/distroless/static-debian13:nonroot` по digest, кладёт его в закрытый Artifact Registry `infra` и выкатывает ревизию Cloud Run по digest образа. Образ `api` собирается по договору его релиза (вторая поправка 2026-11-08 к R106 spec; раздел 3.2). Что сервис кладёт в образ сверх бинарника, делает его собственный код на стадии сборки: у `api` это пакеты модулей. Образов NovaTrail не публикует (RULES.md, Production images);
+  - сборку `app` выкатка проверяет по подписи архива, пишет `/deployment.json` из списка выкатки, проверив его по `deployment.schema.json` этой сборки, а когда формат перейдёт в `spec`, — и по схеме `spec` (поправка 2026-11-08 к R85 spec), собирает заголовок CSP по её `csp.json` и выпускает сборку, файл и заголовок одним выпуском хостинга (R85 spec). Список называет рядом с дайджестом сборки дайджест её `/deployment.json` (Т-19);
   - откат — revert списка. `api`, а пока формат модуля v0 — и сборка `app`, перешедшая на новую версию формата, откатываются только вперёд (Т-19);
-  - задания `api` при выкладке — миграции до приёма запросов, задание после выкладки — когда ревизия приняла весь трафик — выкладка запускает тем же образом, а факты развёртывания и нижнюю ступень допуска `api` передаёт ревизии из своего репозитория (поправка 2026-11-08 к R106 spec);
+  - задания `api` при выкладке — миграции до приёма запросов, задание после выкладки — когда ревизия приняла весь трафик — выкладка запускает тем же образом, а факты развёртывания и нижнюю ступень допуска `api` передаёт ревизии из своего репозитория (поправка 2026-11-08 к R106 spec): факты — файлом, томом секрета, путь — в `API_ADMISSION_FACTS_FILE`, ступень — в `API_ADMISSION_RUNG`, а до миграций задание зовёт команду `api`, которая их проверяет (вторая поправка 2026-11-08 к R106 spec);
   - формат и место списка и кто его правит, что выкатка проверяет до выкладки, что релиз `api` ниже выкаченного отклоняется и как ревизия `api` получает факты и ступень, — решено (R05; раздел 3.2);
 - даёт self-hosting и локальный запуск всей платформы (architecture 3.11 spec): код открыт, и свою копию платформы оператор может развернуть сам (product 3 spec). Self-hosting берёт тот же список и тот же путь выкладки: собирает образ у себя из того же бинарника и по тому же `Dockerfile` (R105 spec, R106 spec). Подписанная сборка `app` у всех одна: конфигурацию развёртывания она читает во время работы из `/deployment.json`, а его оператор self-hosting пишет сам по той же схеме (R85 spec; Т-19). Свои факты для допуска к ИИ self-hosting заявляет сам (Т-20; R96 spec).
 
@@ -32,22 +32,22 @@
 
 **Данные и связи:**
 - данных учеников и секретов в репозитории нет, как ни в одном (RULES.md, Hard rules). Но то, что он настраивает, — журналы, регион, хостинг — касается данных учеников, поэтому каждое предложение здесь сначала читается по privacy spec (RULES.md, Hard rules). Хостинг и инфраструктура — обработчики данных (privacy 2 spec);
-- в журналах — события, коды, время и версии, без прямых идентификаторов, IP-адресов, работ, прочитанного и текста подсказок (R09 spec; privacy 4 spec; architecture 5 spec). Сроки хранения — П-9;
-- хостинг `app` и сервис входа пишут IP-адрес в свои журналы сами. Эти журналы решаются вместе с выбором этих сервисов: хостинга — здесь, сервиса входа — в `api` (architecture 1 spec; architecture 3.12 spec; privacy 4 spec; П-9). Сервис входа `api` выбрал — Firebase Auth: IP-адреса он держит несколько недель, а получает их не только при входе — на iPad, в Safari и в мобильных браузерах его скрипт и iframe грузятся при каждом старте `app` (privacy 4 spec; architecture 3.12 spec; П-9);
+- в журналах — события, коды, время и версии, без прямых идентификаторов, IP-адресов, работ, прочитанного и текста подсказок (R09 spec; privacy 4 spec; architecture 5 spec). Журналы платформы хранятся 30 дней в `us-east4`, аудит — 400 дней в `global` (R07; П-9);
+- хостинг `app` и сервис входа пишут IP-адрес в свои журналы сами (architecture 1 spec; architecture 3.12 spec; privacy 4 spec; П-9). Хостинг — Firebase Hosting: IP-адреса он хранит несколько месяцев, глобально, и срок не настраивается, а выгрузку его журналов в Cloud Logging `infra` не включает (R06). Сервис входа `api` выбрал — Firebase Auth: IP-адреса он держит несколько недель, а получает их не только при входе — на iPad, в Safari и в мобильных браузерах его скрипт и iframe грузятся при каждом старте `app` (privacy 4 spec; architecture 3.12 spec; П-9);
 - при сборке ни от чего не зависит, кроме `spec`, и по сети ни к кому не обращается (repositories 2.1 spec). На схеме зависимостей его стрелки — выкладка релизов `api` и `app` (repositories 3 spec);
 - общие проверки CI — поиск секретов, DCO, CodeQL, Scorecard и проверку документов — берёт из `.github` ещё до кода; подключила их T21 `spec` (R30 spec; architecture 3.11 spec);
 - файл релиза NovaTrail — бинарник сервиса, его `Dockerfile`, архив сборки `app` — входит в выкладку, только когда его принял рецепт `spec` `release-verify` (RULES.md, Release files are verified; R77 spec). Т-27, что сверяет эта проверка, закрыт им же;
 - его сервисы (architecture 3.12 spec): хостинг сборки `app`, домен и хостинг виджетов на этапе 4, Secret Manager, Artifact Registry, Cloud Logging и Trace, а вместе с `api` — Cloud Scheduler и задания Cloud Run;
-- этап 2, вместе с `tutor`, `canvas`, `api`, `app` и `skill-map` (product 11 spec). Репозиторий заведён раньше кода ради документов, а код ждал П-11 — регион данных, который нужен до первого развёртывания (architecture 3.11 spec; repositories 2.1, 6 spec). П-11 закрыт решением R109 spec (R03). Первое приложение — у автора, локально и без развёртывания, так что строку `infra` в сквозном плане `spec` автор отложил до первого развёртывания (R76 spec). Terraform или OpenTofu встанет в devcontainer вместе с кодом (T14 `spec`), а который из них — Т-29: он вырос из вопроса В2 этого репозитория, и решает его первый код `infra`.
+- этап 2, вместе с `tutor`, `canvas`, `api`, `app` и `skill-map` (product 11 spec). Репозиторий заведён раньше кода ради документов, а код ждал П-11 — регион данных, который нужен до первого развёртывания (architecture 3.11 spec; repositories 2.1, 6 spec). П-11 закрыт решением R109 spec (R03). Первое приложение — у автора, локально и без развёртывания, так что строку `infra` в сквозном плане `spec` автор отложил до первого развёртывания (R76 spec). Инструмент встаёт в devcontainer вместе с кодом (T14 `spec`), и это OpenTofu: Т-29, который вырос из вопроса В2 этого репозитория, закрыт поправкой 2026-11-08 к R11 spec по строке В10 (R08).
 
 ## 2. Решить при детализации
 
 Пункты «Решить при детализации» из карточки — по подразделу на пункт, а два пункта о выкатке — в одном, 2.2. Решённый пункт называет запись журнала, а само решение переехало в раздел 3. Вопрос, который выходит за этот репозиторий, уходит «в реестр spec» (RULES.md, Across repositories).
 
-Эпик E1 решил всё, что карточка оставила детализации, кроме Т-29, а сверх её списка решил один пункт и отложил другой:
-- 2.1–2.3 — регион, список выкатки и проверки, хостинг и адреса — решены: R04–R06, разделы 3.1–3.3. Регион закрыл в `spec` R109 spec. Что из 2.2 и 2.3 касается других репозиториев и реестров `spec`, ушло строками таблицы 3 [RUN.md](../RUN.md): В4 — переменные фактов и ступени для `api`, В5 — формат `/deployment.json` в `spec`, В6 и В7 — хостинг, домены и срок IP-адресов Firebase Hosting (Т-17, О-16, П-9);
-- 2.4 — исключение журналов запросов, сверх списка карточки, — решён: R07, раздел 3.4. Сроки журналов и уточнение privacy 4 spec — строка В8, а карточку под него и под решённое правит строка В9 (начало architecture 3 spec);
-- 2.5 — Terraform или OpenTofu — отложен сознательно: его решает эпик первого кода, первым делом (Т-29);
+Эпик E1 решил всё, что карточка оставила детализации, кроме Т-29, а сверх её списка решил один пункт и отложил другой. Т-29 закрыл `spec` по строке В10, так что «Решить при детализации» в карточке пуст (R08):
+- 2.1–2.3 — регион, список выкатки и проверки, хостинг и адреса — решены: R04–R06, разделы 3.1–3.3. Регион закрыл в `spec` R109 spec. Что из 2.2 и 2.3 касается других репозиториев и реестров `spec`, ушло строками «в реестр spec» В4–В7, и `spec` записал все по их рекомендациям (R08): переменные фактов и ступени и команду проверки `api` — вторая поправка 2026-11-08 к R106 spec, перенос формата `/deployment.json` — поправка 2026-11-08 к R85 spec, хостинг, домены и срок IP-адресов Firebase Hosting — Т-17, О-16 и П-9;
+- 2.4 — исключение журналов запросов, сверх списка карточки, — решён: R07, раздел 3.4. Сроки журналов и уточнение privacy 4 spec `spec` записал по строке В8 в П-9 и privacy 4 spec, а карточку под него и под решённое правил по строке В9 (R08);
+- 2.5 — Terraform или OpenTofu — отложен сознательно и решён первым делом эпика E2: OpenTofu, поправка 2026-11-08 к R11 spec по строке В10 (R08), раздел 3.6;
 - 2.6 — self-hosting и локальный запуск всей платформы, сверх списка карточки, — отложен: что о них уже следует из решений E1, — раздел 3.5, а остальное решает эпик E3.
 
 ### 2.1. Регион (П-11)
@@ -68,15 +68,7 @@
 
 ### 2.5. Terraform или OpenTofu (Т-29)
 
-- **Суть:** чем `infra` описывает инфраструктуру. R11 spec называет базой Terraform, а Terraform с версии 1.6.0 вышел из открытых лицензий. Вопрос завёл этот репозиторий строкой В2 таблицы 3 [RUN.md](../RUN.md), а `spec` записал его в свой реестр как Т-29 и поставил в пункты карточки (architecture 3.11 spec).
-- **Что известно:**
-  - варианты Т-29 — Terraform по точной версии, названным исключением в решении `infra`, которое вводит его в devcontainer; OpenTofu по точной версии, тоже названным исключением, и поправка к R11 spec с правкой карточки 3.11 spec и мест, где назван Terraform; Terraform 1.5.7, последний под MPL 2.0 (repositories 8 spec);
-  - рекомендация — предварительно OpenTofu, а решить в эпике первого кода `infra`, до того как инструмент встанет в devcontainer. MPL 2.0 проходит правило о лицензиях инструментов прямо, а грант BUSL — не об открытом коде, а о конкуренции, и его условия принимал бы и self-hosting (Т-29; раздел 4 этого документа);
-  - поправка 2026-10-22 к R12 spec пускает и условия, бесплатные для всех, но только у инструмента, который NovaTrail не распространяет и без которого платформу можно собрать, запустить и развернуть. Terraform нужен, чтобы её развернуть, и рекомендация Т-29 прежняя (RULES.md, Hard rules; Т-29);
-  - цена OpenTofu — правка мест, где назван Terraform, и проверка, что код по образцу canvas-api идёт под OpenTofu: документация `tofu test` нужные блоки называет (ниже), а сам код под `tofu` не запускался — это T12;
-  - на 2026-11-08 (T09; раздел 4 этого документа): OpenTofu v1.13.9 — под MPL 2.0, суммы его архивов и подпись файла сумм сверены; провайдеры `hashicorp/google` и `hashicorp/google-beta` — в реестре OpenTofu, под MPL 2.0; `tofu test` держит `mock_provider` и `command = plan`, как тесты canvas-api. Terraform v1.17.1 — под BUSL 1.1, а в Terraform 1.5.7, последнем под MPL 2.0, нет ни общедоступного `terraform test`, ни `mock_provider`. Рекомендация — OpenTofu, строка В10 таблицы 3 [RUN.md](../RUN.md), «в реестр spec».
-- **Варианты:** в Т-29 и строке В10.
-- **Задача:** T09 и T11 эпика E2 «Первый код» (таблица 1 [RUN.md](../RUN.md)).
+Решено: поправка 2026-11-08 к R11 spec, Т-29 закрыт, по строке В10 (R08); раздел 3.6. Задачи — T09 и T10, а инструмент в devcontainer ставит T11, и код под `tofu` проверяет T12.
 
 ### 2.6. Self-hosting и локальный запуск
 
@@ -89,14 +81,14 @@
 
 ## 3. Устройство
 
-Здесь — то, что решено по разделу 2: из каких частей компонент состоит, его данные и как он связан с другими репозиториями. Решения — R04–R07; кода ещё нет, и строит его эпик E2 «Первый код» (таблица 1 [RUN.md](../RUN.md)).
+Здесь — то, что решено по разделу 2: из каких частей компонент состоит, его данные и как он связан с другими репозиториями. Решения — R04–R07 и поправка 2026-11-08 к R11 spec (раздел 3.6); кода ещё нет, и строит его эпик E2 «Первый код» (таблица 1 [RUN.md](../RUN.md)).
 
 **Из чего состоит репозиторий, когда придёт код:**
 
 | Часть | Что делает | Решение |
 |---|---|---|
 | `bootstrap.sh` | один раз, руками оператора: проект, бакет состояния, Workload Identity Federation для CI и учётная запись конфигурации, как в canvas-api | R11 spec; образец — canvas-api |
-| корневой модуль Terraform или OpenTofu | проект и его сервисы: Artifact Registry, Secret Manager, бакет журналов и sink с фильтром, `_Trace`, сайт Firebase Hosting, бюджет с оповещением, а сервис и задания Cloud Run — без образа: образ и ревизию ставит выкладка по digest, а модуль их не трогает, как `ignore_changes` у canvas-api (раздел 4). Всё — в регионе раздела 3.1 | R04, R05, R06, R07; Т-29 |
+| корневой модуль OpenTofu | проект и его сервисы: Artifact Registry, Secret Manager, бакет журналов и sink с фильтром, `_Trace`, сайт Firebase Hosting, бюджет с оповещением, а сервис и задания Cloud Run — без образа: образ и ревизию ставит выкладка по digest, а модуль их не трогает, как `ignore_changes` у canvas-api (раздел 4). Всё — в регионе раздела 3.1 | R04, R05, R06, R07; поправка 2026-11-08 к R11 spec |
 | `deploy/` | список выкатки, значения `/deployment.json`, файл фактов и схема списка | R05; раздел 3.2 |
 | проверки pull request | схема, `release-verify` и sha256, `deployment.json`, факты, ступень, тег `api` не ниже | R05 |
 | выкладка | рецепты и workflow: образ, задания `api`, ревизия, выпуск сборки `app` на Hosting | R05, R06; разделы 3.2, 3.3 |
@@ -107,8 +99,8 @@
 
 | Репозиторий | Что `infra` берёт | Что `infra` даёт |
 |---|---|---|
-| `spec` | правила, `release-verify`, таблицу допуска, а с первым кодом — формат `/deployment.json` (R85 spec; В5) | строки «в реестр spec» таблицы 3 [RUN.md](../RUN.md) |
-| `api` | бинарник и `Dockerfile` релиза, имена команд заданий и переменных (В4) | образ, ревизию и задания, файл фактов и ступень, адрес `*.run.app` |
+| `spec` | правила, `release-verify`, таблицу допуска, а до первой выкладки — формат `/deployment.json` со своей версией в релизе `spec` (поправка 2026-11-08 к R85 spec) | строки «в реестр spec» таблицы 3 [RUN.md](../RUN.md); перенос формата `/deployment.json` — вместе со `spec`, в эпике E2 |
+| `api` | бинарник и `Dockerfile` релиза по договору сборки, команды проверки конфигурации, миграций и задания после выкладки (R28 api; вторая поправка 2026-11-08 к R106 spec) | образ, ревизию и задания, файл фактов — путь в `API_ADMISSION_FACTS_FILE`, ступень — в `API_ADMISSION_RUNG`, адрес `*.run.app` |
 | `app` | архив сборки с `deployment.schema.json` и `csp.json` | `/deployment.json`, заголовки, origin `web.app` и разрешённый домен Firebase |
 | `canvas` | — | позже — отдельный сайт Hosting для страницы образцов (R06) |
 | `.github` | общие проверки CI; файлы релизов, которые `infra` выкатывает, подписаны общим `release.yml`, а сверяет подпись `release-verify` `spec` (R77 spec) | — |
@@ -128,7 +120,7 @@
 | бакет `_Required` | `global` | sink `_Required` не меняется, а регион бакету даёт только настройка организации или папки до создания проекта; организация связана с доменом, которого до О-16 нет — Д3 в таблице 4 [RUN.md](../RUN.md) |
 | бакет трасс `_Trace` | `us-east4`, создаётся через Observability API до первой трассы | иначе место выберут настройки по умолчанию или сама система, а сменить его может только reprovision, который трассы стирает |
 
-Не `infra`: базу Neon `aws-us-east-1` держит `api`; Firebase Auth обрабатывает данные только в США при любом регионе; хостинг сборки `app` выбирает T03, а Firebase Hosting — глобальный сервис; регион вызовов ИИ R109 spec не решает (R96 spec).
+Не `infra`: базу Neon `aws-us-east-1` держит `api`; Firebase Auth обрабатывает данные только в США при любом регионе; хостинг сборки `app` — Firebase Hosting (R06), глобальный сервис; регион вызовов ИИ R109 spec не решает (R96 spec).
 
 ### 3.2. Список выкатки и выкладка
 
@@ -171,12 +163,12 @@
 }
 ```
 
-Имена файлов релиза — те, что выпустят релизы `api` и `app`: их пока нет, и в примере имена условные, по образцу `module-kit_v0.2.6_linux_amd64` (раздел 4).
+Имя бинарника `api` — по договору его релиза, `api_<тег>_linux_amd64` (R28 api; вторая поправка 2026-11-08 к R106 spec). Последний релиз `api` — v0.1.1 от 2026-11-08: в нём `api_v0.1.1_linux_amd64`, `Dockerfile` и `SHA256SUMS`, каждый с подписью, а бинарник даёт команды `serve`, `migrate` и `version` — команды проверки конфигурации и задания после выкладки в нём ещё нет (раздел 4). У `app` релизов пока нет, и имя архива в примере — условное.
 
 **Pull request со списком** — CI без доступа к production:
 1. список — по своей схеме;
 2. бинарник, `Dockerfile` и архив — `release-verify` с репозиторием и тегом из списка, а sha256 каждого — как в списке. Если Sigstore или GitHub не отвечают, файл отклоняется (R77 spec);
-3. `deployment.json` — по `deployment.schema.json` из архива, а его sha256 — как в списке;
+3. `deployment.json` — по `deployment.schema.json` из архива, а когда формат перейдёт в `spec`, — и по схеме `spec` подмодуля (поправка 2026-11-08 к R85 spec); его sha256 — как в списке;
 4. `facts.json` — по словарю фактов таблицы допуска тега `spec` подмодуля: это ранний знак, а окончательно файл проверяет образ нового релиза `api` (шаг 4 ниже);
 5. ступень — `full` (R25 api);
 6. тег `api` — не ниже, чем в списке на `main`.
@@ -184,12 +176,12 @@
 **Выкладка** — после мержа, из коммита списка. Первое задание проверяет, что `main` стоит на этом коммите, а каждое следующее — на повторной попытке (R45 canvas-api). Выкладка делает только то, что изменилось против `main` до мержа.
 
 Новый релиз `api`:
-1. конфигурация облака — `apply` Terraform или OpenTofu из того же коммита (Т-29); этот шаг идёт на каждой выкладке;
+1. конфигурация облака — `tofu apply` из того же коммита (раздел 3.6); этот шаг идёт на каждой выкладке;
 2. тег `api` — не ниже, чем у ревизии, которая сейчас принимает трафик: `main` может опережать production, если прошлая выкладка не дошла. Затем повтор `release-verify` и sha256 каждого файла — в задание, которое достаёт production, попадает только проверенный файл;
-3. образ — по `Dockerfile` из релиза, вокруг его бинарника, на базе по digest, которую называет `Dockerfile` (R105 spec). Стадия сборки кладёт в образ пакеты модулей командой бинарника, и ей нужна сеть (architecture 3.3 api). Образ — в Artifact Registry `us-east4` (R04), его digest — из push;
-4. проверка конфигурации — заданием Cloud Run тем же образом, с файлом фактов и ступенью нового списка: неизвестный таблице этого релиза факт останавливает выкладку до миграций. Команду называет релиз `api` (В4 таблицы 3 [RUN.md](../RUN.md));
+3. образ — по договору релиза `api`: бинарник — файлом `api` в контексте сборки `binary`, образ — `docker build --target release --build-context binary=<папка>` по `Dockerfile` из релиза, на базе по digest, которую называет `Dockerfile`; основного контекста стадия не читает (R105 spec; R28 api; вторая поправка 2026-11-08 к R106 spec). Стадия сборки кладёт в образ пакеты модулей командой бинарника, и ей нужна сеть (architecture 3.3 api). Образ — в Artifact Registry `us-east4` (R04), его digest — из push;
+4. проверка конфигурации — заданием Cloud Run тем же образом, с файлом фактов и ступенью нового списка: неизвестный таблице этого релиза факт останавливает выкладку до миграций. Команду даёт бинарник `api`: она проверяет файл фактов по таблице допуска релиза и ступень и не обслуживает запросов, а её имя пишет эпик кода `api` (вторая поправка 2026-11-08 к R106 spec);
 5. задание миграций обеих баз, `api` и `openfga` (R05 api), — тем же образом по digest, командой, которую называет релиз `api`. Не прошло — выкладка останавливается, и новой ревизии нет;
-6. ревизия Cloud Run по digest образа — с файлом фактов томом на точной версии секрета и со ступенью переменной окружения (R05; В4) — сначала без трафика; когда она запустилась — весь трафик ей;
+6. ревизия Cloud Run по digest образа — с файлом фактов томом на точной версии секрета, путь — в `API_ADMISSION_FACTS_FILE`, и со ступенью `author` или `full` в `API_ADMISSION_RUNG` (R05; вторая поправка 2026-11-08 к R106 spec) — сначала без трафика; когда она запустилась — весь трафик ей;
 7. задание после выкладки — тем же образом, когда новая ревизия приняла весь трафик (поправка 2026-11-08 к R106 spec).
 
 Только факты или ступень: новая версия секрета фактов и новая ревизия на образе, который уже выкачен, по его digest, — шаг 6 без шагов 2–5 и 7. Сборки, миграций и `release-verify` нет: файлы релиза не менялись, и снятие факта не ждёт Sigstore.
@@ -227,7 +219,7 @@
 
 | Журнал | IP-адрес | Где и сколько |
 |---|---|---|
-| журналы самого Firebase Hosting | да | у Firebase, глобально: «a few months», не настраивается — В7 таблицы 3 [RUN.md](../RUN.md) |
+| журналы самого Firebase Hosting | да | у Firebase, глобально: «a few months», не настраивается (П-9; privacy 4 spec) |
 | выгрузка журналов Hosting в Cloud Logging | да, `remoteIp` | не включается: в Cloud Logging проекта журналов Hosting нет (вход T04) |
 
 **Адреса и домены:**
@@ -237,11 +229,11 @@
 | `app` | `<проект>.web.app` | свой домен у Hosting — когда он будет куплен |
 | `api` | `*.run.app` своего сервиса, CORS — точному origin `app` | когда будет свой домен; как — решить тогда, domain mapping Cloud Run в Preview |
 | `authDomain` Firebase Auth | `<проект>.firebaseapp.com` | не меняется: `app` входит окном (R09 app) |
-| основной домен и домен виджетов | нет | когда покупать, решает `spec` (О-16, Т-17); рекомендация — вместе после О-16, до публичного запуска (В6 таблицы 3 [RUN.md](../RUN.md)); виджеты — этап 4, хостинг бандлов — Т-17 |
+| основной домен и домен виджетов | нет | покупаются вместе после О-16, до публичного запуска (О-16, Т-17); виджеты — этап 4, хостинг бандлов — Т-17 |
 
 Сайт по умолчанию отвечает на двух адресах, `web.app` и `firebaseapp.com`, с одним содержимым. Origin `app` — только `web.app`: его называют CORS `api` и `/deployment.json`. Выкатка добавляет его в разрешённые домены проекта Firebase (Т-19) и не убирает тех, что ставит туда сам Firebase.
 
-**Страница образцов `canvas`** — когда переедет на хостинг (R25 spec), отдельным сайтом проекта и своим origin: выход `app` стирает хранилище своего origin. Тогда в журналы Firebase попадут и IP-адреса устройств, на которых делают образцы детей, — В7.
+**Страница образцов `canvas`** на хостинг пока не переезжает. Переедет — отдельным сайтом проекта и своим origin, когда так решит автор после ответа юриста о сроке IP-адресов Hosting: выход `app` стирает хранилище своего origin, а в журналы Firebase тогда попадут и IP-адреса устройств, на которых делают образцы детей (вторая поправка 2026-11-08 к R25 spec; П-9).
 
 **Не проверено — первый код:** умеют ли rewrites исключить `/assets/**` и `/deployment.json` (иначе — явный список путей SPA) и шлёт ли Hosting сам HSTS или `Cross-Origin-Opener-Policy`.
 
@@ -272,7 +264,7 @@
 | Data Access audit | был бы `callerIp` | не включается |
 | журнал активности Identity Platform | был бы каждый запрос входа | не включается |
 | выгрузка журналов Firebase Hosting | была бы `remoteIp` | не включается (R06) |
-| журналы Firebase Auth и Firebase Hosting у самого Firebase | IP-адреса | у Firebase: Auth — «a few weeks», Hosting — «a few months» (П-9; В7) |
+| журналы Firebase Auth и Firebase Hosting у самого Firebase | IP-адреса | у Firebase: Auth — «a few weeks», Hosting — «a few months» (П-9) |
 | трассы | — | нет: Cloud Trace API не включается |
 
 Журналов запросов у заданий Cloud Run нет: их пишут только сервисы.
@@ -286,7 +278,7 @@
 
 **Трассы:** нет. Cloud Trace API не включается, а бакет `_Trace` всё равно создаётся в `us-east4` до любой трассы (R04): Cloud Run трассирует часть запросов сам.
 
-**Не проверено — первый код:** точное имя журнала запросов в фильтре; что без Cloud Trace API у Cloud Run нет трасс, а если есть — их атрибуты; вызывает ли что-то в проекте `SignUp` Identity Platform и что лежит в его записи Admin Activity (В8).
+**Не проверено — первый код:** точное имя журнала запросов в фильтре; что без Cloud Trace API у Cloud Run нет трасс, а если есть — их атрибуты; вызывает ли что-то в проекте `SignUp` Identity Platform и что лежит в его записи Admin Activity (П-9).
 
 ### 3.5. Self-hosting и локальный запуск
 
@@ -299,6 +291,17 @@ Self-hosting — копия платформы, которую оператор 
 - **регион** — у копии свой: R109 spec и R04 — о платформе.
 
 Что сверх этого — свой `bootstrap.sh`, переменные корневого модуля, свой проект Firebase — и локальный запуск всей платформы отложены: раздел 2.6.
+
+### 3.6. Инструмент: OpenTofu
+
+Инфраструктуру описывает OpenTofu, открытый форк Terraform, по точной версии: код на HCL по образцу `infra/` canvas-api, а инструмент и команды — `tofu` (поправка 2026-11-08 к R11 spec; Т-29 закрыт). Источники — раздел 4.
+
+- **Почему не Terraform:** с версии 1.6.0 он выходит под BUSL 1.1, а поправка 2026-10-22 к R12 spec пускает бесплатные условия только у инструмента, без которого платформу можно развернуть. Terraform 1.5.7, последний под MPL 2.0, — без общедоступного `terraform test` и без `mock_provider`, и больше не развивается.
+- **Что известно на 2026-11-08 (T09):** OpenTofu v1.13.9 от 2026-11-05 — последний релиз, под MPL 2.0; суммы sha256 архивов `linux_amd64` и `linux_arm64` и подпись файла сумм сверены; провайдеры `hashicorp/google` и `hashicorp/google-beta` — в реестре OpenTofu, до 8.10.0, под MPL 2.0; `tofu test` держит `mock_provider`, `override_resource` и `command = plan`, на которых стоят тесты canvas-api.
+- **Против canvas-api меняется:** `tofu` и `tofu test` вместо `terraform`; провайдеры — из реестра OpenTofu, и суммы `.terraform.lock.hcl` — его; инструмент — в стадии `toolchain` devcontainer по `ARG` версии и суммам sha256 (R34 spec), а не на раннере, и CI зовёт его через `spec/tools/toolchain/toolchain.sh` (R30 spec). Код модуля на HCL и тесты переносятся.
+- **Лицензия:** MPL 2.0 — названным исключением в решении `infra`, которое вводит OpenTofu в devcontainer (R12 spec).
+- **Не проверено — первый код:** идёт ли под `tofu` код по образцу canvas-api (T12); проверять ли при установке подпись файла сумм, а не только суммы (T11).
+- **Задачи:** T11 — инструмент в devcontainer и своя проверка в CI; T12 — корневой модуль.
 
 ## 4. Источники
 
@@ -346,7 +349,7 @@ Self-hosting — копия платформы, которую оператор 
   - [Identity Platform audit logging](https://docs.cloud.google.com/identity-platform/docs/audit-logging), обновлено 2026-11-03: «Methods that require an IAM permission with the type property value of ADMIN_WRITE generate Admin Activity audit logs»; у «google.cloud.identitytoolkit.v1.AuthenticationService.SignUp» — «Audit log type: Admin activity»; `SignInWithIdp` — в списке «The following methods don't produce audit logs»;
   - [Error Reporting overview](https://docs.cloud.google.com/error-reporting/docs/grouping-errors), обновлено 2026-11-06: «Error Reporting collects events directly from the Error Reporting API or infers them by scanning log entries»; условие — «The log bucket is stored in the same project where the log entries originated».
 - **Журналы `api`** (раздел 3.4; R07) — [`api` `main` 5a02ff4](https://github.com/altnovatrail/api/tree/5a02ff4), прочитано 2026-11-08 через API GitHub: architecture 3.9 api — «перехватчик Connect пишет метод, код, причину отказа и время. Тела, заголовков и адреса запроса он не пишет»; `internal/server/server.go` — жалобы сервера, которые «name the client's address, so they go through the log's guard, which drops them».
-- **Лицензии Terraform и OpenTofu** (разделы 1 и 2.5; Т-29, который вырос из строки В2 таблицы 3 [RUN.md](../RUN.md)), прочитано 2026-10-20:
+- **Лицензии Terraform и OpenTofu** (разделы 1, 2.5 и 3.6; Т-29, который вырос из строки В2 таблицы 3 [RUN.md](../RUN.md)), прочитано 2026-10-20:
   - [hashicorp/terraform, `LICENSE`](https://github.com/hashicorp/terraform/blob/79307e8/LICENSE), коммит 79307e8: «Business Source License 1.1», «Licensed Work: Terraform Version 1.6.0 or later». Additional Use Grant: «You may make production use of the Licensed Work, provided Your use does not include offering the Licensed Work to third parties on a hosted or embedded basis in order to compete with IBM Corp.'s paid version(s) of the Licensed Work»; «Products that are not provided on a paid basis are not competitive». Тот же файл на теге v1.5.7, последнем теге ветки 1.5, — «Mozilla Public License, version 2.0». Последний релиз Terraform — v1.16.6 от 2026-10-14 (релизы hashicorp/terraform на GitHub);
   - [opentofu/opentofu, `LICENSE`](https://github.com/opentofu/opentofu/blob/42f15c9/LICENSE), коммит 42f15c9: «Mozilla Public License, version 2.0»;
   - Open Source Initiative, [OSI Approved Licenses](https://opensource.org/licenses): Mozilla Public License 2.0 в списке есть, Business Source License — нет.
@@ -370,7 +373,7 @@ Self-hosting — копия платформы, которую оператор 
   - `app`, [`main` 375a09b](https://github.com/altnovatrail/app/tree/375a09b), architecture 3.7 app: «`release-files` пакует сборку — `index.html` с нижним слоем, `assets/`, `deployment.schema.json` и `csp.json`, без `deployment.json`»; «Откат — прежний список: прежняя сборка со своим файлом, тоже одним выпуском». Релизов у `app` ещё нет;
   - `tutor`, [`main` 28ea592](https://github.com/altnovatrail/tutor/tree/28ea592), `admission/models.go`: `StageAuthor Stage = "author"`, `StageFull Stage = "full"`;
   - `.github`, релиз v0.1.21, `.github/workflows/release.yml`: у `workflow_call` нет `outputs`; файлы релиза — то, что рецепт `release-files` вызывающего пишет в `dist/`, и `.sigstore.json` к каждому. Образец имён файлов сервиса Go — релиз `module-kit` v0.2.6: `module-kit_v0.2.6_linux_amd64` и `SHA256SUMS`.
-- **OpenTofu, Terraform и провайдеры** (раздел 2.5; Т-29; строка В10 таблицы 3 [RUN.md](../RUN.md)), прочитано 2026-11-08:
+- **OpenTofu, Terraform и провайдеры** (разделы 2.5 и 3.6; Т-29; строка В10 — в RUN.md коммита e56c8bc, а решение — поправка 2026-11-08 к R11 spec), прочитано 2026-11-08:
   - релизы на GitHub: [opentofu/opentofu v1.13.9](https://github.com/opentofu/opentofu/releases/tag/v1.13.9) — последний, опубликован 2026-11-05; [hashicorp/terraform v1.17.1](https://github.com/hashicorp/terraform/releases/tag/v1.17.1) — последний, опубликован 2026-10-28;
   - `LICENSE` OpenTofu на теге v1.13.9 — «Mozilla Public License, version 2.0»; `LICENSE` Terraform на теге v1.17.1 — «Business Source License», «Licensed Work: Terraform Version 1.6.0 or later»;
   - `tofu_1.13.9_SHA256SUMS` релиза OpenTofu: `b34b327cc1ef07178207b6f2cd1f5276537d3e5b7be316500f6dac50d4c0a857  tofu_1.13.9_linux_amd64.tar.gz`, `5dc196dde75b667e4806d358310ec96742774cd0993c54c1237efee5644b69b8  tofu_1.13.9_linux_arm64.tar.gz`; те же суммы — в поле `digest` этих ассетов в API GitHub. Подпись `tofu_1.13.9_SHA256SUMS.gpgsig` проверена `gpg` ключом [opentofu.asc](https://get.opentofu.org/opentofu.asc): «Good signature from "OpenTofu (This key is used to sign opentofu providers) <core@opentofu.org>"», отпечаток `E3E6 E43D 84CB 852E ADB0 051D 0C0A F313 E5FD 9F80`;
@@ -378,6 +381,7 @@ Self-hosting — копия платформы, которую оператор 
   - [реестр OpenTofu](https://registry.opentofu.org/v1/providers/hashicorp/google/versions): `hashicorp/google` и `hashicorp/google-beta` — новейшая версия 8.10.0; `LICENSE` [terraform-provider-google](https://github.com/hashicorp/terraform-provider-google) и terraform-provider-google-beta — «Mozilla Public License Version 2.0»;
   - документация `tofu test` на теге v1.13.9 — [`website/docs/cli/commands/test/index.mdx`](https://github.com/opentofu/opentofu/blob/v1.13.9/website/docs/cli/commands/test/index.mdx), она же [на сайте](https://opentofu.org/docs/cli/commands/test/): «The `mock_provider` blocks (optional): define the providers to be mocked»; «The `override_resource` blocks (optional): define the resources to be overridden»; «You can use the `command = plan` setting to perform a plan instead of an apply»;
   - `CHANGELOG.md` Terraform: на теге v1.6.0 — «The `terraform test` command is now generally available»; на теге v1.7.0 — «Providers, modules, resources, and data sources can now be mocked during executions of `terraform test`», с блоком `mock_provider`.
+- **Релиз `api` v0.1.1** (раздел 3.2), прочитано 2026-11-08 через API GitHub: `gh release view v0.1.1 -R altnovatrail/api` — опубликован 2026-11-08T23:15:36Z, неизменяемый; файлы — `api_v0.1.1_linux_amd64` и `api_v0.1.1_linux_arm64`, `Dockerfile`, лицензии и `SHA256SUMS`, у каждого — `.sigstore.json`. `README.md` на теге: «Whoever deploys checks the files with `just -f spec/justfile release-verify api <tag> <file>` and builds the image around the binary: `docker build --target release --build-context binary=<a folder holding the binary as api> .`, with the release's `Dockerfile`»; `cmd/api/main.go` на теге — «serve», «migrate», «version». У v0.1.0 команды `migrate` нет; релизов у `app` нет (`gh release list -R altnovatrail/app`).
 - **Регион, адреса, журналы и выкладка в canvas-api** (разделы 2.1–2.4, 3.2) — [mathtrail/canvas-api](https://github.com/mathtrail/canvas-api/tree/0901af0), коммит 0901af0, прочитано 2026-10-19, а цитаты R45 и R58 canvas-api, его environments, `service_api.tf` и `justfile` — 2026-11-08:
   - `docs/decisions.md`: R54 canvas-api — весь контур в `us-east4`, потому что в бете только семьи из США; R55 canvas-api — API по адресу `*.run.app`, приложение по адресу Firebase Hosting `web.app`, своего домена нет: «свой домен не нужен закрытой бете по приглашениям, а domain mapping Cloud Run в Preview»; R57 canvas-api — журналы в бакете `default-us-east4` на 30 дней, `_Required` остаётся в `global`, место трасс задано до первой трассы; R45 canvas-api и R58 canvas-api — выкладка после релиза, из его тега: «выкладка идёт, только если `main` всё ещё стоит на этом коммите. Иначе перезапуск CI старого коммита откатил бы prod», «Выкатываются подписанные файлы релиза, а не сборка из тега», после отката — `update-traffic --to-latest`; у environment `prod` и `prod-hosting` только правило ветки `main`, без reviewers (API GitHub, прочитано 2026-11-08); `justfile`, комментарий к `ci-hosting-check`: «a browser that kept it would ask for the files of a release that the next one removed»; в `infra/terraform/service_api.tf` образ — в `ignore_changes`, и выкладка ставит его по digest из push, мимо Terraform;
   - `infra/terraform/logging.tf` — бакет журналов в регионе проекта и sink `_Default`, перенаправленный в него с прежним фильтром; фильтра исключения журналов запросов в нём нет;
