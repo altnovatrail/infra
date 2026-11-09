@@ -17,7 +17,7 @@ A component of [NovaTrail](https://github.com/altnovatrail/spec/tree/v0.9.16), a
 
 ## Status
 
-Detailed, no code yet. The first epic of [RUN.md](RUN.md) decided what the component's card left open (finished 2026-11-08), and the code follows in the order RUN.md sets: the current epic is the first code. For now the repository holds only documents; the infrastructure will be described with OpenTofu, the open fork of Terraform (spec's question Т-29, closed by the 2026-11-08 amendment to R11 spec). The region of the platform's data, spec's question П-11, is decided: the US, with Cloud Run and infra's regional resources in `us-east4` and `api`'s Neon database in `aws-us-east-1` (R109 spec).
+Detailed; the first code has begun. The first epic of [RUN.md](RUN.md) decided what the component's card left open (finished 2026-11-08), and the code follows in the order RUN.md sets: the current epic is the first code. The infrastructure is described with OpenTofu, the open fork of Terraform (spec's question Т-29, closed by the 2026-11-08 amendment to R11 spec): it is in the devcontainer, with its own CI check (R09), while the module, the deployment and its checks are still to come. The region of the platform's data, spec's question П-11, is decided: the US, with Cloud Run and infra's regional resources in `us-east4` and `api`'s Neon database in `aws-us-east-1` (R109 spec).
 
 ## Documents
 

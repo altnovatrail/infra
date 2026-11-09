@@ -106,7 +106,7 @@
 |---|---|---|---|---|---|
 | [x] | T09 | Т-29: Terraform или OpenTofu — строка «в реестр spec» | Claude, проверяю я | — | — |
 | [x] | T10 | Переход на тег spec с ответами на В4–В10 | Claude, проверяю я | — | T09; ответы `spec` |
-| [ ] | T11 | OpenTofu в devcontainer и своя проверка в CI | Claude, проверяю я | да | T10 |
+| [x] | T11 | OpenTofu в devcontainer и своя проверка в CI | Claude, проверяю я | да | T10 |
 | [ ] | T12 | Корневой модуль: каркас, провайдеры, тесты | Claude | да | T11 |
 | [ ] | T13 | Модуль: журналы и трассы (R04, R07) | Claude | — | T12 |
 | [ ] | T14 | Модуль: Artifact Registry, Secret Manager, бюджет и оповещения (R04, R05, R07) | Claude | — | T12 |
@@ -166,7 +166,9 @@
 
 Д2 закрыт 2026-11-08 тем же Rebuild Container, ради которого заведён: автор пересобрал контейнер посреди T07, и `meta.env` — `VERSION='3.0.12'`, `go version` — go1.27.3, `buf --version` — 1.75.0, `claude --version` — 2.1.280, а `bin/claude.exe` — родной бинарник.
 
-Номера не переиспользуются: следующий — Д4.
+Д4 закрыт 2026-11-09 тем же Rebuild Container, ради которого заведён (T11, R09): в контейнере `tofu version` — «OpenTofu v1.13.9 on linux_amd64», `just ci-tofu` — «OpenTofu 1.13.9», `just ci-tofu-test` — ok. Стадию на amd64 первым собрал job CI `OpenTofu` pull request 20; arm64 её не собирал никто.
+
+Номера не переиспользуются: следующий — Д5.
 
 | ID | Долг | Откуда | Чем грозит, пока не закрыт | Когда вернуться |
 |---|---|---|---|---|
@@ -252,18 +254,37 @@
 - **Как проверить:** Rebuild Container проходит, и версия инструмента та, что в `ARG`; job CI зелёный на pull request; `/code-review high`, один круг.
 - **Мой шаг:** Rebuild Container; обязательная проверка в ruleset `main`.
 - **Разделы:** RULES.md, Hard rules; R11 spec с поправкой 2026-11-08, R12 spec, R30 spec, R34 spec, R40 spec; R08; architecture 3.6, 4.
+- **Решено автором (2026-11-09):**
+  - при установке архив сверяется только с суммой sha256, как у остальных инструментов (R34 spec), а подпись файла сумм `gpg` проверяется руками при каждом подъёме версии;
+  - проверка `OpenTofu` встаёт обязательной в ruleset `main` — шаг автора после мержа.
+- **Выяснилось при планировании (2026-11-09):**
+  - OpenTofu v1.13.9 — по-прежнему последний релиз; в архиве — `tofu`, `LICENSE`, `README.md` и `CHANGELOG.md`, а `tofu version -json` называет версию полем `terraform_version`;
+  - последний релиз `.github` — v0.1.21, на коммите 706f4067; имена проверок, на которых стоит ruleset `main`, на нём те же, а входы `codeql.yml` необязательны. Группа `shared-workflows` — в шаблоне `dependabot.yml`, architecture 3.3 `.github`;
+  - у Dependabot есть экосистема `opentofu` — обновление версий, без обновлений безопасности и закрытых реестров ([docs/architecture.md](docs/architecture.md), раздел 4); подключать её — T12, с модулем и lock-файлом;
+  - в devcontainer нет Docker, так что стадию с OpenTofu собирает только CI, а контейнер — Rebuild Container автора.
+- **Сделано (2026-11-09):**
+  - `.devcontainer/Dockerfile`, стадия `toolchain`: `ARG OPENTOFU_VERSION=1.13.9`, `ARG OPENTOFU_SHA256_AMD64` и `_ARM64`, загрузка тем же `fetch` со сверкой до распаковки, `tofu` — в `/usr/local/bin`, в конце шага — `tofu version`. Оба архива скачаны и прошли `sha256sum --check --strict`; подпись файла сумм — «Good signature», отпечаток `E3E6 E43D 84CB 852E ADB0 051D 0C0A F313 E5FD 9F80`;
+  - `justfile` — новый: `ci-tofu` сверяет `tofu version -json` с `ARG`, `ci-tofu-test` проверяет его подставным `tofu` — другой версии и той же;
+  - `ci.yml` — job `OpenTofu`: `toolchain.sh build`, затем `toolchain.sh run just ci-tofu-test` и `ci-tofu`; ссылки на `.github` в `ci.yml`, `codeql.yml` и `scorecard.yml` — с v0.1.0 на v0.1.21; `dependabot.yml` — группа `shared-workflows`;
+  - R09 — отличие контейнера и исключение лицензии; следующий номер — R10; CLAUDE.md, Environment, — отличие названо; [docs/architecture.md](docs/architecture.md), раздел 3.6 — установка, раздел 4 — источники;
+  - T12 — вопрос об экосистеме Dependabot `opentofu`; Д4 — пересборка контейнера;
+  - проверки: `just ci-tofu-test` — ok: подставной `tofu` другой версии, без версии и без JSON, `tofu` нет в `PATH`, `ARG` нет или он не точный — отказ с причиной, а `ARG` в кавычках с CR и нужная версия — проходят; `just ci-tofu` с `tofu` из скачанного архива — «OpenTofu 1.13.9», а без него — отказ «no tofu on PATH»; `just -f spec/justfile docs-check-repo` — ok; actionlint в контейнере нет. CI pull request 20 — все проверки зелёные: job `OpenTofu` собрал стадию с OpenTofu v1.13.9 на amd64, и оба рецепта прошли;
+- **Открыто:**
+  - Rebuild Container — сделан автором 2026-11-09, Д4 закрыт; проверку `OpenTofu` по поручению автора исполнитель поставил обязательной в ruleset `main` 2026-11-09 — контекст `OpenTofu`, приложение GitHub Actions (`gh api repos/altnovatrail/infra/rulesets/25506244`);
+  - в CI проверка сейчас подтверждает только, что стадия поставила `tofu` и он запускается: стадия собрана из того же Dockerfile, чей `ARG` она читает. Вес ей даст T12 — проверки модуля в том же job;
+  - `/code-review high`, один круг — 9 находок: Д4 говорил о сборке CI, которой ещё не было; проверка в CI почти ничего не ловит — так и записано; ручная проверка подписи не велела сверять отпечаток ключа; T12 противоречила себе о провайдерах и ссылалась на R09 не по делу; тест не покрывал отказы `ci-tofu`; `sed` брал `ARG` с кавычками и CR как есть; README и architecture 1 говорили, что кода нет; `set shell` в `justfile` ничего не делал. Исправлено всё, кроме загрузки OpenTofu в каждой сборке стадии, и проверкой документов тоже: это цена R09, и запись её называет.
 
 #### T12. Корневой модуль: каркас, провайдеры, тесты
 
 - **Цель:** корневой модуль с точными версиями инструмента и провайдеров, backend `gcs` и переменными проекта; тесты идут без облака; рецепт проверки модуля — в CI.
 - **Сделать:**
-  - версии инструмента и провайдеров — точные; провайдеры — из реестра OpenTofu, и суммы `.terraform.lock.hcl` — его, а поднимаются они руками, как у canvas-api (поправка 2026-11-08 к R11 spec; [docs/architecture.md](docs/architecture.md), разделы 3.6 и 4);
+  - версии инструмента и провайдеров — точные; провайдеры — из реестра OpenTofu, и суммы `.terraform.lock.hcl` — его, а кто их поднимает, решает планирование (поправка 2026-11-08 к R11 spec; [docs/architecture.md](docs/architecture.md), разделы 3.6 и 4);
   - backend `gcs` — бакет состояния, который создаёт `bootstrap.sh` (T17);
   - переменные проекта — регион из R04, без значений, которые не должны лежать в репозитории (RULES.md, Hard rules);
   - API, которые проект включает, — по R04–R07, и без Cloud Trace API (R07);
   - тесты — `tofu test` с `mock_provider` и `command = plan`, как `configuration.tftest.hcl` canvas-api: ничего не входит в облако; идёт ли код по образцу canvas-api под `tofu`, E1 не проверил ([docs/architecture.md](docs/architecture.md), раздел 3.6);
   - рецепты `tf-fmt` и `tf-check` — `tofu fmt`, `tofu init -backend=false`, `tofu validate`, `tofu test`; `tf-check` зовёт job CI из T11.
-- **Решить при планировании:** раскладка каталога — `infra/terraform/`, как у canvas-api, или в корне; имена переменных.
+- **Решить при планировании:** раскладка каталога — `infra/terraform/`, как у canvas-api, или в корне; имена переменных; кто поднимает провайдеры и их суммы в `.terraform.lock.hcl` — руками, как canvas-api ([docs/architecture.md](docs/architecture.md), раздел 4), или экосистемой Dependabot `opentofu`, которую R09 отложил до модуля.
 - **Как проверить:** `just tf-check` зелёный локально и в CI; `/code-review high`, один круг.
 - **Разделы:** R11 spec с поправкой 2026-11-08; R04–R08; architecture 3, 3.1, 3.6.
 

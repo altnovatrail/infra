@@ -18,14 +18,34 @@ concurrency:
 jobs:
   secrets:
     name: Secrets
-    uses: altnovatrail/.github/.github/workflows/secrets.yml@ff2a3597769ca85e59e476b1a41bdcbc1f50e3ed # v0.1.0
+    uses: altnovatrail/.github/.github/workflows/secrets.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
 
   # A pull request's commits are what it checks; a push to main has been checked as one.
   dco:
     name: DCO
     if: github.event_name == 'pull_request'
-    uses: altnovatrail/.github/.github/workflows/dco.yml@ff2a3597769ca85e59e476b1a41bdcbc1f50e3ed # v0.1.0
+    uses: altnovatrail/.github/.github/workflows/dco.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
 
   documents:
     name: Documents
-    uses: altnovatrail/.github/.github/workflows/documents.yml@ff2a3597769ca85e59e476b1a41bdcbc1f50e3ed # v0.1.0
+    uses: altnovatrail/.github/.github/workflows/documents.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
+
+  # infra's own check: the OpenTofu of the toolchain stage of .devcontainer/Dockerfile, at the
+  # version its ARG names, and the test of the recipe that checks it (R09). spec's script builds
+  # the stage and runs the recipes in it, as the shared Documents check runs its own (R30 spec).
+  opentofu:
+    name: OpenTofu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # With the spec submodule: toolchain.sh is spec's, at the tag this repository pins.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: OpenTofu
+        run: |
+          spec/tools/toolchain/toolchain.sh build
+          spec/tools/toolchain/toolchain.sh run just ci-tofu-test
+          spec/tools/toolchain/toolchain.sh run just ci-tofu
