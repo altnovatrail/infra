@@ -10,3 +10,7 @@ budget_currency = "USD"
 
 workload_identity_pool_id  = "infra-github"
 github_oidc_subject_prefix = "repo:example@1000/infra@2000"
+
+# Every value tofu/production.auto.tfvars sets is set here too: tofu test reads that file as well,
+# and this one wins, so no test stands on the platform's values.
+eval_github_subject_prefixes = []

@@ -209,7 +209,9 @@ deployer_permissions=(
 
 # The publisher of app's build, granted on the project, since Hosting takes no grant on a site:
 # Firebase Hosting Admin less firebasehosting.sites.create and .delete, so that the site app's
-# address is cannot be made anew or deleted by the Firebase CLI (R12).
+# address is cannot be made anew or deleted by the Firebase CLI (R12), and less
+# resourcemanager.projects.list, which a role of a project cannot hold: IAM refuses it as "not
+# valid" there (T23).
 publisher_role=hostingPublisher
 publisher_permissions=(
     firebase.clients.get
@@ -219,7 +221,6 @@ publisher_permissions=(
     firebasehosting.sites.list
     firebasehosting.sites.update
     resourcemanager.projects.get
-    resourcemanager.projects.list
 )
 
 # api's own identity, granted on the project, since sign-in takes no grant on anything smaller: it

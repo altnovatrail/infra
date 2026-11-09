@@ -44,6 +44,14 @@ if (process.env.STUB_FAIL_ONCE && !state.failedOnce && args.join(" ").includes(p
   fail("UNAVAILABLE: the service is unavailable, try again");
 }
 
+// IAM refuses, in a role of a project, a permission that is valid only at a higher level.
+const NOT_IN_A_PROJECT_ROLE = ["resourcemanager.projects.list"];
+function projectRolePermissions() {
+  for (const permission of (flag("permissions") ?? "").split(",")) {
+    if (NOT_IN_A_PROJECT_ROLE.includes(permission)) fail(`INVALID_ARGUMENT: Permission ${permission} is not valid.`);
+  }
+}
+
 const flag = (name) => {
   const prefix = `--${name}=`;
   const found = args.find((a) => a.startsWith(prefix));
@@ -130,11 +138,13 @@ switch (true) {
   }
   case command === "iam roles create":
     if (state.roles[`${projectOf()}/${first}`]) fail("ALREADY_EXISTS: role");
+    projectRolePermissions();
     state.roles[`${projectOf()}/${first}`] = { title: flag("title"), permissions: flag("permissions").split(","), deleted: false };
     break;
   case command === "iam roles update": {
     const role = state.roles[`${projectOf()}/${first}`] ?? notFound(`role ${first}`);
     if (role.deleted) fail("FAILED_PRECONDITION: the role is deleted");
+    projectRolePermissions();
     Object.assign(role, { title: flag("title"), permissions: flag("permissions").split(",") });
     break;
   }
