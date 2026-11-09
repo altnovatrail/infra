@@ -43,11 +43,17 @@ ARG OPENTOFU_VERSION=1.13.9
 # (R13). The second tool beyond spec's container, kept the same way; it never ships, and its
 # license, GPL-3.0, is the named exception of the 2026-11-09 amendment to R09 (R12 spec).
 ARG SHELLCHECK_VERSION=0.11.0
+# actionlint: the check of the workflows, the deployment's among them, which runs only after a merge
+# and so cannot show its mistakes in the pull request (R18). The third tool beyond spec's container,
+# kept the same way; it never ships, and its license, MIT, is compatible with Apache-2.0 (the second
+# 2026-11-09 amendment to R09). It calls the ShellCheck above on the workflows' scripts.
+ARG ACTIONLINT_VERSION=1.7.12
 # The sha256 of every archive, per architecture, as its publisher lists it: SHASUMS256.txt of
 # the Node release, SHA256SUMS of the just release, the sha256 go.dev/dl lists for Go,
 # sha256.txt of the buf release, whose binary comes as it is, with no archive, and
 # tofu_<version>_SHA256SUMS of the OpenTofu release, whose own signature is checked by hand with
-# gpg each time the version is raised (R09), and, for ShellCheck, which publishes no list of sums,
+# gpg each time the version is raised (R09), actionlint_<version>_checksums.txt of the actionlint
+# release, and, for ShellCheck, which publishes no list of sums,
 # the digest GitHub gives each asset of the release, checked against the archive itself. A sum written here keeps a download from being
 # swapped once it has been read (R34 spec), and is raised together with its version.
 ARG NODE_SHA256_AMD64=6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff
@@ -62,6 +68,8 @@ ARG OPENTOFU_SHA256_AMD64=b34b327cc1ef07178207b6f2cd1f5276537d3e5b7be316500f6dac
 ARG OPENTOFU_SHA256_ARM64=5dc196dde75b667e4806d358310ec96742774cd0993c54c1237efee5644b69b8
 ARG SHELLCHECK_SHA256_AMD64=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
 ARG SHELLCHECK_SHA256_ARM64=68a8133197a50beb8803f8d42f9908d1af1c5540d4bb05fdfca8c1fa47decefc
+ARG ACTIONLINT_SHA256_AMD64=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+ARG ACTIONLINT_SHA256_ARM64=325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6
 
 # Every archive comes through one helper, so that every download is retried the same way and
 # checked against its sum before anything unpacks it. --retry-all-errors is the point of it: a
@@ -72,11 +80,11 @@ RUN arch="$(dpkg --print-architecture)"; \
         amd64) node_arch=x64; gnu_arch=x86_64; \
             node_sha256="$NODE_SHA256_AMD64"; just_sha256="$JUST_SHA256_AMD64"; go_sha256="$GO_SHA256_AMD64"; \
             buf_sha256="$BUF_SHA256_AMD64"; tofu_sha256="$OPENTOFU_SHA256_AMD64"; \
-            shellcheck_sha256="$SHELLCHECK_SHA256_AMD64" ;; \
+            shellcheck_sha256="$SHELLCHECK_SHA256_AMD64"; actionlint_sha256="$ACTIONLINT_SHA256_AMD64" ;; \
         arm64) node_arch=arm64; gnu_arch=aarch64; \
             node_sha256="$NODE_SHA256_ARM64"; just_sha256="$JUST_SHA256_ARM64"; go_sha256="$GO_SHA256_ARM64"; \
             buf_sha256="$BUF_SHA256_ARM64"; tofu_sha256="$OPENTOFU_SHA256_ARM64"; \
-            shellcheck_sha256="$SHELLCHECK_SHA256_ARM64" ;; \
+            shellcheck_sha256="$SHELLCHECK_SHA256_ARM64"; actionlint_sha256="$ACTIONLINT_SHA256_ARM64" ;; \
         *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
     esac; \
     workdir="$(mktemp -d)"; \
@@ -125,6 +133,13 @@ RUN arch="$(dpkg --print-architecture)"; \
         "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"; \
     install -m 0755 "$workdir/shellcheck" /usr/local/bin/shellcheck; \
     shellcheck --version; \
+    \
+    echo "actionlint ${ACTIONLINT_VERSION}"; \
+    fetch "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${arch}.tar.gz" \
+        "$workdir/actionlint-${ACTIONLINT_VERSION}-${arch}.tar.gz" "$actionlint_sha256"; \
+    tar -C "$workdir" -xzf "$workdir/actionlint-${ACTIONLINT_VERSION}-${arch}.tar.gz" actionlint; \
+    install -m 0755 "$workdir/actionlint" /usr/local/bin/actionlint; \
+    actionlint -version; \
     \
     rm -rf "$workdir"
 

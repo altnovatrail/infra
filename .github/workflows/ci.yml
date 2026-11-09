@@ -32,7 +32,7 @@ jobs:
 
   # infra's own check: the OpenTofu and the ShellCheck of the toolchain stage of
   # .devcontainer/Dockerfile, at the versions its ARGs name, and the tests of the recipes that check
-  # them (R09); then the root module in tofu/ — its format, an init by the lock file, a validate and
+  # them (R09), and actionlint over the workflows (R18); then the root module in tofu/ — its format, an init by the lock file, a validate and
   # its tests on mock providers (R10) — and bootstrap.sh, by ShellCheck and against a stand-in
   # gcloud (R13). spec's script builds the stage and runs the recipes in it, as the shared Documents
   # check runs its own (R30 spec).
@@ -56,6 +56,8 @@ jobs:
           spec/tools/toolchain/toolchain.sh run just ci-shellcheck-test
           spec/tools/toolchain/toolchain.sh run just ci-shellcheck
           spec/tools/toolchain/toolchain.sh run just bootstrap-test
+          spec/tools/toolchain/toolchain.sh run just ci-actionlint-test
+          spec/tools/toolchain/toolchain.sh run just ci-actionlint
 
   # The checks of the deployment's list (R05, R14) and api's deployment (R15), in the same
   # toolchain stage: the licenses of tools/, the checks' tests on synthetic releases, the check of a
@@ -82,4 +84,50 @@ jobs:
           spec/tools/toolchain/toolchain.sh run just deploy-check-release-test
           spec/tools/toolchain/toolchain.sh run just deploy-api-test
           spec/tools/toolchain/toolchain.sh run just deploy-app-test
+          spec/tools/toolchain/toolchain.sh run just deploy-target-test
+          spec/tools/toolchain/toolchain.sh run just tools-install-test
           spec/tools/toolchain/toolchain.sh run just ci-deploy-check origin/main
+
+  # The deployment's tools as its jobs install them, on the runner they run on (R18): each download
+  # against the sum written down, and the runner's Docker engine against the version named. A sum or
+  # an engine that no longer holds shows here, in a pull request, not first in a deployment.
+  tools:
+    name: Deployment tools
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # In a pull request only when it changes what the tools are installed by; on main always, so
+      # that a runner whose Docker engine moved on shows after the next merge, before a deployment.
+      - name: Whether the tools change
+        id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          install=true
+          if [ "$EVENT" = pull_request ]; then
+            changed="$(git diff --name-only "origin/${BASE}...HEAD" -- tools/ci .github/actions/tools .devcontainer/Dockerfile)"
+            if [ -z "$changed" ]; then install=false; fi
+          fi
+          echo "install=${install}" >> "$GITHUB_OUTPUT"
+          if [ "$install" = false ]; then echo "::notice::Nothing the deployment's tools are installed by changes: they are not installed."; fi
+
+      - uses: ./.github/actions/tools
+        if: steps.changed.outputs.install == 'true'
+        with:
+          tools: tofu just node gcloud jq buildx docker
+
+      - name: Versions
+        if: steps.changed.outputs.install == 'true'
+        run: |
+          tofu version
+          just --version
+          node --version
+          gcloud --version
+          jq --version
+          docker buildx version

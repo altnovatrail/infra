@@ -117,7 +117,7 @@
 | [x] | T19 | Рецепты выкладки `api` (R05) | Claude | да | T15, T18 |
 | [x] | T27 | Вход в production: Identity Platform и вход через Google | Claude | да | T16 |
 | [x] | T20 | Рецепты выпуска сборки `app` на Hosting (R06) | Claude | да | T16, T18, T27 |
-| [ ] | T21 | Workflow выкладки (R05) | Claude | да | T19, T20 |
+| [x] | T21 | Workflow выкладки (R05) | Claude | да | T19, T20 |
 | [ ] | T22 | Ключ eval для CI `modules` и `tutor` (Т-28) | Claude | — | T14, T17; Т-28 решён по рекомендации |
 | [ ] | T23 | Проект в облаке: `bootstrap.sh` и первый `apply` | я + Claude | да | T13–T17, T27 |
 | [ ] | T26 | Переход на тег spec с форматом `/deployment.json` | Claude, проверяю я | — | T18, T20; релиз `spec` с форматом |
@@ -177,11 +177,12 @@
 
 Д5 закрыт 2026-11-09 тем же Rebuild Container, ради которого заведён (T17; поправка 2026-11-09 к R09): в контейнере `shellcheck --version` — 0.11.0, «GNU General Public License, version 3», `just ci-shellcheck` — «ShellCheck 0.11.0, tofu/bootstrap.sh clean», `just ci-shellcheck-test` — ok, `just bootstrap-test` — 23 из 23. Стадию с ShellCheck на amd64 первым собрал job CI `OpenTofu` pull request 26.
 
-Номера не переиспользуются: следующий — Д6.
+Номера не переиспользуются: следующий — Д7.
 
 | ID | Долг | Откуда | Чем грозит, пока не закрыт | Когда вернуться |
 |---|---|---|---|---|
 | Д3 | Бакет `_Required` Cloud Logging — в `global`: регион ему даёт только настройка организации или папки Google Cloud до создания проекта, а организация связана с доменом, которого нет до О-16 ([docs/architecture.md](docs/architecture.md), разделы 3.1 и 4; R04). Решение автора при планировании T01, 2026-11-08 | T01 | журналы `_Required` лежат вне региона П-11; у проектов, созданных до организации, бакет так и останется в `global` — место существующего бакета не меняется | когда после О-16 зарегистрирован домен: решить, заводить ли организацию с регионом по умолчанию до создания проектов платформы |
+| Д6 | actionlint 1.7.12 добавлен в стадию `toolchain` (T21; вторая поправка 2026-11-09 к R09), а контейнер автора собран до этого: в нём actionlint нет, и `just ci-actionlint` в нём отказывает, пока контейнер не пересобран. CI собирает стадию из того же Dockerfile и actionlint в нём есть | T21 | `just ci-actionlint` в devcontainer говорит «no actionlint on PATH»; проверка workflow идёт только в CI | после Rebuild Container: `actionlint -version` — 1.7.12, `just ci-actionlint` и `just ci-actionlint-test` — зелёные; тогда Д6 закрыть строкой над таблицей |
 
 ## Эпик E2. Первый код
 
@@ -736,6 +737,50 @@
 - **Решить при планировании:** как workflow узнаёт выпущенную сборку `app` (R06) и тег ревизии `api`; где проверки повторяются, а где берутся из pull request.
 - **Как проверить:** workflow проходит actionlint и пробный прогон без облака; `/code-review high`, один круг.
 - **Разделы:** R05, R06; R106 spec; architecture 3.2, 3.3.
+- **Решено автором (2026-11-09)** при планировании, все четыре — по рекомендациям:
+  - инструменты — на раннер, со своими суммами: OpenTofu, `just` и Node — по `ARG` Dockerfile, Google Cloud CLI, `jq` и `buildx` — по своему файлу версий; движок Docker — раннера, со сверкой версии;
+  - что изменилось — по списку, блоки сравниваются по смыслу; для починки — запуск руками с выбором частей и повтор упавших заданий;
+  - две строки `bootstrap.sh` — в закоммиченном `tofu/ci.env`; окружения и секреты заводит автор в T23 по инструкции;
+  - workflow проверяет actionlint в стадии `toolchain` и тесты его скриптов.
+- **Выяснилось при планировании (2026-11-09):**
+  - как workflow узнаёт выпущенную сборку `app` и тег ревизии `api` — уже решили T19 и T20: тег по реестру и сообщение выпуска Hosting; проверки повторяют сами рецепты;
+  - `toolchain.sh` `spec` не передаёт в контейнер ни сокет Docker, ни среду со входом в Google;
+  - Google публикует sha256 только архива `gcloud` без версии в имени, Docker — никаких, а `buildx` раннера меняется с еженедельной сборкой его образа;
+  - «Re-run failed jobs» оставляет выходы заданий, от которых зависит упавшее, прежними, а очередь concurrency вытесняет ожидающий прогон новым. Поэтому части считаются против последнего зелёного прогона выкладки, а не против прошлого push;
+  - canvas-api выкладывал всё на каждом прогоне.
+- **Сделано (2026-11-09):**
+  - `.github/workflows/deploy.yml` — задания `target`, `config`, `api` и `app`, по R18;
+  - `.github/actions/tools/action.yml`, `tools/ci/install.sh` и `tools/ci/versions.env` — инструменты по точным версиям и суммам; job `Deployment tools` в `ci.yml` ставит их на настоящий раннер в каждом pull request;
+  - `tools/deploy/target.mjs` — что выкладывать, страж на повторе, `tofu/ci.env`;
+  - `justfile` — `ci-deploy-target`, `ci-deploy-current`, `ci-deploy-identity`, `ci-tf-apply`, `ci-tf-outputs`, `ci-actionlint` и его тест, `deploy-target-test`, `tools-install-test`; ShellCheck — и по `tools/ci/*.sh`;
+  - actionlint 1.7.12 в стадии `toolchain`; `.gitignore` — файл входа `google-github-actions/auth`;
+  - R18; вторая поправка 2026-11-09 к R09 и третья — к R13; следующий номер — R19;
+  - [docs/architecture.md](docs/architecture.md) — разделы 3.2, 3.6 и 4, с шагом оператора перед первой выкладкой;
+  - Д6 в таблице 4 — Rebuild Container ради actionlint;
+  - проверено:
+    - `just deploy-target-test` — 19 проверок, `just tools-install-test` — 9;
+    - actionlint 1.7.12 из архива с той же суммой — workflows без замечаний, `just ci-actionlint-test` — ok;
+    - `just deploy-app-test` — 30, `deploy-check-test` — 38, `deploy-api-test` — 16, `bootstrap-test` — 23;
+    - `just tf-check` — 68; `just ci-shellcheck`, `ci-shellcheck-test`, `ci-tofu-test`, `ci-licenses` и `just -f spec/justfile docs-check-repo` — зелёные;
+    - тест на поломку: без стража на повторе в `api` и со счётом от родительского коммита тесты падают;
+  - `/code-review high`, один круг, нашёл десять замечаний; девять исправлены:
+    - основанием считался любой зелёный push-прогон, а зелёным кончается и прогон, который ничего не выложил, — изменение `api` пропало бы. Теперь основание — прогон, где прошло задание `Configuration`;
+    - первая выкладка с готовым списком упала бы на `deploy-api`, пока нет `api_image`, — теперь только образ и подсказка, что дальше;
+    - пути запуска не видели `.devcontainer/Dockerfile` и `spec` — добавлены;
+    - артефакт выходов жил 7 дней, а повтор возможен 30 — теперь 30;
+    - `ci-actionlint` без ShellCheck молча не проверил бы скрипты — теперь отказывает;
+    - суммы в `install.sh` читались внутри подстановки, и ошибка называла не тот ARG — теперь отдельно;
+    - job `Deployment tools` шёл в каждом pull request — теперь в тех, что меняют инструменты, и на каждом push в `main`;
+    - чтение ARG повторялось в трёх рецептах — общий `_arg`;
+    - части ручного запуска собирал bash в workflow — теперь `target.mjs` читает входы сам, с тестом;
+    - не изменено: прогон руками основанием не считается — один `app` скрыл бы невыложенный `api`; выложенное им следующий push выложит снова, и это безопасно.
+- **Открыто** — для других задач, их тела не тронуты (правило 1):
+  - T23 — шаг оператора по [docs/architecture.md](docs/architecture.md), раздел 3.2: `tofu/ci.env` из вывода `bootstrap.sh`, три окружения с правилом `main` и секреты `TF_VAR_billing_account` и `TF_VAR_operator_email` окружения `production-config`. До этого прогон выкладки зелёный и ничего не делает;
+  - T24:
+    - первая выкладка: `config`, руками `image`, `api_image` в `production.auto.tfvars`, затем `api`;
+    - движок Docker раннера тогда — тот ли, что в `tools/ci/versions.env`;
+    - нужно ли ждать, пока привязки учётных записей к пулу начнут действовать (`ci-identity-ready` canvas-api);
+  - Д6 — после Rebuild Container.
 
 #### T22. Ключ eval для CI `modules` и `tutor` (Т-28)
 
