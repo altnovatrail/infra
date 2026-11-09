@@ -84,8 +84,9 @@ ci-tofu-test:
     env PATH="$work/bin:$PATH" "$just" ci-tofu >"$work/out" 2>&1 || { echo "ci-tofu-test: ci-tofu refused tofu ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-tofu-test: ok"
 
-# ShellCheck over tofu/bootstrap.sh, by the ShellCheck the toolchain stage installs, at the version
-# its ARG names (the 2026-11-09 amendment to R09).
+# ShellCheck over the repository's scripts, tofu/bootstrap.sh and tools/deploy/*.sh, by the
+# ShellCheck the toolchain stage installs, at the version its ARG names (the 2026-11-09 amendment to
+# R09).
 ci-shellcheck:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -103,8 +104,8 @@ ci-shellcheck:
         echo "ci-shellcheck: shellcheck is ${got:-of no version}, and {{dockerfile}} names ${want}" >&2
         exit 1
     fi
-    shellcheck {{ quote(tofu_dir) }}/bootstrap.sh
-    echo "ci-shellcheck: ShellCheck ${got}, {{ tofu_dir }}/bootstrap.sh clean"
+    shellcheck {{ quote(tofu_dir) }}/bootstrap.sh tools/deploy/*.sh
+    echo "ci-shellcheck: ShellCheck ${got}, {{ tofu_dir }}/bootstrap.sh and tools/deploy/*.sh clean"
 
 # ci-shellcheck's own test, with no real shellcheck: a stand-in ahead on PATH, of another version,
 # of none and of the right one, which finds a script clean or not as it is told.
@@ -231,9 +232,9 @@ deploy-check base="origin/main": _tools
     node tools/deploy-check/main.mjs --base {{ quote(base) }} deploy
 
 # What CI runs: deploy-check, when the pull request changes against base what the list is checked
-# by — deploy/, the checks and their packages, this file, or the tag of spec, whose admission table
-# and release-verify the checks read — and otherwise nothing, so that a pull request of documents
-# downloads no release.
+# or deployed by — deploy/, the checks, the deployment of tools/deploy/, their packages, this file,
+# or the tag of spec, whose admission table and release-verify the checks read — and otherwise
+# nothing, so that a pull request of documents downloads no release.
 ci-deploy-check base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -242,7 +243,7 @@ ci-deploy-check base="origin/main":
         echo "ci-deploy-check: the base ${base} is not a commit here: fetch it before the check" >&2
         exit 1
     fi
-    changed=$(git diff --name-only "${base}...HEAD" -- deploy tools/deploy-check tools/package.json tools/package-lock.json justfile spec)
+    changed=$(git diff --name-only "${base}...HEAD" -- deploy tools/deploy-check tools/deploy tools/package.json tools/package-lock.json justfile spec)
     if [ -z "$changed" ]; then
         echo "ci-deploy-check: nothing the list is checked by changes against ${base}, and the list is not checked"
         exit 0
@@ -256,3 +257,22 @@ deploy-check-test: _tools
 # The check of a release's files on a real release of api, against GitHub and Sigstore (R14).
 deploy-check-release-test: _tools
     node --test tools/deploy-check/test/release.test.mjs
+
+# api's deployment by the list, as R05 lays out its steps (R15), on what the configuration's outputs
+# name, as `tofu output -json` prints them after the apply of the same commit; a relative path to them
+# is the caller's, from where just is run. They run gcloud and docker, signed in as api's deployment.
+# Build api's image of the list's release, push it and print its digest
+deploy-api-image outputs: _tools
+    cd {{ quote(invocation_directory()) }} && {{ quote(justfile_directory() / "tools/deploy/api.sh") }} image {{ quote(outputs) }} {{ quote(justfile_directory() / "deploy") }}
+
+# Deploy the list's release of api: image, jobs, revision and traffic
+deploy-api outputs: _tools
+    cd {{ quote(invocation_directory()) }} && {{ quote(justfile_directory() / "tools/deploy/api.sh") }} release {{ quote(outputs) }} {{ quote(justfile_directory() / "deploy") }}
+
+# Give api's service a new version of the facts, on the image that takes the traffic
+deploy-api-facts outputs:
+    cd {{ quote(invocation_directory()) }} && {{ quote(justfile_directory() / "tools/deploy/api.sh") }} facts {{ quote(outputs) }} {{ quote(justfile_directory() / "deploy") }}
+
+# tools/deploy/api.sh against stand-ins for gcloud, docker and fetch.mjs: no cloud, no network.
+deploy-api-test:
+    node --test tools/deploy/test/api.test.mjs

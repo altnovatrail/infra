@@ -399,3 +399,74 @@ run "a_request_timeout_past_an_hour_is_refused" {
 
   expect_failures = [var.api_request_timeout]
 }
+
+# Each job's part in api's deployment, which the deployment reads from the configuration's outputs
+# with the service's name and the file of the facts (R15): migrate migrates; a job of the clock has
+# none.
+run "the_deployment_reads_the_jobs_parts_from_the_outputs" {
+  command = plan
+
+  variables {
+    api_image = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_jobs = {
+      migrate = {
+        args   = ["migrate"]
+        deploy = "migrate"
+      }
+      daily = {
+        args     = ["daily"]
+        schedule = "15 3 * * *"
+      }
+    }
+  }
+
+  assert {
+    condition     = toset(keys(output.api_jobs)) == toset(["migrate", "daily"]) && output.api_jobs["migrate"].job == "api-migrate" && output.api_jobs["migrate"].deploy == "migrate" && output.api_jobs["daily"].job == "api-daily" && output.api_jobs["daily"].deploy == null
+    error_message = "The outputs name each job made, by its Cloud Run name, with its part in the deployment."
+  }
+
+  assert {
+    condition     = output.api_service_name == "api" && output.admission_facts_file == "/etc/api/admission/facts.json"
+    error_message = "The outputs name the service and the file of the facts the revision reads."
+  }
+}
+
+run "migrate_is_the_deployments_by_default" {
+  command = plan
+
+  assert {
+    condition     = var.api_jobs["migrate"].deploy == "migrate"
+    error_message = "The default list's migrate is the deployment's migrations."
+  }
+}
+
+run "a_part_in_the_deployment_it_does_not_know_is_refused" {
+  command = plan
+
+  variables {
+    api_jobs = {
+      migrate = {
+        args   = ["migrate"]
+        deploy = "before"
+      }
+    }
+  }
+
+  expect_failures = [var.api_jobs]
+}
+
+run "a_job_of_the_deployment_on_a_schedule_is_refused" {
+  command = plan
+
+  variables {
+    api_jobs = {
+      migrate = {
+        args     = ["migrate"]
+        deploy   = "migrate"
+        schedule = "15 3 * * *"
+      }
+    }
+  }
+
+  expect_failures = [var.api_jobs]
+}

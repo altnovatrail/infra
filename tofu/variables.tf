@@ -171,12 +171,13 @@ variable "api_image" {
 }
 
 variable "api_jobs" {
-  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, and, for a job that runs by the clock, its schedule in cron's form, UTC. Only commands api's release has go here."
+  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, for a job that runs by the clock its schedule in cron's form, UTC, and for a job the deployment runs its part in it: check, before the migrations; migrate; or after, once the new revision takes all traffic (R05, R15). Only commands api's release has go here."
   type = map(object({
     args     = list(string)
     secrets  = optional(map(string), {})
     timeout  = optional(string, "600s")
     schedule = optional(string)
+    deploy   = optional(string)
   }))
   nullable = false
 
@@ -185,7 +186,8 @@ variable "api_jobs" {
   # the retention periods join the list when api's release names them.
   default = {
     migrate = {
-      args = ["migrate"]
+      args   = ["migrate"]
+      deploy = "migrate"
       secrets = {
         API_MIGRATE_DATABASE_URL         = "api-migrate-database-url"
         API_MIGRATE_OPENFGA_DATABASE_URL = "api-migrate-openfga-database-url"
@@ -206,6 +208,13 @@ variable "api_jobs" {
   validation {
     condition     = alltrue([for job in values(var.api_jobs) : length(job.args) > 0 && can(regex("^[1-9][0-9]*s$", job.timeout)) && try(tonumber(trimsuffix(job.timeout, "s")) <= 604800, false)])
     error_message = "A job names its command, and its timeout is a whole number of seconds up to 604800s, Cloud Run's 168 hours, such as 600s."
+  }
+
+  # The deployment runs a job of check, migrate and after in its turn; the clock runs the others. A
+  # job of the deployment that ran by the clock as well would run outside the deployment's order.
+  validation {
+    condition     = alltrue([for job in values(var.api_jobs) : job.deploy == null || (contains(["check", "migrate", "after"], coalesce(job.deploy, "-")) && job.schedule == null)])
+    error_message = "A job's part in the deployment is check, migrate or after, and a job the deployment runs has no schedule."
   }
 
   validation {
