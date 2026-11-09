@@ -95,7 +95,9 @@ function siteOf(outputsFile) {
     if (typeof found !== "string" || !found) throw new Refusal(`the configuration's outputs name no ${name}`);
     return found;
   };
-  return { site: value("hosting_site"), url: value("hosting_url").replace(/\/+$/, "") };
+  let url = value("hosting_url");
+  while (url.endsWith("/")) url = url.slice(0, -1);
+  return { site: value("hosting_site"), url };
 }
 
 // The list's block of app, the list held to its schema, and its deployment.json, of the sha256
@@ -196,7 +198,7 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
     if (!version.name) throw new Refusal("Hosting made a version and named none");
     const required = new Set();
     let uploadUrl = null;
-    const paths = Object.keys(hashes).sort();
+    const paths = Object.keys(hashes).sort((a, b) => a.localeCompare(b));
     for (let i = 0; i < paths.length; i += BATCH) {
       const batch = Object.fromEntries(paths.slice(i, i + BATCH).map((where) => [where, hashes[where]]));
       const populated = await call("POST", `${version.name}:populateFiles`, { json: { files: batch }, what: `the files of ${version.name}` });

@@ -212,7 +212,7 @@ export function buildFiles(dir) {
     .readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 }
 
 // /deployment.json against the deployment.schema.json at the root of the unpacked build.
