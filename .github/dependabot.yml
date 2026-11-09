@@ -35,3 +35,12 @@ updates:
     groups:
       google-providers:
         patterns: ["hashicorp/google", "hashicorp/google-beta"]
+
+  # The packages of tools/, the checks of the deployment's list (R14): ajv and what it needs. A
+  # pull request that raises them runs the licenses check and the checks' tests in the job Deploy.
+  - package-ecosystem: npm
+    directory: /tools
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3

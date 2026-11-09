@@ -56,3 +56,27 @@ jobs:
           spec/tools/toolchain/toolchain.sh run just ci-shellcheck-test
           spec/tools/toolchain/toolchain.sh run just ci-shellcheck
           spec/tools/toolchain/toolchain.sh run just bootstrap-test
+
+  # The checks of the deployment's list (R05, R14), in the same toolchain stage: the licenses of
+  # tools/, the checks' tests on synthetic releases, the check of a release's files on a real
+  # release of api, against GitHub and Sigstore, and the list itself when the pull request changes
+  # what it is checked by: deploy/, the checks, their packages, the justfile or the tag of spec. The
+  # whole history, so that the list on main is there to compare with.
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Deploy
+        run: |
+          spec/tools/toolchain/toolchain.sh build
+          spec/tools/toolchain/toolchain.sh run just ci-licenses
+          spec/tools/toolchain/toolchain.sh run just deploy-check-test
+          spec/tools/toolchain/toolchain.sh run just deploy-check-release-test
+          spec/tools/toolchain/toolchain.sh run just ci-deploy-check origin/main

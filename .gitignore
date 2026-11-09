@@ -5,3 +5,6 @@
 *.tfstate.*
 *.tfplan
 crash.log
+
+# The packages npm ci installs from tools/package-lock.json, for the checks of the deployment's list.
+tools/node_modules/

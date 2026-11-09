@@ -1,7 +1,8 @@
 # infra's own recipes. spec's, the documents check among them, run from spec's justfile:
-# `just -f spec/justfile docs-check-repo`. CI runs the ci- recipes, tf-check and bootstrap-test in
-# the toolchain stage of .devcontainer/Dockerfile, through spec/tools/toolchain/toolchain.sh
-# (R30 spec): the job OpenTofu, required in the ruleset of main.
+# `just -f spec/justfile docs-check-repo`. CI runs the ci- recipes, tf-check, bootstrap-test and the
+# tests of deploy-check in the toolchain stage of .devcontainer/Dockerfile, through
+# spec/tools/toolchain/toolchain.sh (R30 spec): the jobs OpenTofu, required in the ruleset of main,
+# and Deploy.
 
 # The Dockerfile whose ARGs ci-tofu and ci-shellcheck read; their tests point it at broken copies.
 dockerfile := env("INFRA_DOCKERFILE", ".devcontainer/Dockerfile")
@@ -203,3 +204,55 @@ bootstrap:
 # bootstrap.sh against a stand-in gcloud, with synthetic values: no cloud, no credential.
 bootstrap-test:
     node --test {{ quote(tofu_dir) }}/tests/bootstrap.test.mjs
+
+# The tools of tools/, by its lock file: installed again only when package.json or the lock file
+# changes, as spec's own _tools does.
+_tools:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    stamp=tools/node_modules/.installed-from
+    wanted="$(cd tools && sha256sum package.json package-lock.json)"
+    if [[ ! -f "$stamp" || "$(cat "$stamp")" != "$wanted" ]]; then
+        (cd tools && npm ci --ignore-scripts --no-audit --no-fund)
+        printf '%s\n' "$wanted" > "$stamp"
+    fi
+
+# The packages of tools/package-lock.json against the licenses NovaTrail builds from, by spec's check
+# (R12 spec).
+ci-licenses:
+    just -f spec/justfile licenses-check-repo tools/package-lock.json
+
+# The checks R05 asks of a pull request that changes the deployment's list (R14): deploy/production.json
+# by its schema, the files of its releases by release-verify and sha256, deployment.json, the facts,
+# the rung, and api's tag no lower than in the list at base. It reads the releases from GitHub and
+# Sigstore. With no list yet there is nothing to check, and it says so.
+# Check the deployment's list in deploy/ against the list at base
+deploy-check base="origin/main": _tools
+    node tools/deploy-check/main.mjs --base {{ quote(base) }} deploy
+
+# What CI runs: deploy-check, when the pull request changes against base what the list is checked
+# by — deploy/, the checks and their packages, this file, or the tag of spec, whose admission table
+# and release-verify the checks read — and otherwise nothing, so that a pull request of documents
+# downloads no release.
+ci-deploy-check base="origin/main":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    base={{ quote(base) }}
+    if ! git rev-parse --verify --quiet "${base}^{commit}" >/dev/null; then
+        echo "ci-deploy-check: the base ${base} is not a commit here: fetch it before the check" >&2
+        exit 1
+    fi
+    changed=$(git diff --name-only "${base}...HEAD" -- deploy tools/deploy-check tools/package.json tools/package-lock.json justfile spec)
+    if [ -z "$changed" ]; then
+        echo "ci-deploy-check: nothing the list is checked by changes against ${base}, and the list is not checked"
+        exit 0
+    fi
+    just deploy-check "$base"
+
+# The checks' own tests, on synthetic releases, with no network.
+deploy-check-test: _tools
+    node --test tools/deploy-check/test/check.test.mjs
+
+# The check of a release's files on a real release of api, against GitHub and Sigstore (R14).
+deploy-check-release-test: _tools
+    node --test tools/deploy-check/test/release.test.mjs

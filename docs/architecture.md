@@ -130,7 +130,7 @@
 - `production.json` — список выкатки;
 - `production/deployment.json` — значения `/deployment.json` сборки `app`, формат 1 (R09 app);
 - `production/facts.json` — файл фактов развёртывания для функции допуска, в форме `facts` таблицы допуска ([текст таблицы допуска](../spec/admission/README.md), раздел 5);
-- `schema/` — схема JSON списка.
+- `schema/production.schema.json` — схема JSON списка, JSON Schema 2020-12 (R14).
 
 **Пример списка** — синтетический: версии и дайджесты выдуманы.
 
@@ -163,7 +163,7 @@
 }
 ```
 
-Имя бинарника `api` — по договору его релиза, `api_<тег>_linux_amd64` (R28 api; вторая поправка 2026-11-08 к R106 spec). Последний релиз `api` — v0.1.1 от 2026-11-08: в нём `api_v0.1.1_linux_amd64`, `Dockerfile` и `SHA256SUMS`, каждый с подписью, а бинарник даёт команды `serve`, `migrate` и `version` — команды проверки конфигурации и задания после выкладки в нём ещё нет (раздел 4). У `app` релизов пока нет, и имя архива в примере — условное.
+Имя бинарника `api` — по договору его релиза, `api_<тег>_linux_amd64` (R28 api; вторая поправка 2026-11-08 к R106 spec). Последний релиз `api` — v0.1.1 от 2026-11-08: в нём `api_v0.1.1_linux_amd64`, `Dockerfile` и `SHA256SUMS`, каждый с подписью, а бинарник даёт команды `serve`, `migrate` и `version` — команды проверки конфигурации и задания после выкладки в нём ещё нет (раздел 4). На 2026-11-09 последний — v0.1.5: бинарники `api_v0.1.5_linux_amd64` и `api_v0.1.5_linux_arm64`, `Dockerfile`, `SHA256SUMS` и лицензии, у каждого файла — подпись (раздел 4; T18). У `app` релизов пока нет, и имя архива в примере — условное.
 
 **Pull request со списком** — CI без доступа к production:
 1. список — по своей схеме;
@@ -172,6 +172,8 @@
 4. `facts.json` — по словарю фактов таблицы допуска тега `spec` подмодуля: это ранний знак, а окончательно файл проверяет образ нового релиза `api` (шаг 4 ниже);
 5. ступень — `full` (R25 api);
 6. тег `api` — не ниже, чем в списке на `main`.
+
+**Проверки в коде** (R14; T18) — `tools/deploy-check/` на Node и ajv 8.20.0, рецепт `just deploy-check`. Job CI `Deploy` гоняет их тесты в каждом pull request — синтетику и настоящий релиз `api` v0.1.5 против GitHub и Sigstore, — а сам список, когда pull request меняет то, чем он проверяется: `deploy/`, проверки, их пакеты, `justfile` или тег `spec`. Самого `deploy/production.json` до первой выкладки нет: его, `production/deployment.json` и `production/facts.json` пишет T24, когда будут релизы `api` и `app`.
 
 **Выкладка** — после мержа, из коммита списка. Первое задание проверяет, что `main` стоит на этом коммите, а каждое следующее — на повторной попытке (R45 canvas-api). Выкладка делает только то, что изменилось против `main` до мержа.
 
@@ -361,6 +363,10 @@ Self-hosting — копия платформы, которую оператор 
   - «If the log entry matches the inclusion filter and at least one exclusion filter, then it isn't routed»;
   - «You can't use exclusion filters to reduce the consumption of your entries.write API quota or the number of entries.write API calls. Exclusion filters are applied after log entries are received by the Logging API»;
   - «For each Google Cloud project, billing account, folder, and organization, Cloud Logging creates two log sinks, one named _Required and the other named _Default».
+- **Проверки списка выкатки** (раздел 3.2; R14; T18), прочитано 2026-11-09:
+  - `gh release view v0.1.5 -R altnovatrail/api` — последний релиз `api`, опубликован 2026-11-09T03:51:10Z: `api_v0.1.5_linux_amd64` и `api_v0.1.5_linux_arm64`, `Dockerfile`, `SHA256SUMS` и лицензии, у каждого файла — `.sigstore.json`; `gh release list -R altnovatrail/app` — релизов нет, а в репозитории `app` на `main` 375a09b кода ещё нет;
+  - `spec` v0.9.16: `admission/schemas/answer-vector.schema.json` — `$defs/declared_facts`, «The deployment facts declared, by provider»: провайдер — факт — непустой список возрастных категорий; `admission/admission-table.json` — провайдеры `anthropic`, `google`, `openai` и факты `data_processing_agreement`, `minimal_retention`, `zero_data_retention`, `minor_safeguards`; `tools/format-check/schemas.mjs` — ajv с `allErrors`, `validateFormats: false`, `strictTypes: false`, `strictTuples: false`; `tools/release/verify.mjs` — «checks a file of the release <tag> of <repository>, against its bundle, by default <file>.sigstore.json beside it»; `tools/package.json` — `ajv` 8.20.0;
+  - `npm install ajv@8.20.0` в `tools/`: в lock-файле — `ajv` 8.20.0, `fast-deep-equal` 3.1.3, `json-schema-traverse` 1.0.0 и `require-from-string` 2.0.2 под MIT, `fast-uri` 3.1.9 под BSD-3-Clause; `just -f spec/justfile licenses-check-repo tools/package-lock.json` — «ok — 5 packages, 0 exceptions».
 - **`bootstrap.sh`** (разделы 3, 3.2, 3.3 и 3.6; R13; поправки 2026-11-09 к R09, R11 и R12; T17), прочитано 2026-11-09:
   - Google Cloud, [Set limits on granting roles](https://docs.cloud.google.com/iam/docs/setting-limits-on-granting-roles), даты на странице нет: пример условия — «api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['roles/pubsub.editor', 'roles/pubsub.publisher'])»; «Don't include the following types of roles in the list of allowed roles: Roles with permissions to grant and revoke IAM roles (that is, roles with permission names that end in `setIamPolicy`). Custom roles that the limited IAM admin can modify»; в списке — до 10 ролей; «Some Google Cloud services don't recognize limits on role granting»;
   - Google Cloud, [Allow policies](https://docs.cloud.google.com/iam/docs/policies), даты на странице нет: «For role bindings that include a condition, IAM appends the string `_withcond_` to the role name, followed by a hash value»; «When you use the Google Cloud console or the gcloud CLI, you don't need to specify an allow policy version. These tools specify the version automatically»;
