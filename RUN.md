@@ -171,12 +171,13 @@
 
 Д4 закрыт 2026-11-09 тем же Rebuild Container, ради которого заведён (T11, R09): в контейнере `tofu version` — «OpenTofu v1.13.9 on linux_amd64», `just ci-tofu` — «OpenTofu 1.13.9», `just ci-tofu-test` — ok. Стадию на amd64 первым собрал job CI `OpenTofu` pull request 20; arm64 её не собирал никто.
 
+Д5 закрыт 2026-11-09 тем же Rebuild Container, ради которого заведён (T17; поправка 2026-11-09 к R09): в контейнере `shellcheck --version` — 0.11.0, «GNU General Public License, version 3», `just ci-shellcheck` — «ShellCheck 0.11.0, tofu/bootstrap.sh clean», `just ci-shellcheck-test` — ok, `just bootstrap-test` — 23 из 23. Стадию с ShellCheck на amd64 первым собрал job CI `OpenTofu` pull request 26.
+
 Номера не переиспользуются: следующий — Д6.
 
 | ID | Долг | Откуда | Чем грозит, пока не закрыт | Когда вернуться |
 |---|---|---|---|---|
 | Д3 | Бакет `_Required` Cloud Logging — в `global`: регион ему даёт только настройка организации или папки Google Cloud до создания проекта, а организация связана с доменом, которого нет до О-16 ([docs/architecture.md](docs/architecture.md), разделы 3.1 и 4; R04). Решение автора при планировании T01, 2026-11-08 | T01 | журналы `_Required` лежат вне региона П-11; у проектов, созданных до организации, бакет так и останется в `global` — место существующего бакета не меняется | когда после О-16 зарегистрирован домен: решить, заводить ли организацию с регионом по умолчанию до создания проектов платформы |
-| Д5 | Rebuild Container ради ShellCheck: стадию `toolchain` с ним собирает CI, а контейнер автора — нет (поправка 2026-11-09 к R09; T17) | T17 | `just ci-shellcheck` в контейнере говорит «no shellcheck on PATH», а `bootstrap.sh` проверяет только CI | Rebuild Container: `shellcheck --version` — 0.11.0, `just ci-shellcheck` — ok |
 
 ## Эпик E2. Первый код
 
@@ -505,7 +506,7 @@
     - лишние `update` сразу после `create` — убраны.
     Не исправлена одна: имена ролей в `api.tftest.hcl` и `firebase.tftest.hcl` пишутся строкой — эти тесты держат то, что даёт модуль, сами по себе, а со скриптом их связывает `bootstrap.tftest.hcl`.
 - **Открыто** — для других задач, их тела не тронуты (правило 1):
-  - Д5 — Rebuild Container;
+  - Д5 — Rebuild Container: сделан автором 2026-11-09, Д5 закрыт;
   - T23: `tofu/production.auto.tfvars` и `tofu/backend.hcl` с тем, что читает скрипт; где запускать его с `gcloud` — в контейнере его нет; `just bootstrap` до первого `apply`; там же проверить, что `infra-config` хватает прав — в частности, давать свои роли без `iam.roles.get` и `firebase.admin` для `google_firebase_project`, — что условие `projectIamAdmin` с ролью вида `projects/<проект>/roles/…` IAM принимает, что `gcloud` отдаёт политику с условиями, а не с суффиксом `_withcond_`, и после первого `apply` — что ни одна учётная запись проекта не держит Owner или Editor: подставной `gcloud` этого не проверяет;
   - T21: окружение `production-config` — только `main`; `apply` — от `infra-config`; куда лягут `GCP_WORKLOAD_IDENTITY_PROVIDER` и `GCP_CONFIG_SERVICE_ACCOUNT`; plan на pull request, если понадобится, — своей учётной записью только на чтение;
   - T22: провайдер пускает только `infra` — как в пул войдут `modules` и `tutor`;
