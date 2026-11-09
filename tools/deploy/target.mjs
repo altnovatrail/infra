@@ -119,7 +119,11 @@ export function partsOfInputs(env) {
 // Whether tofu/production.auto.tfvars at the commit names api_image: until it does, api has no jobs.
 function hasImage(dir, commit) {
   if (!has(dir, commit, TFVARS)) return false;
-  return /^\s*api_image\s*=\s*"[^"]+"/m.test(git(dir, ["show", `${commit}:${TFVARS}`]).stdout);
+  // Line by line, with no regular expression over the whole text, which would backtrack (S8786).
+  return git(dir, ["show", `${commit}:${TFVARS}`]).stdout.split("\n").some((line) => {
+    const at = line.indexOf("=");
+    return at > 0 && line.slice(0, at).trim() === "api_image" && /^"[^"]+"/.test(line.slice(at + 1).trim());
+  });
 }
 
 function partsByHand(text) {
