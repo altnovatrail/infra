@@ -3,13 +3,23 @@
 # providers are mocked; a provider left out would be the real one, and a plan with it would call
 # Google. The values below are synthetic: the platform's own come when its project is created.
 
-mock_provider "google" {}
+mock_provider "google" {
+  mock_data "google_project" {
+    defaults = {
+      number = "123456789012"
+    }
+  }
+}
 
 mock_provider "google-beta" {}
 
 variables {
   project_id = "novatrail-test-0"
   region     = "us-east4"
+
+  billing_account = "0A1B2C-3D4E5F-6A7B8C"
+  budget_amount   = "10"
+  budget_currency = "USD"
 }
 
 # The APIs on are exactly those the parts of the configuration stand on — one more is a change

@@ -198,11 +198,15 @@
 
 Не дошедшую выкладку повторяют, перезапустив её задания, или чинят вперёд новым pull request.
 
+**Реестр и секрет фактов в модуле** (T14):
+- `tofu/registry.tf` — репозиторий Docker `images` в регионе. Очистка держит 5 последних версий в любом состоянии, а удаляет только версии без тега, старше 30 дней; версия, которая подходит и под сохранение, и под удаление, сохраняется (раздел 4). Выкладка кладёт образ с тегом релиза (T19), так что выкаченный образ тег держит, сколько бы push ни пришло после него, и путь «только факты или ступень» встанет на него по digest; тег теряет только повторный push того же релиза. Модуль репозиторий не удаляет: `deletion_policy = "PREVENT"`. Читать его вне проекта модуль не даёт, а право push учётной записи выкладки — T15;
+- `tofu/secrets.tf` — секрет `api-admission-facts` с репликой только в регионе и без значения: каждую версию добавляет выкладка. Модуль его не удаляет: `deletion_protection = true`, ведь ревизия монтирует одну из его версий. Чтение — учётной записи `api`, T15.
+
 **Self-hosting** — тот же каталог `deploy/` со своими `deployment.json` и фактами, те же проверки и шаги в своём проекте и своём закрытом реестре. Подписанные файлы релизов у всех одни (R105, R106 spec; Т-20).
 
 ### 3.3. Хостинг сборки `app` и домены
 
-Сборку `app` раздаёт Firebase Hosting — сайт проекта по умолчанию, план Blaze; бюджет проекта с оповещением ставит первый код (R06).
+Сборку `app` раздаёт Firebase Hosting — сайт проекта по умолчанию, план Blaze; бюджет проекта с оповещением — `tofu/budget.tf` (R06; T14): только этот проект, по его номеру, за месяц, письма на 50, 90 и 100 % суммы — администраторам и пользователям платёжного аккаунта, как бюджет шлёт их по умолчанию, и в канал оператора, если он назван (раздел 4). Сумма и валюта — значения развёртывания, а платёжный аккаунт приходит из окружения, `TF_VAR_billing_account`: он называет, кто платит.
 
 **Выпуск** — шаг выкладки `app` раздела 3.2:
 1. папка выпуска — архив новой сборки, `assets/` сборки, которая сейчас выпущена на Hosting, и `/deployment.json` из `deploy/production/deployment.json`. Выпущенную сборку выкатка узнаёт по выпуску Hosting, а не по списку на `main`, и проверяет её архив, как новый: `release-verify` и sha256. Версия Hosting — полный набор файлов, и без `assets/` прошлой сборки она убрала бы их. У первого выпуска прошлой сборки нет;
@@ -274,7 +278,7 @@
 - встроенные метрики Cloud Run в Cloud Monitoring — число запросов, задержки, экземпляры;
 - Error Reporting — по журналам `api`, которые хранятся.
 
-Своих метрик по журналам, где меткой стал бы адрес, проект не заводит: они считаются и по исключённым записям. Оповещения — на встроенных метриках, первый код.
+Своих метрик по журналам, где меткой стал бы адрес, проект не заводит: они считаются и по исключённым записям. Оповещения — на встроенных метриках, `tofu/alerts.tf` (T14): нагрузка — запросов к `api` в минуту больше `load_alert_per_minute`, 300 по умолчанию, — и ошибки — ответов класса 5xx в минуту больше `error_alert_per_minute`, 1 по умолчанию, — оба в среднем за пять минут, по `run.googleapis.com/request_count`. Письмо — оператору, чей адрес приходит из окружения, `TF_VAR_operator_email`; без адреса нет ни канала, ни оповещений. Текст письма ведёт к метрикам Cloud Run и журналу `api`, а не к журналам запросов: их нет. Метрики Cloud Run бесплатны, а сами оповещения Google берёт с 1 сентября 2027 года: $0,35 в месяц за каждую метрику в условии — здесь по одной в каждом из двух — и $0,50 за миллион точек, которые возвращает запрос условия (раздел 4).
 
 **Трассы:** нет. Cloud Trace API не включается, а место `_Trace` — `us-east4` — всё равно задано до любой трассы (R04 с поправкой 2026-11-09): Cloud Run трассирует часть запросов сам.
 
@@ -345,6 +349,11 @@ Self-hosting — копия платформы, которую оператор 
   - «If the log entry matches the inclusion filter and at least one exclusion filter, then it isn't routed»;
   - «You can't use exclusion filters to reduce the consumption of your entries.write API quota or the number of entries.write API calls. Exclusion filters are applied after log entries are received by the Logging API»;
   - «For each Google Cloud project, billing account, folder, and organization, Cloud Logging creates two log sinks, one named _Required and the other named _Default».
+- **Реестр, бюджет и оповещения в модуле** (разделы 3.2–3.4; T14), прочитано 2026-11-09:
+  - Google Cloud, [Configure cleanup policies](https://docs.cloud.google.com/artifact-registry/docs/repositories/cleanup-policy), даты на странице нет: «When an artifact matches the criteria for both a delete policy and a keep policy, the artifact is kept»; `tagState` — «TAGGED: only applies to tagged artifacts», «UNTAGGED: only applies to untagged artifacts»; длительность — «seconds, minutes, hours, or days by appending `s`, `m`, `h`, or `d`»;
+  - Google Cloud, [Create, edit, or delete budgets and budget alerts](https://docs.cloud.google.com/billing/docs/how-to/budgets), даты на странице нет: по умолчанию — «Email alerts to billing admins and users», что «sends alert emails to Billing Account Administrators and Billing Account Users on the target Cloud Billing account»; каналы Cloud Monitoring — «Link Monitoring email notification channels to this budget»; создать бюджет — роль на платёжном аккаунте с `billing.budgets.create`, например «Billing Account Costs Manager». Должна ли валюта бюджета совпадать с валютой аккаунта, страница не говорит;
+  - [Google Cloud Observability pricing](https://cloud.google.com/products/observability/pricing), даты на странице нет: «Alerting policies $0.35 per month for each metric reference in an alerting policy $0.50 per 1,000,000 points returned by the query of a metric alerting policy condition», бесплатного объёма — «Not applicable», с «September 1, 2027»; «A metric reference is a single mention of a metric name within an alerting policy condition»;
+  - схема провайдера `google` 8.10.0 (`tofu providers schema -json`): у `google_artifact_registry_repository` — `registry_uri`, «The repository endpoint»; у источника данных `google_project` — `billing_account`, и его чтение требует «Billing Account Administrator privileges (roles/billing.admin)».
 - **Журналы и трассы в модуле** (раздел 3.4; T13), прочитано 2026-11-09:
   - Google Cloud, [Create observability buckets](https://docs.cloud.google.com/trace/docs/create-observability-buckets), даты на странице нет: бакет `_Trace` создаётся методом `projects.locations.buckets.create`, с `name` `projects/PROJECT_ID/locations/LOCATION/buckets/_Trace`, и нужна роль `roles/observability.editor`; в OpenTofu — ресурс `google_observability_bucket` с `bucket_id` `_Trace`; если трассы пришли раньше, бакет создаётся сам, «using your project's default settings for observability buckets»;
   - [Route log entries](https://docs.cloud.google.com/logging/docs/routing/overview): фильтр sink `_Default` — `NOT LOG_ID("cloudaudit.googleapis.com/activity") AND NOT LOG_ID("externalaudit.googleapis.com/activity") AND NOT LOG_ID("cloudaudit.googleapis.com/system_event") AND NOT LOG_ID("externalaudit.googleapis.com/system_event") AND NOT LOG_ID("cloudaudit.googleapis.com/access_transparency") AND NOT LOG_ID("externalaudit.googleapis.com/access_transparency")`, тот же, что у canvas-api;
