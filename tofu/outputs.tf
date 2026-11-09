@@ -25,3 +25,18 @@ output "admission_facts_secret" {
   description = "The secret whose versions are api's deployment facts: the deployment adds each, and mounts the one it names."
   value       = google_secret_manager_secret.admission_facts.secret_id
 }
+
+output "api_service_account" {
+  description = "The identity api runs as, in its service and its jobs."
+  value       = google_service_account.api.email
+}
+
+output "deploy_service_account" {
+  description = "The identity the deployment borrows to push api's image, add a version of its facts, run its jobs and roll a revision."
+  value       = google_service_account.deployer.email
+}
+
+output "api_service_url" {
+  description = "api's address on run.app, the one app calls; null until the service exists."
+  value       = one(google_cloud_run_v2_service.api[*].uri)
+}
