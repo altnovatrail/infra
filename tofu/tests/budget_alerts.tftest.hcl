@@ -8,18 +8,20 @@ mock_provider "google" {
       number = "123456789012"
     }
   }
+
+  # The provider checks the form of a service account's name where another resource names it.
+  mock_resource "google_service_account" {
+    defaults = {
+      name  = "projects/novatrail-test-0/serviceAccounts/mock-account@novatrail-test-0.iam.gserviceaccount.com"
+      email = "mock-account@novatrail-test-0.iam.gserviceaccount.com"
+    }
+  }
 }
 
 mock_provider "google-beta" {}
 
-variables {
-  project_id = "novatrail-test-0"
-  region     = "us-east4"
+# The variables every run starts from are in tests/terraform.tfvars.
 
-  billing_account = "0A1B2C-3D4E5F-6A7B8C"
-  budget_amount   = "10"
-  budget_currency = "USD"
-}
 
 # The budget counts this project alone, by its number, a month at a time, and mails at half of
 # the amount, nine tenths of it and all of it. It is an alert, not a cap (R06).

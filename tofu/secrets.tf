@@ -28,3 +28,30 @@ resource "google_secret_manager_secret" "admission_facts" {
 
   depends_on = [google_project_service.enabled]
 }
+
+# The secrets api's jobs read as files, one for every id the list of jobs names: the direct
+# connection strings of api's two databases for migrate, to begin with (R11). Their values are put
+# by whoever holds them; each is replicated to the region alone. A secret the list stops naming is
+# let go rather than deleted: the configuration forgets it and its value stays, for whoever holds
+# it to delete.
+resource "google_secret_manager_secret" "api_job" {
+  for_each = local.api_job_secret_ids
+
+  secret_id = each.value
+
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+
+  labels = {
+    purpose = "api-job-secret"
+  }
+
+  deletion_policy = "ABANDON"
+
+  depends_on = [google_project_service.enabled]
+}

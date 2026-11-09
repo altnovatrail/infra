@@ -9,18 +9,20 @@ mock_provider "google" {
       number = "123456789012"
     }
   }
+
+  # The provider checks the form of a service account's name where another resource names it.
+  mock_resource "google_service_account" {
+    defaults = {
+      name  = "projects/novatrail-test-0/serviceAccounts/mock-account@novatrail-test-0.iam.gserviceaccount.com"
+      email = "mock-account@novatrail-test-0.iam.gserviceaccount.com"
+    }
+  }
 }
 
 mock_provider "google-beta" {}
 
-variables {
-  project_id = "novatrail-test-0"
-  region     = "us-east4"
+# The variables every run starts from are in tests/terraform.tfvars.
 
-  billing_account = "0A1B2C-3D4E5F-6A7B8C"
-  budget_amount   = "10"
-  budget_currency = "USD"
-}
 
 # The APIs on are exactly those the parts of the configuration stand on — one more is a change
 # made on purpose, here as well — and none is switched off when its resource goes: switching one
