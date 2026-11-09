@@ -108,7 +108,7 @@
 | [x] | T10 | Переход на тег spec с ответами на В4–В10 | Claude, проверяю я | — | T09; ответы `spec` |
 | [x] | T11 | OpenTofu в devcontainer и своя проверка в CI | Claude, проверяю я | да | T10 |
 | [x] | T12 | Корневой модуль: каркас, провайдеры, тесты | Claude | да | T11 |
-| [ ] | T13 | Модуль: журналы и трассы (R04, R07) | Claude | — | T12 |
+| [x] | T13 | Модуль: журналы и трассы (R04, R07) | Claude | — | T12 |
 | [ ] | T14 | Модуль: Artifact Registry, Secret Manager, бюджет и оповещения (R04, R05, R07) | Claude | — | T12 |
 | [ ] | T15 | Модуль: Cloud Run `api`, задания и расписание, учётные записи (R05) | Claude | да | T12, T14 |
 | [ ] | T16 | Модуль: Firebase и сайт Hosting (R06) | Claude | да | T12 |
@@ -316,6 +316,18 @@
   - тест: у каждого sink, который описывает модуль, есть фильтр исключения журналов запросов.
 - **Как проверить:** `just tf-check` зелёный; в разделе 3.4 [docs/architecture.md](docs/architecture.md) — те же sink и фильтры.
 - **Разделы:** R04, R07; architecture 3.1, 3.4.
+- **Сделано (2026-11-09):**
+  - перед задачей, правило 12: у SonarCloud открытых находок и hotspots нет, в code scanning — те же 7 алертов Scorecard (R33 spec);
+  - `tofu/logging.tf`: бакет журналов `default-<регион>` на `log_retention_days` дней, 30 по умолчанию, с `deletion_policy = "PREVENT"`; sink `_Default` из списка `local.sinks` — прежний фильтр дословно, назначение — бакет региона, исключения блоками `exclusions`: журналы запросов Cloud Run, Data Access audit и журнал активности Identity Platform; место `_Trace` — настройка проекта для бакетов Observability, `default_storage_location` региона;
+  - решения автора в задаче, 2026-11-09, по рекомендациям исполнителя после ревью: место `_Trace` — настройкой, а не явным бакетом — поправка 2026-11-09 к R04; Data Access и Identity Platform — исключены в sink — поправка 2026-11-09 к R07;
+  - `justfile` — `_tf-sinks` перед `tf-check`: sink или исключение, объявленные вне `google_logging_project_sink.sinks`, останавливают проверку;
+  - `variables.tf` — `log_retention_days`, от 1 до 3650, целое, `nullable = false`; `outputs.tf` — `log_bucket`;
+  - `tofu/tests/logging.tftest.hcl` — 9 `run`: каждый sink исключает все три журнала, и не выключенным исключением; `_Default` — в бакет региона, с прежним фильтром; 30 дней в регионе, и бакет модуль не удаляет; место `_Trace` — регион; новый проект в другом регионе — бакет, `_Trace` и назначение sink там; `null` — 30 дней; срок 0, 3651 и 1,5 дня отклоняется;
+  - [docs/architecture.md](docs/architecture.md): раздел 3.4 — что в модуле, раздел 4 — источники, прочитано 2026-11-09;
+  - проверки: `just tf-check` — «20 passed, 0 failed»; тест ловит поломку: без блока `exclusions` и с `disabled = true` падает его `run`, а лишний sink в `tofu/` останавливает `_tf-sinks`; `just -f spec/justfile docs-check-repo` — ok;
+  - `/code-review high`, один круг — 8 находок: явный `_Trace` падал бы, если бакет уже есть, — место теперь задаёт настройка; `destroy` и смена региона удалили бы бакет, в который пишет `_Default`, — `deletion_policy = "PREVENT"`; Data Access и Identity Platform держались только умолчанием — исключены; тест держал только sink списка — `_tf-sinks` в `tf-check`; `log_retention_days = null` давал невнятную ошибку — `nullable = false`. Не исправлены две: назначение sink собрано из переменных, а не из `id` бакета — под подставным провайдером `id` случаен, и тест не смог бы его сверить; список `local.sinks` из одного sink — с `_tf-sinks` он и есть то место, куда встаёт каждый новый sink.
+- **Открыто:**
+  - точное имя журнала запросов в фильтре, что настройка места `_Trace` встаёт без ошибки и что без Cloud Trace API трасс нет — первый `apply` и первая выкладка (T23, T24): подставные провайдеры этого не проверяют.
 
 #### T14. Модуль: Artifact Registry, Secret Manager, бюджет и оповещения (R04, R05, R07)
 

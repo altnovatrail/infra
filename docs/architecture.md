@@ -118,7 +118,7 @@
 | секреты Secret Manager | репликация по выбору, место `us-east4` | места репликации не меняются; автоматическая репликация — без ограничений, а региональный секрет доступен только из своего региона, и CI на GitHub, который читал бы ключ eval по Т-28, его бы не прочитал |
 | бакет журналов | свой, `us-east4`; sink `_Default` направлен в него | бакет `_Default` создан в `global`, и место бакета не меняется — меняется sink. Журналы запросов Cloud Run исключаются (раздел 3.4) |
 | бакет `_Required` | `global` | sink `_Required` не меняется, а регион бакету даёт только настройка организации или папки до создания проекта; организация связана с доменом, которого до О-16 нет — Д3 в таблице 4 [RUN.md](../RUN.md) |
-| бакет трасс `_Trace` | `us-east4`, создаётся через Observability API до первой трассы | иначе место выберут настройки по умолчанию или сама система, а сменить его может только reprovision, который трассы стирает |
+| бакет трасс `_Trace` | `us-east4`: место по умолчанию для бакетов Observability задано до первой трассы, а бакет создаёт система с первой трассой (поправка 2026-11-09 к R04) | иначе место выберут настройки по умолчанию или сама система, а сменить его может только reprovision, который трассы стирает |
 
 Не `infra`: базу Neon `aws-us-east-1` держит `api`; Firebase Auth обрабатывает данные только в США при любом регионе; хостинг сборки `app` — Firebase Hosting (R06), глобальный сервис; регион вызовов ИИ R109 spec не решает (R96 spec).
 
@@ -261,8 +261,8 @@
 | Admin Activity | `callerIp` и почта вызывающего — оператора и CI при правке ресурсов; `SignUp` Identity Platform тоже пишет сюда, а вход Google, `SignInWithIdp`, — нет | `_Required`, `global`, 400 дней (Д3); не исключить |
 | System Event | действия самого Google с ресурсами проекта | `_Required`, `global`, 400 дней |
 | Policy Denied | `callerIp` и почта того, кому политика отказала | бакет `us-east4`, 30 дней |
-| Data Access audit | был бы `callerIp` | не включается |
-| журнал активности Identity Platform | был бы каждый запрос входа | не включается |
+| Data Access audit | был бы `callerIp` | не включается и исключён в каждом sink (поправка 2026-11-09 к R07) |
+| журнал активности Identity Platform | был бы каждый запрос входа | не включается и исключён в каждом sink (поправка 2026-11-09 к R07) |
 | выгрузка журналов Firebase Hosting | была бы `remoteIp` | не включается (R06) |
 | журналы Firebase Auth и Firebase Hosting у самого Firebase | IP-адреса | у Firebase: Auth — «a few weeks», Hosting — «a few months» (П-9) |
 | трассы | — | нет: Cloud Trace API не включается |
@@ -276,7 +276,14 @@
 
 Своих метрик по журналам, где меткой стал бы адрес, проект не заводит: они считаются и по исключённым записям. Оповещения — на встроенных метриках, первый код.
 
-**Трассы:** нет. Cloud Trace API не включается, а бакет `_Trace` всё равно создаётся в `us-east4` до любой трассы (R04): Cloud Run трассирует часть запросов сам.
+**Трассы:** нет. Cloud Trace API не включается, а место `_Trace` — `us-east4` — всё равно задано до любой трассы (R04 с поправкой 2026-11-09): Cloud Run трассирует часть запросов сам.
+
+**В модуле** — `tofu/logging.tf` (T13):
+- бакет `default-<регион>`, `log_retention_days` — 30 по умолчанию, от 1 до 3650; `deletion_policy = "PREVENT"`: модуль бакет не удаляет — ни `destroy`, ни сменой региона, — иначе `_Default`, который `destroy` не трогает, писал бы в удаляемый бакет;
+- sink `_Default` модуль берёт на себя: провайдер обновляет sink, который уже есть, а при удалении `_Default` не трогает. Прежний фильтр — дословно, назначение — бакет региона, а исключения — блоками `exclusions` самого sink: `cloud-run-request-logs`, `data-access-audit` и `identity-platform-requests`;
+- sink проекта перечислены одним списком, `local.sinks`, и каждый получает те же исключения; тест держит каждый sink этого списка, а `tf-check` не пускает sink или исключение, объявленные вне него;
+- место `_Trace` — `google_observability_project_settings` с `default_storage_location` региона: настройку провайдер ставит через PATCH, и второй `apply` её повторяет без вреда, а бакет `_Trace` он создаёт через POST, который отказывает, если бакет уже есть, и удалить его не может (поправка 2026-11-09 к R04; раздел 4);
+- Data Access audit и журнал активности Identity Platform выключены по умолчанию Google, модуль их не включает, а sink их исключает (поправка 2026-11-09 к R07).
 
 **Не проверено — первый код:** точное имя журнала запросов в фильтре; что без Cloud Trace API у Cloud Run нет трасс, а если есть — их атрибуты; вызывает ли что-то в проекте `SignUp` Identity Platform и что лежит в его записи Admin Activity (П-9).
 
@@ -338,6 +345,11 @@ Self-hosting — копия платформы, которую оператор 
   - «If the log entry matches the inclusion filter and at least one exclusion filter, then it isn't routed»;
   - «You can't use exclusion filters to reduce the consumption of your entries.write API quota or the number of entries.write API calls. Exclusion filters are applied after log entries are received by the Logging API»;
   - «For each Google Cloud project, billing account, folder, and organization, Cloud Logging creates two log sinks, one named _Required and the other named _Default».
+- **Журналы и трассы в модуле** (раздел 3.4; T13), прочитано 2026-11-09:
+  - Google Cloud, [Create observability buckets](https://docs.cloud.google.com/trace/docs/create-observability-buckets), даты на странице нет: бакет `_Trace` создаётся методом `projects.locations.buckets.create`, с `name` `projects/PROJECT_ID/locations/LOCATION/buckets/_Trace`, и нужна роль `roles/observability.editor`; в OpenTofu — ресурс `google_observability_bucket` с `bucket_id` `_Trace`; если трассы пришли раньше, бакет создаётся сам, «using your project's default settings for observability buckets»;
+  - [Route log entries](https://docs.cloud.google.com/logging/docs/routing/overview): фильтр sink `_Default` — `NOT LOG_ID("cloudaudit.googleapis.com/activity") AND NOT LOG_ID("externalaudit.googleapis.com/activity") AND NOT LOG_ID("cloudaudit.googleapis.com/system_event") AND NOT LOG_ID("externalaudit.googleapis.com/system_event") AND NOT LOG_ID("cloudaudit.googleapis.com/access_transparency") AND NOT LOG_ID("externalaudit.googleapis.com/access_transparency")`, тот же, что у canvas-api;
+  - terraform-provider-google v8.10.0, [`resource_observability_bucket.go`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/google/services/observability/resource_observability_bucket.go) — создание через `POST …/buckets?bucketId=`, а удаление только убирает ресурс из состояния: «cannot be deleted from Google Cloud»; [`resource_observability_project_settings.go`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/google/services/observability/resource_observability_project_settings.go) — и создание, и правка через `PATCH`;
+  - terraform-provider-google v8.10.0, [`resource_logging_project_sink.go`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/google/services/logging/resource_logging_project_sink.go): при создании sink, который уже есть, провайдер его обновляет, а удаление `_Required` и `_Default` пропускает — «Default logging sinks cannot be deleted»; у `google_logging_project_sink` есть блок `exclusions` с `name`, `filter`, `description` и `disabled`.
 - **Журналы и трассы Google Cloud** (раздел 3.4; R07), прочитано 2026-11-08:
   - [Logging for Cloud Run](https://docs.cloud.google.com/run/docs/logging), обновлено 2026-10-30: «Request logs (services only): logs of requests sent to Cloud Run services. These logs are created automatically»; «Although you cannot control the amount of request logs directly from Cloud Run, you can make use of the logs exclusion feature from Cloud Logging»; имя журнала в образце записи — `run.googleapis.com%2Frequests`, типы ресурсов — `cloud_run_revision` и `cloud_run_job`;
   - [Log-based metrics overview](https://docs.cloud.google.com/logging/docs/logs-based-metrics), обновлено 2026-11-06: «System log-based metrics are calculated from included logs only. User-defined log-based metrics are calculated from both included and excluded logs»;

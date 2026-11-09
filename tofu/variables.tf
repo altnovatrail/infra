@@ -21,3 +21,15 @@ variable "region" {
     error_message = "region is the name of a Google Cloud region, such as us-east4."
   }
 }
+
+variable "log_retention_days" {
+  description = "How many days the logs in the region's bucket are kept. The platform's are 30 (R07); the audit in _Required is kept 400 days, which nothing here can change."
+  type        = number
+  default     = 30
+  nullable    = false
+
+  validation {
+    condition     = var.log_retention_days >= 1 && var.log_retention_days <= 3650 && floor(var.log_retention_days) == var.log_retention_days
+    error_message = "log_retention_days is a whole number of days, from 1 to 3650."
+  }
+}

@@ -10,3 +10,8 @@ output "region" {
   description = "The region everything regional here lives in."
   value       = var.region
 }
+
+output "log_bucket" {
+  description = "The bucket the project's logs are kept in, in its region."
+  value       = google_logging_project_bucket_config.logs.bucket_id
+}
