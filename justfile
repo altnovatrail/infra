@@ -93,8 +93,21 @@ tf-fmt:
 # What CI runs on the module: its format, an init with no backend that installs the providers by
 # the lock file and refuses one the lock file does not name, a validate, and the tests, which run
 # against mock providers and need no credential.
-tf-check:
+tf-check: _tf-sinks
     tofu -chdir={{ tofu_dir }} fmt -check -recursive -diff
     tofu -chdir={{ tofu_dir }} init -backend=false -input=false -lockfile=readonly
     tofu -chdir={{ tofu_dir }} validate
     tofu -chdir={{ tofu_dir }} test
+
+# Every log sink is declared in the one list of tofu/logging.tf, google_logging_project_sink.sinks,
+# so that each gets the exclusions R07 asks for and the tests hold each to them: a sink declared
+# anywhere else would pass them by.
+_tf-sinks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    stray=$(grep -rnE '^[[:space:]]*resource[[:space:]]+"google_(logging_(project|folder|organization|billing_account)_sink|logging_project_exclusion)"' {{ quote(tofu_dir) }} --include='*.tf' | grep -vE ':[[:space:]]*resource[[:space:]]+"google_logging_project_sink"[[:space:]]+"sinks"[[:space:]]*\{' || true)
+    if [ -n "$stray" ]; then
+        echo "tf-check: a log sink or exclusion outside google_logging_project_sink.sinks in tofu/logging.tf (R07):" >&2
+        echo "$stray" >&2
+        exit 1
+    fi
