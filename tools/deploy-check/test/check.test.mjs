@@ -35,9 +35,13 @@ const deploymentSchema = {
   unevaluatedProperties: false,
 };
 
+// The build's table of the CSP header, synthetic, with the place deployment.json fills.
+const cspTable = { "default-src": "'none'", "script-src": "'self'", "connect-src": "'self' {api}" };
+
 // A git repository with deploy/ and a folder of releases for each, the list on main at baseTag
-// (or none), and the working tree's list at tag.
-function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, edit } = {}) {
+// (or none), and the working tree's list at tag. `build` changes the build's folder before it is
+// packed.
+function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, csp = cspTable, build: change, edit } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-check-test-"));
   made.push(dir);
   const releases = path.join(dir, "releases");
@@ -58,7 +62,10 @@ function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, 
   const build = path.join(dir, "build");
   fs.mkdirSync(path.join(build, "assets"), { recursive: true });
   fs.writeFileSync(path.join(build, "index.html"), "<!doctype html>");
+  fs.writeFileSync(path.join(build, "assets", "index-1a2b3c.js"), "console.log(1)");
   if (schema) fs.writeFileSync(path.join(build, "deployment.schema.json"), JSON.stringify(schema));
+  if (csp !== null) fs.writeFileSync(path.join(build, "csp.json"), JSON.stringify(csp));
+  change?.(build);
   const archivePath = path.join(dir, "app_v0.3.0.tar.gz");
   assert.equal(spawnSync("/usr/bin/tar", ["-czf", archivePath, "-C", build, "."]).status, 0);
   const archive = put("app", "v0.3.0", "app_v0.3.0.tar.gz", fs.readFileSync(archivePath));
@@ -127,7 +134,9 @@ test("a list that holds passes every check", async () => {
     "api v0.2.0: the Dockerfile is verified, of the sha256 named",
     "app v0.3.0: app_v0.3.0.tar.gz is verified, of the sha256 named",
     "production/deployment.json is of the sha256 named",
+    "app v0.3.0: app_v0.3.0.tar.gz holds a build to release",
     "production/deployment.json holds to its build's deployment.schema.json",
+    "the build's csp.json makes the CSP header of production/deployment.json",
     "facts of spec's admission table",
     "the rung is full",
     "api v0.2.0 is no lower than v0.1.0 at main",
@@ -176,9 +185,22 @@ test("refusals, each on its own", async (t) => {
     ["an archive release-verify refuses", {}, "app_v0.3.0", /release-verify refused app_v0\.3\.0\.tar\.gz of app v0\.3\.0/],
     ["a file the release does not hold", { edit: (l, w) => fs.rmSync(path.join(w.releases, "api", "v0.2.0", "Dockerfile.sigstore.json")) }, undefined, /the release v0\.2\.0 of api holds no Dockerfile\.sigstore\.json/],
     ["a deployment.json of another sha256", { edit: (l) => (l.app.deployment.sha256 = "1".repeat(64)) }, undefined, /production\/deployment\.json has sha256 [0-9a-f]{64}, and the list names 1{64}/],
+    ["a deployment.json larger than app reads", { edit: (l, w) => {
+      const text = JSON.stringify({ format: 1, api: `https://${"a".repeat(17000)}.example` });
+      fs.writeFileSync(path.join(w.deploy, "production", "deployment.json"), text);
+      l.app.deployment.sha256 = hash(text);
+    } }, undefined, /production\/deployment\.json is larger than the 16384 bytes app reads/],
     ["a deployment.json its build's schema refuses", { schema: { ...deploymentSchema, properties: { ...deploymentSchema.properties, api: { type: "string", pattern: "^http://" } } } }, undefined, /does not hold to the build's deployment\.schema\.json: \/api must match pattern/],
     ["a build with no schema", { schema: null }, undefined, /holds no deployment\.schema\.json at its root/],
     ["a build's schema of another dialect", { schema: { ...deploymentSchema, $schema: "http://json-schema.org/draft-07/schema#" } }, undefined, /is not of JSON Schema 2020-12/],
+    ["a build with no csp.json", { csp: null }, undefined, /holds no csp\.json at its root/],
+    ["a build with no asset", { build: (b) => fs.rmSync(path.join(b, "assets", "index-1a2b3c.js")) }, undefined, /holds no file under assets\//],
+    ["a build with a deployment.json of its own", { build: (b) => fs.writeFileSync(path.join(b, "deployment.json"), "{}") }, undefined, /holds a deployment\.json of its own/],
+    ["a build with a link", { build: (b) => fs.symlinkSync("/etc/passwd", path.join(b, "assets", "passwd")) }, undefined, /holds \.\/assets\/passwd, which is neither a file nor a folder/],
+    ["a csp.json not of its shape", { csp: ["default-src 'none'"] }, undefined, /csp\.json is not a table of directives/],
+    ["a csp.json with a place deployment.json does not fill", { csp: { ...cspTable, "img-src": "{images}" } }, undefined, /the place \{images\} in img-src, and only \{api\} and \{authDomain\} are filled/],
+    ["a csp.json that would end its directive", { csp: { ...cspTable, "script-src": "'self'; script-src *" } }, undefined, /is not its sources as one string/],
+    ["a csp.json framed by others", { csp: { ...cspTable, "frame-ancestors": "*" } }, undefined, /frame-ancestors \*, and app is framed by nobody/],
     ["a fact spec's table does not know", { edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ openai: { signed_by_hand: ["adult"] } })) }, undefined, /names what spec's admission table does not: the fact signed_by_hand of openai/],
     ["a provider spec's table does not know", { edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ acme: { data_processing_agreement: ["adult"] } })) }, undefined, /the provider acme/],
     ["facts not of their form", { edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ openai: { data_processing_agreement: ["grown_up"] } })) }, undefined, /is not facts a deployment declares/],

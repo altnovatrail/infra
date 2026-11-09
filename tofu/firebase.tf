@@ -29,3 +29,26 @@ resource "google_firebase_hosting_site" "app" {
 
   depends_on = [google_firebase_project.this]
 }
+
+# The Firebase web app app signs in as: its id and its API key are what /deployment.json names in
+# signIn, with the project and its authDomain (R09 app; R17). Firebase makes the key itself, a
+# browser key restricted to Firebase's APIs, and it is no secret: it is in every copy of app. The
+# configuration never deletes the app, since a new one would come with a new key, and a new key
+# signs everybody out of app on every device (architecture 3.7 app).
+resource "google_firebase_web_app" "app" {
+  provider = google-beta
+
+  project      = var.project_id
+  display_name = "app"
+
+  deletion_policy = "PREVENT"
+
+  depends_on = [google_firebase_project.this]
+}
+
+data "google_firebase_web_app_config" "app" {
+  provider = google-beta
+
+  project    = var.project_id
+  web_app_id = google_firebase_web_app.app.app_id
+}

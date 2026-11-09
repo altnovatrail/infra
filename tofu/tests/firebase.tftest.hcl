@@ -17,7 +17,15 @@ mock_provider "google" {
   }
 }
 
-mock_provider "google-beta" {}
+mock_provider "google-beta" {
+  # The web app's configuration, as Firebase gives it.
+  mock_data "google_firebase_web_app_config" {
+    defaults = {
+      api_key     = "synthetic-browser-key"
+      auth_domain = "novatrail-test-0.firebaseapp.com"
+    }
+  }
+}
 
 # The variables every run starts from are in tests/terraform.tfvars.
 
@@ -44,7 +52,7 @@ run "the_site_is_the_projects_and_kept" {
 
 # The publisher of app's build: lent to the jobs of production-hosting alone, holding Hosting's
 # rights less the making and deleting of sites — bootstrap.sh's role hostingPublisher, whose
-# permissions its test holds — and the reading of API keys, and nothing of api's nor of sign-in
+# permissions its test holds — and nothing else: nothing of api's, of sign-in or of API keys
 # (R12). With api's service made too, and the publisher given an address of its own,
 # so that a grant to it among api's would show.
 run "the_publisher_holds_hosting_alone" {
@@ -74,8 +82,8 @@ run "the_publisher_holds_hosting_alone" {
   }
 
   assert {
-    condition     = toset([for g in google_project_iam_member.grants : g.role if g.member == "serviceAccount:hosting-publish@novatrail-test-0.iam.gserviceaccount.com"]) == toset(["projects/novatrail-test-0/roles/hostingPublisher", "roles/serviceusage.apiKeysViewer"])
-    error_message = "On the project the publisher holds bootstrap.sh's role hostingPublisher and the reading of API keys, and no other role."
+    condition     = toset([for g in google_project_iam_member.grants : g.role if g.member == "serviceAccount:hosting-publish@novatrail-test-0.iam.gserviceaccount.com"]) == toset(["projects/novatrail-test-0/roles/hostingPublisher"])
+    error_message = "On the project the publisher holds bootstrap.sh's role hostingPublisher, and no other role."
   }
 
   assert {
@@ -126,4 +134,34 @@ run "one_environment_in_another_case_is_refused" {
   }
 
   expect_failures = [var.hosting_environment]
+}
+
+# The web app app signs in as, kept, and the signIn block of /deployment.json out of it (R17).
+# Applied against the mocks: the web app's configuration is read once the web app is there, after
+# a plan.
+run "the_web_app_is_kept_and_gives_the_sign_in_block" {
+  command = apply
+
+  override_resource {
+    target = google_firebase_web_app.app
+    values = {
+      app_id = "1:123456789012:web:0a1b2c3d"
+    }
+  }
+
+  assert {
+    condition     = google_firebase_web_app.app.deletion_policy == "PREVENT" && google_firebase_web_app.app.project == "novatrail-test-0"
+    error_message = "The web app is the platform project's, and the configuration never deletes it."
+  }
+
+  assert {
+    condition = output.app_sign_in == {
+      service    = "firebase"
+      apiKey     = "synthetic-browser-key"
+      authDomain = "novatrail-test-0.firebaseapp.com"
+      projectId  = "novatrail-test-0"
+      appId      = "1:123456789012:web:0a1b2c3d"
+    }
+    error_message = "app_sign_in is the signIn block of /deployment.json, as R09 app names its fields."
+  }
 }

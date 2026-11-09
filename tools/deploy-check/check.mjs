@@ -8,7 +8,8 @@
 //      with its bundle from the release on GitHub, accepted by spec's release-verify and of the
 //      sha256 the list names (R77 spec);
 //   4. production/deployment.json, by the deployment.schema.json of the archive of that build, and
-//      of the sha256 the list names;
+//      of the sha256 the list names; the archive holding what a release of the build is made of,
+//      and its csp.json making the header of that deployment.json (R17);
 //   5. production/facts.json, by the facts a deployment declares in spec's admission schemas, with
 //      every provider and fact of the dictionary of spec's admission table, at the tag of the
 //      submodule: an early sign, since api checks the file again with its own table (R25 api);
@@ -51,7 +52,7 @@ function first(paths) {
 
 export class Refusal extends Error {}
 
-function readJson(file, what) {
+export function readJson(file, what) {
   let text;
   try {
     text = fs.readFileSync(file, "utf8");
@@ -77,7 +78,7 @@ function explain(errors) {
   return errors.map((e) => `${e.instancePath || "/"} ${e.message}${e.params?.unevaluatedProperty ? `: ${e.params.unevaluatedProperty}` : ""}`).join("; ");
 }
 
-function sha256(file) {
+export function sha256(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 }
 
@@ -153,15 +154,70 @@ function baseList(base, deployDir) {
   }
 }
 
-// /deployment.json against the deployment.schema.json at the root of the build's archive.
-function deploymentHoldsToItsBuild(archive, archiveName, deploymentFile, work) {
-  const unpacked = path.join(work, "app-build");
-  fs.mkdirSync(unpacked);
-  const tar = spawnSync(TAR, ["-xzf", archive, "-C", unpacked, "--no-same-owner", "--no-same-permissions"], { encoding: "utf8" });
+// app reads /deployment.json only if it is no larger (architecture 3.7 app).
+const DEPLOYMENT_LIMIT = 16 * 1024;
+
+// The list of <deploy dir>, held to its schema: what the release of either part reads it as.
+export function readList(listFile) {
+  const list = readJson(listFile, "the list");
+  const validate = ajv().compile(readJson(LIST_SCHEMA, "the list's schema"));
+  if (!validate(list)) throw new Refusal(`the list does not hold to its schema: ${explain(validate.errors)}`);
+  return list;
+}
+
+// production/deployment.json as the list names it: there, of the sha256 named, and no larger than
+// app reads.
+export function deploymentOfTheList(app, deploymentFile) {
+  if (!fs.existsSync(deploymentFile)) throw new Refusal("production/deployment.json is not there");
+  const got = sha256(deploymentFile);
+  if (got !== app.deployment.sha256) throw new Refusal(`production/deployment.json has sha256 ${got}, and the list names ${app.deployment.sha256}`);
+  if (fs.statSync(deploymentFile).size > DEPLOYMENT_LIMIT) throw new Refusal(`production/deployment.json is larger than the ${DEPLOYMENT_LIMIT} bytes app reads`);
+}
+
+// What a build of app holds at the root of its archive, and what a release of it is made of: its
+// page, its assets, the schema of /deployment.json and the table of the CSP header; never a
+// deployment.json of its own, which is the deployment's (architecture 3.7 app; R17).
+const BUILD_FILES = ["index.html", "deployment.schema.json", "csp.json"];
+
+// The archive of a build unpacked into dir, once its listing shows nothing but files and folders
+// under it: no link, no device, no path that is absolute or climbs out with "..". The release is
+// verified before this, and the listing is read all the same, since what is unpacked here is
+// published on the platform's own address.
+export function unpackBuild(archive, archiveName, dir) {
+  const names = spawnSync(TAR, ["-tzf", archive], { encoding: "utf8" });
+  const kinds = spawnSync(TAR, ["-tvzf", archive], { encoding: "utf8" });
+  if (names.status !== 0 || kinds.status !== 0) throw new Refusal(`${archiveName} cannot be read: ${(names.stderr || kinds.stderr).trim()}`);
+  const listed = names.stdout.split("\n").filter(Boolean);
+  const types = kinds.stdout.split("\n").filter(Boolean).map((line) => line[0]);
+  if (listed.length !== types.length) throw new Refusal(`${archiveName} holds a name that cannot be read as one line`);
+  for (const [i, name] of listed.entries()) {
+    if (types[i] !== "-" && types[i] !== "d") throw new Refusal(`${archiveName} holds ${name}, which is neither a file nor a folder`);
+    if (name.startsWith("/") || name.split("/").includes("..")) throw new Refusal(`${archiveName} holds ${name}, a path out of the build`);
+  }
+  fs.mkdirSync(dir, { recursive: true });
+  const tar = spawnSync(TAR, ["-xzf", archive, "-C", dir, "--no-same-owner", "--no-same-permissions"], { encoding: "utf8" });
   if (tar.status !== 0) throw new Refusal(`${archiveName} cannot be unpacked: ${tar.stderr.trim()}`);
-  const schemaFile = path.join(unpacked, "deployment.schema.json");
-  if (!fs.existsSync(schemaFile)) throw new Refusal(`${archiveName} holds no deployment.schema.json at its root`);
-  const schema = readJson(schemaFile, "the build's deployment.schema.json");
+  for (const name of BUILD_FILES) {
+    if (!fs.statSync(path.join(dir, name), { throwIfNoEntry: false })?.isFile()) throw new Refusal(`${archiveName} holds no ${name} at its root`);
+  }
+  const assets = path.join(dir, "assets");
+  if (!fs.statSync(assets, { throwIfNoEntry: false })?.isDirectory() || !buildFiles(assets).length) throw new Refusal(`${archiveName} holds no file under assets/`);
+  if (fs.existsSync(path.join(dir, "deployment.json"))) throw new Refusal(`${archiveName} holds a deployment.json of its own, and that file is the deployment's`);
+  return dir;
+}
+
+// Every file under dir, by its path relative to it with "/" between the parts, in order.
+export function buildFiles(dir) {
+  return fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"))
+    .sort();
+}
+
+// /deployment.json against the deployment.schema.json at the root of the unpacked build.
+export function deploymentHoldsToItsBuild(build, deploymentFile) {
+  const schema = readJson(path.join(build, "deployment.schema.json"), "the build's deployment.schema.json");
   if (schema.$schema !== DIALECT) throw new Refusal(`the build's deployment.schema.json is not of JSON Schema 2020-12, but ${schema.$schema ?? "of no dialect named"}`);
   let check;
   try {
@@ -172,6 +228,43 @@ function deploymentHoldsToItsBuild(archive, archiveName, deploymentFile, work) {
   if (!check(readJson(deploymentFile, "production/deployment.json"))) {
     throw new Refusal(`production/deployment.json does not hold to the build's deployment.schema.json: ${explain(check.errors)}`);
   }
+}
+
+// The Content-Security-Policy header of a release, out of the build's csp.json and the
+// deployment.json it ships with (R17). csp.json is one table of directives, each name to its
+// sources as one string, with two places in it: {api}, which takes the origin of api, and
+// {authDomain}, the host sign-in's window is opened on (architecture 3.7 app). frame-ancestors is
+// 'none', and a table that does not say so gets it: the header is the only place it holds, a meta
+// tag cannot carry it. Anything else — another shape, another place, a value that would end a
+// directive or start another — is refused rather than guessed at.
+export function cspHeader(csp, deployment) {
+  if (csp === null || typeof csp !== "object" || Array.isArray(csp) || !Object.keys(csp).length) {
+    throw new Refusal("the build's csp.json is not a table of directives, each name to its sources");
+  }
+  const places = { api: deployment?.api, authDomain: deployment?.signIn?.authDomain };
+  const directives = [];
+  for (const [name, sources] of Object.entries(csp)) {
+    if (!/^[a-z]+(-[a-z]+)*$/.test(name)) throw new Refusal(`the build's csp.json names ${JSON.stringify(name)}, which is no directive's name`);
+    if (typeof sources !== "string" || !sources.trim() || /[;,\r\n]/.test(sources)) {
+      throw new Refusal(`the build's csp.json gives ${name} ${JSON.stringify(sources)}, which is not its sources as one string`);
+    }
+    const filled = sources.replace(/\{([^{}]*)\}/g, (_, place) => {
+      if (!Object.hasOwn(places, place)) throw new Refusal(`the build's csp.json has the place {${place}} in ${name}, and only {api} and {authDomain} are filled`);
+      const value = places[place];
+      if (typeof value !== "string" || !/^[A-Za-z0-9.:/-]+$/.test(value)) throw new Refusal(`production/deployment.json gives no value {${place}} of csp.json can take`);
+      return value;
+    });
+    if (/[{}]/.test(filled)) throw new Refusal(`the build's csp.json has a brace in ${name} that is no place`);
+    if (name === "frame-ancestors" && filled.trim() !== "'none'") throw new Refusal(`the build's csp.json gives frame-ancestors ${filled.trim()}, and app is framed by nobody: 'none'`);
+    directives.push(`${name} ${filled.trim().split(/\s+/).join(" ")}`);
+  }
+  if (!Object.hasOwn(csp, "frame-ancestors")) directives.push("frame-ancestors 'none'");
+  return directives.join("; ");
+}
+
+// The CSP header of an unpacked build with the deployment.json it ships with.
+export function buildCsp(build, deploymentFile) {
+  return cspHeader(readJson(path.join(build, "csp.json"), "the build's csp.json"), readJson(deploymentFile, "production/deployment.json"));
 }
 
 // production/facts.json against the facts a deployment declares in spec's admission schemas, and
@@ -212,9 +305,7 @@ export async function run(deployDir, base, standIns = {}) {
     if (base && baseList(base, deployDir)) throw new Refusal(`production.json is gone, and ${base} has one: a pull request changes the list, it does not remove it`);
     return { lines: [`deploy-check: ${listFile} is not there yet, and there is nothing to check`], refusals: [] };
   }
-  const list = readJson(listFile, "the list");
-  const validate = ajv().compile(readJson(LIST_SCHEMA, "the list's schema"));
-  if (!validate(list)) throw new Refusal(`the list does not hold to its schema: ${explain(validate.errors)}`);
+  const list = readList(listFile);
 
   const lines = ["the list holds to its schema"];
   const refusals = [];
@@ -234,6 +325,7 @@ export async function run(deployDir, base, standIns = {}) {
     const { api, app } = list;
     const deploymentFile = path.join(deployDir, "production", "deployment.json");
     let archive = null;
+    let build = null;
     await step("api's binary is named by its release", () => {
       const want = `api_${api.release}_linux_amd64`;
       if (api.binary.name !== want) throw new Refusal(`api's binary is ${api.binary.name}, and its release ${api.release} names it ${want}`);
@@ -247,15 +339,20 @@ export async function run(deployDir, base, standIns = {}) {
     await step(`app ${app.release}: ${app.archive.name} is verified, of the sha256 named`, async () => {
       archive = await releaseFile("app", app.release, app.archive.name, app.archive.sha256, path.join(work, "archive"), standIns);
     });
-    await step("production/deployment.json is of the sha256 named", () => {
-      const got = fs.existsSync(deploymentFile) ? sha256(deploymentFile) : null;
-      if (!got) throw new Refusal("production/deployment.json is not there");
-      if (got !== app.deployment.sha256) throw new Refusal(`production/deployment.json has sha256 ${got}, and the list names ${app.deployment.sha256}`);
+    await step("production/deployment.json is of the sha256 named, and no larger than app reads", () => deploymentOfTheList(app, deploymentFile));
+    await step(`app ${app.release}: ${app.archive.name} holds a build to release`, () => {
+      if (!archive) return `${app.archive.name} is not unpacked: it was refused`;
+      build = unpackBuild(archive, app.archive.name, path.join(work, "app-build"));
     });
     await step("production/deployment.json holds to its build's deployment.schema.json", () => {
-      if (!archive) return `production/deployment.json is not checked against its build's schema: ${app.archive.name} was refused`;
+      if (!build) return `production/deployment.json is not checked against its build's schema: ${app.archive.name} was refused`;
       if (!fs.existsSync(deploymentFile)) return "production/deployment.json is not checked against its build's schema: it is not there";
-      deploymentHoldsToItsBuild(archive, app.archive.name, deploymentFile, work);
+      deploymentHoldsToItsBuild(build, deploymentFile);
+    });
+    await step("the build's csp.json makes the CSP header of production/deployment.json", () => {
+      if (!build) return `the CSP header is not made: ${app.archive.name} was refused`;
+      if (!fs.existsSync(deploymentFile)) return "the CSP header is not made: production/deployment.json is not there";
+      buildCsp(build, deploymentFile);
     });
     await step("production/facts.json declares facts of spec's admission table", () => factsHoldToTheTable(path.join(deployDir, "production", "facts.json")));
     await step("the rung is full", () => {

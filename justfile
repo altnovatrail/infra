@@ -290,3 +290,25 @@ deploy-api-facts outputs:
 # tools/deploy/api.sh against stand-ins for gcloud, docker and fetch.mjs: no cloud, no network.
 deploy-api-test:
     node --test tools/deploy/test/api.test.mjs
+
+# The release of app's build on Firebase Hosting by the list, as R06 lays out its steps (R17), on
+# the site the configuration's outputs name. It signs in with an access token gcloud gives for the
+# identity it is signed in as, hosting-publish where the workflow runs it, and the token goes to the
+# script through its environment, never its command line.
+# Release the list's build of app on Hosting, with the assets of the build released, and check it
+deploy-app outputs: _tools
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{ quote(invocation_directory()) }}
+    HOSTING_ACCESS_TOKEN="$(gcloud auth print-access-token)"
+    export HOSTING_ACCESS_TOKEN
+    node {{ quote(justfile_directory() / "tools/deploy/app.mjs") }} release {{ quote(outputs) }} {{ quote(justfile_directory() / "deploy") }}
+
+# Check what the site answers against the list's build of app
+deploy-app-check outputs: _tools
+    cd {{ quote(invocation_directory()) }} && node {{ quote(justfile_directory() / "tools/deploy/app.mjs") }} check {{ quote(outputs) }} {{ quote(justfile_directory() / "deploy") }}
+
+# tools/deploy/app.mjs against a stand-in for Hosting's API, synthetic releases of app and a
+# stand-in for the site: no cloud, no network.
+deploy-app-test: _tools
+    node --test tools/deploy/test/app.test.mjs
