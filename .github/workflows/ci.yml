@@ -31,8 +31,10 @@ jobs:
     uses: altnovatrail/.github/.github/workflows/documents.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
 
   # infra's own check: the OpenTofu of the toolchain stage of .devcontainer/Dockerfile, at the
-  # version its ARG names, and the test of the recipe that checks it (R09). spec's script builds
-  # the stage and runs the recipes in it, as the shared Documents check runs its own (R30 spec).
+  # version its ARG names, and the test of the recipe that checks it (R09); then the root module in
+  # tofu/ — its format, an init by the lock file, a validate and its tests on mock providers (R10).
+  # spec's script builds the stage and runs the recipes in it, as the shared Documents check runs
+  # its own (R30 spec).
   opentofu:
     name: OpenTofu
     runs-on: ubuntu-24.04
@@ -49,3 +51,4 @@ jobs:
           spec/tools/toolchain/toolchain.sh build
           spec/tools/toolchain/toolchain.sh run just ci-tofu-test
           spec/tools/toolchain/toolchain.sh run just ci-tofu
+          spec/tools/toolchain/toolchain.sh run just tf-check

@@ -1,0 +1,7 @@
+# What OpenTofu writes beside the configuration and must not be committed: the providers it
+# downloads, state, plans and its crash log. The lock file, .terraform.lock.hcl, is committed.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log

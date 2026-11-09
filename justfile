@@ -1,6 +1,7 @@
 # infra's own recipes. spec's, the documents check among them, run from spec's justfile:
-# `just -f spec/justfile docs-check-repo`. CI runs the ci- recipes in the toolchain stage of
-# .devcontainer/Dockerfile, through spec/tools/toolchain/toolchain.sh (R30 spec).
+# `just -f spec/justfile docs-check-repo`. CI runs the ci- recipes and tf-check in the toolchain
+# stage of .devcontainer/Dockerfile, through spec/tools/toolchain/toolchain.sh (R30 spec): the job
+# OpenTofu, required in the ruleset of main.
 
 # The Dockerfile whose ARG ci-tofu reads; ci-tofu-test points it at broken copies.
 dockerfile := env("INFRA_DOCKERFILE", ".devcontainer/Dockerfile")
@@ -81,3 +82,19 @@ ci-tofu-test:
     env INFRA_DOCKERFILE="$work/quoted" PATH="$work/bin:$PATH" "$just" ci-tofu >"$work/out" 2>&1 || { echo "ci-tofu-test: ci-tofu refused a quoted ARG of ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     env PATH="$work/bin:$PATH" "$just" ci-tofu >"$work/out" 2>&1 || { echo "ci-tofu-test: ci-tofu refused tofu ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-tofu-test: ok"
+
+# The root module in tofu/, by the OpenTofu of the toolchain stage (R10).
+tofu_dir := "tofu"
+
+# Format the module in place.
+tf-fmt:
+    tofu -chdir={{ tofu_dir }} fmt -recursive
+
+# What CI runs on the module: its format, an init with no backend that installs the providers by
+# the lock file and refuses one the lock file does not name, a validate, and the tests, which run
+# against mock providers and need no credential.
+tf-check:
+    tofu -chdir={{ tofu_dir }} fmt -check -recursive -diff
+    tofu -chdir={{ tofu_dir }} init -backend=false -input=false -lockfile=readonly
+    tofu -chdir={{ tofu_dir }} validate
+    tofu -chdir={{ tofu_dir }} test
