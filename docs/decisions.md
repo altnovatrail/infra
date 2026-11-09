@@ -260,6 +260,8 @@
 
 — *Вторая поправка 2026-11-09:* **каждый sink проекта исключает и журналы запросов Firebase Hosting — по типу ресурса, `resource.type="firebase_domain"`. Выгрузку их в Cloud Logging модуль по-прежнему не включает (R06), а исключение держит их вне бакета, если кто-то нажмёт Link в консоли Firebase.** Решение автора при планировании T16, 2026-11-09, по рекомендации исполнителя (RUN.md, T16). — *Почему:* выгрузка включается только кнопкой в консоли, которую модуль не видит, а в записях — `remoteIp`. Firebase называет журнал `webrequests`, а тип ресурса — `firebase_domain`, и полного `LOG_ID` не даёт ([Web request logs and metrics](https://firebase.google.com/docs/hosting/web-request-logs-and-metrics), «Last updated 2026-11-05 UTC», прочитано 2026-11-09), поэтому исключение — по типу ресурса. — *Отвергнуто:* полагаться на то, что выгрузку не включат. — *Следствие:* четвёртое исключение в `local.exclusions`, `tofu/logging.tf`; [architecture.md](architecture.md), разделы 3.3 и 3.4.
 
+— *Третья поправка 2026-11-09:* **Cloud Trace API в проекте платформы включён, и выключить его нельзя: от него зависят Cloud Scheduler, на котором идут задания `api` по расписанию (R05, R11), и `cloudapis.googleapis.com`. Трассы, которые Cloud Run пишет сам на части запросов, поэтому возможны. Они лягут в `_Trace` в `us-east4`, место которого задано до первой трассы, а их атрибуты T24 сверяет на первом трафике с privacy 4 spec.** Ответ автора на находку T23. Google включает API сам при создании проекта, вместе с BigQuery, Pub/Sub и Datastore. `gcloud services disable cloudtrace.googleapis.com` отказал: «FAILED_PRECONDITION: The service cloudtrace.googleapis.com is depended on by the following active service(s): cloudapis.googleapis.com,cloudscheduler.googleapis.com», `COMMON_SU_SERVICE_HAS_DEPENDENT_SERVICES`. — *Отвергнуто:* убрать Cloud Scheduler и выключить API силой, `--force`, вместе со всем, что от него зависит: задания по расписанию пришлось бы запускать иначе, а `cloudapis` потянул бы за собой неизвестно что. — *Следствие:* В16 таблицы 3 RUN.md, «в реестр spec», — к карточке 3.11 spec, где «трасс у первого среза нет»; T24 — атрибуты трасс.
+
 ## Тег `spec` с ответами E1 и T09
 
 **R08. `infra` стоит на `spec` v0.9.16 — последнем релизе. Тег отвечает на строки «в реестр spec» В4–В10, все по их рекомендациям: факты развёртывания ревизия `api` получает файлом, ступень — переменной, а выкладка до миграций зовёт команду проверки конфигурации; формат `/deployment.json` переходит в `spec` в эпике E2, до первой выкладки; хостинг, домены, сроки журналов и карточка `infra` записаны в `spec`; Т-29 закрыт — инфраструктуру описывает OpenTofu.** Задача T10 эпика E2, по его плану: на тег с ответами репозиторий переходит своей задачей, как T07 и T08 (RUN.md, T10; [plan/E1.md](plan/E1.md), T07 и T08).
@@ -468,6 +470,17 @@
 
 — *Четвёртая поправка 2026-11-09:* **скрипт делает и второй пул, `github-eval`, с провайдером `github` и условием R120 spec, когда `production.auto.tfvars` называет репозитории eval; учётных записей в нём нет; список пуст — провайдер сделанного пула получает условие `false`, а правка списка — повторный запуск скрипта до мержа. Прав на пулы у `infra-config` по-прежнему нет: условия IAM пулы не сужают, и право на один было бы правом на тот, через который он входит (R20).** Решение автора при планировании T22. — *Следствие:* шаги пула и провайдера — функция `federated_pool` для обоих пулов; `tofu/tests/bootstrap.test.mjs`.
 
+— *Пятая поправка 2026-11-09:* **первый запуск на проекте `novatrail` (T23) подтвердил то, что проверяла только заглушка:**
+- `gcloud` отдаёт политику в версии 3, и привязка `projectIamAdmin` приходит со своим условием, а не с `_withcond_`;
+- IAM принял условие `hasOnly` с ролями вида `projects/<проект>/roles/…`;
+- у `infra-config` ровно его роли, и первый `apply` прошёл без единого отказа прав.
+
+**Что нашлось сверх задуманного:**
+- Editor у учётной записи Compute по умолчанию — её создал включённый Google API, и скрипт роль забрал;
+- Firebase при первом `apply` создал учётную запись `firebase-adminsdk-fbsvc` с `roles/firebase.sdkAdminServiceAgent` и `roles/iam.serviceAccountTokenCreator` на проекте. Она остаётся, по решению автора: это настройка Firebase по умолчанию, пользовательских ключей у неё нет (`gcloud iam service-accounts keys list --managed-by=user` — пусто), взять её может только Owner, а `infra-config` и так распоряжается IAM учётных записей проекта.
+
+Ответы автора при T23. — *Следствие:* RUN.md, T23.
+
 ## Проверки списка выкатки
 
 **R14. Список выкатки проверяют схема `deploy/schema/production.schema.json` и проверка `tools/deploy-check/` на Node: шесть пунктов R05 — схема, файлы релизов — `release-verify` и sha256, `deployment.json` — схемой своей сборки, факты — словарём таблицы допуска `spec`, ступень `full`, тег `api` не ниже, чем на `main`, — и ещё имя бинарника `api`, которого схеме не выразить. В CI job `Deploy` гоняет её тесты в каждом pull request, а сам список — когда pull request меняет то, чем он проверяется. Одна зависимость — ajv 8.20.0 по lock-файлу `tools/`.** Решения автора при планировании T18, 2026-11-09 (RUN.md, T18).
@@ -586,6 +599,15 @@
 
 — RUN.md, T27; `tofu/sign_in.tf`, `tofu/identities.tf`, `tofu/api.tf`, `tofu/apis.tf`, `tofu/bootstrap.sh`, `tofu/tests/sign_in.tftest.hcl`, `tofu/tests/bootstrap.tftest.hcl`, `tofu/tests/bootstrap.test.mjs`; [architecture.md](architecture.md), разделы 3.2–3.5 и 4.
 
+— *Поправка 2026-11-09:* **проверено на проекте `novatrail` (T23):**
+- консоль Firebase, включая Google, сама создала OAuth-клиента — его ID начинается с номера проекта — и формы с ID и секретом клиента не просила;
+- разрешённых доменов после шага по-прежнему два;
+- `tofu plan` после включения провайдера — «No changes»: шаг меняет провайдера входа, а не то, что держит модуль;
+- Audience Google Auth Platform — External и In production: API эту настройку не читает, и автор подтвердил её снимком экрана консоли 2026-11-09. Предел «0 users / 100 user cap» на той же странице касается только непроверенных чувствительных областей, а у входа их нет;
+- `initializeAuth` пустил `infra-config`.
+
+Права `api` и окно входа на `web.app` проверит первая выкладка (T24). — *Следствие:* [architecture.md](architecture.md), раздел 3.3.
+
 ## Выпуск сборки `app`
 
 **R17. Сборку `app` на Firebase Hosting выпускает свой скрипт, `tools/deploy/app.mjs`, через REST API Hosting, а не Firebase CLI. Выпущенную сборку он узнаёт по сообщению выпуска, держит её `assets/` в новой версии и проверяет ответы сайта после выпуска. Заголовок CSP он собирает из `csp.json` сборки — таблицы «директива → строка источников» с местами `{api}` и `{authDomain}`, — а другую форму отклоняет. Web App, которое даёт `apiKey` и `appId` для `/deployment.json`, создаёт модуль.** Решения автора при планировании T20, 2026-11-09, все четыре — по рекомендациям (RUN.md, T20). Источники — [architecture.md](architecture.md), раздел 4, прочитано 2026-11-09.
@@ -642,6 +664,9 @@
 — RUN.md, T20; `tools/deploy/app.mjs`, `tools/deploy/test/app.test.mjs`, `tools/deploy-check/check.mjs`, `tools/deploy-check/test/check.test.mjs`, `justfile`, `.github/workflows/ci.yml`, `tofu/firebase.tf`, `tofu/outputs.tf`, `tofu/identities.tf`, `tofu/bootstrap.sh`, `tofu/tests/firebase.tftest.hcl`, `tofu/tests/bootstrap.test.mjs`; [architecture.md](architecture.md), разделы 3.2, 3.3 и 4.
 
 — *Поправка 2026-11-09:* **шаг 2 выпуска проверяет ещё чтение `deployment.json` `spec` подмодуля и версию сборки, в том же порядке, что проверка pull request. Origin `app` берётся из выхода модуля `hosting_url`, и он должен быть `https`. Сборку, которую чтение отклонило, выпуск отклоняет до первого вызова Hosting.** T26 (R19). — *Следствие:* `tools/deploy/app.mjs`, `tools/deploy/test/app.test.mjs`.
+
+— *Вторая поправка 2026-11-09:* **Web App создаётся, и его ключ читается без включённого `apikeys.googleapis.com`:** первый `apply` проекта `novatrail` создал Web App, `apiKeyId` у него есть, а API Keys API в проекте не включён (T23). Из «Не проверено» этот пункт уходит.
+
 
 ## Workflow выкладки
 

@@ -120,7 +120,7 @@
 | [x] | T21 | Workflow выкладки (R05) | Claude | да | T19, T20 |
 | [x] | T26 | Переход на тег spec с форматом `/deployment.json` | Claude, проверяю я | — | T18, T20; релиз `spec` с форматом |
 | [x] | T22 | Ключ eval для CI `modules` и `tutor` (Т-28) | Claude | — | T14, T17, T26; R120 spec |
-| [ ] | T23 | Проект в облаке: `bootstrap.sh` и первый `apply` | я + Claude | да | T13–T17, T27 |
+| [x] | T23 | Проект в облаке: `bootstrap.sh` и первый `apply` | я + Claude | да | T13–T17, T27 |
 | [ ] | T24 | Первая выкладка и проверки после неё | я + Claude | да | T21, T23, T26; релиз `api` с командами заданий выкладки и релиз `app`; строка 6.9 COORDINATION.md `spec` |
 | [ ] | T25 | Итог эпика | Claude, проверяю я | — | T09–T23, T26, T27 |
 
@@ -160,11 +160,13 @@
 
 В11–В14 закрыты 2026-11-09 переходом на `spec` v0.12.0 (T26, R19): автор решил все по рекомендациям строк, а их текст — в этом файле коммита e6c7717. В11 и В13 — карточка architecture 3.11 spec и строка «сервис входа» таблицы 3.12 spec: вход в production-проекте настраивает `infra`, на Identity Platform (R12, R16), а поправку к R03 api о dev-проекте пишет `api`. В12 — поправки 2026-11-09 к R85 spec: формат `/deployment.json` — часть `spec` `deployment/` со своей версией, схемой по постоянному пути и векторами чтения, а выкатка читает файл схемой и правилами подмодуля и отказывает сборке другой версии. В14 — третья поправка 2026-11-09 к R85 spec: `csp.json` в формат не входит, а его форму и раскладку архива `app` закрепляет в architecture 3.7 app так, как их читает выпуск (R17).
 
-Номера не переиспользуются: следующий — В16.
+Номера не переиспользуются: следующий — В18.
 
 | ID | Вопрос | Откуда | Варианты | Рекомендация |
 |---|---|---|---|---|
 | В15 | В реестр spec, к R120 spec: пул `github-eval` и его провайдер `github` делает `bootstrap.sh` `infra`, а не модуль. R120 spec положил их в модуль, но тогда `infra-config` нужна роль на пулы проекта: условия IAM пулы не сужают — `iam.googleapis.com` нет среди сервисов с атрибутами ресурса (Google Cloud, IAM Conditions, resource attributes, обновлено 2026-11-07). С такой ролью `infra-config` мог бы поменять условие пула, через который входит сам, а учётные записи выкладки он уже одалживает — production открылся бы любому репозиторию, против R13 infra. Условие провайдера, окружение `eval`, секреты, права на них и что делают `modules` и `tutor` — как в R120 spec. Имя провайдера и секретов `modules` и `tutor` получают после T23 | T22; R20, R13 | (а) поправка к R120 spec и карточке architecture 3.11 spec, где пул — «в модуле, отдельно от пула `bootstrap.sh`»: пул и провайдер делает `bootstrap.sh` `infra`, секреты и права — модуль; (б) как в R120 spec: роль на пулы у `infra-config` и поправка к R13 infra; (в) отдельный проект для eval — R120 spec его уже отверг | (а): граница та же, а `infra-config` не получает прав над своей дверью. Решение автора при планировании T22, 2026-11-09 |
+| В16 | В реестр spec, к карточке architecture 3.11 spec и к строке «Cloud Logging и Trace» таблицы 3.12 spec: «трасс у первого среза нет» — неверно. Cloud Trace API в проекте платформы включён и не выключается: от него зависят Cloud Scheduler, на котором идут задания `api` по расписанию, и `cloudapis.googleapis.com` (отказ Service Usage `COMMON_SU_SERVICE_HAS_DEPENDENT_SERVICES`, T23). Cloud Run сам трассирует часть входящих запросов; трассы лягут в `_Trace` в `us-east4`, а их атрибуты T24 сверит с privacy 4 spec | T23; третья поправка 2026-11-09 к R07 | (а) карточка и строка 3.12 — «трассы Cloud Run возможны, в `us-east4`; их атрибуты сверены с privacy 4 spec при первой выкладке (T24 `infra`)», а если в них окажется IP-адрес или идентификатор — новый вопрос; (б) убрать Cloud Scheduler из платформы и выключить Trace API силой — задания по расписанию шли бы иначе | (а): Scheduler нужен `api`, а место трасс уже верное. Ответ автора 2026-11-09 |
+| В17 | В реестр spec, к R120 spec и к строке Д149 `spec`: чем входят `modules` и `tutor`. Провайдер пула `github-eval` — `projects/306463944576/locations/global/workloadIdentityPools/github-eval/providers/github`; секреты — `projects/novatrail/secrets/eval-key-anthropic` и `projects/novatrail/secrets/eval-key-openai`, пока без значений (вывод `eval_access`, T23). Значения ключей и лимиты трат кладёт автор, а цену первого прогона eval называют `modules` и `tutor` (правило 4) | T22, T23; R20 | (а) `spec` передаёт имена `modules` и `tutor` строками своей таблицы 4, и они пишут их в свои workflow eval; (б) `modules` и `tutor` читают их прямо из RUN.md `infra` | (а): так `spec` передаёт всё, что идёт между репозиториями (R81 spec) |
 
 ## Таблица 4. Технический долг
 
@@ -178,12 +180,13 @@
 
 Д6 закрыт 2026-11-09 тем же Rebuild Container, ради которого заведён (T21; вторая поправка 2026-11-09 к R09): в контейнере `actionlint -version` — 1.7.12, `just ci-actionlint` — «actionlint 1.7.12, .github/workflows clean», `just ci-actionlint-test` — ok, а `tofu version` — «OpenTofu v1.13.9» и `shellcheck --version` — 0.11.0, как прежде. Стадию на amd64 первым собрал job CI `OpenTofu` pull request 32; arm64 её не собирал никто.
 
-Номера не переиспользуются: следующий — Д8.
+Номера не переиспользуются: следующий — Д9.
 
 | ID | Долг | Откуда | Чем грозит, пока не закрыт | Когда вернуться |
 |---|---|---|---|---|
 | Д3 | Бакет `_Required` Cloud Logging — в `global`: регион ему даёт только настройка организации или папки Google Cloud до создания проекта, а организация связана с доменом, которого нет до О-16 ([docs/architecture.md](docs/architecture.md), разделы 3.1 и 4; R04). Решение автора при планировании T01, 2026-11-08 | T01 | журналы `_Required` лежат вне региона П-11; у проектов, созданных до организации, бакет так и останется в `global` — место существующего бакета не меняется | когда после О-16 зарегистрирован домен: решить, заводить ли организацию с регионом по умолчанию до создания проектов платформы |
 | Д7 | CodeQL не читает JavaScript `infra`: вход `languages` общего `codeql.yml` в `.github/workflows/codeql.yml` пуст, а кода на JavaScript с T17–T21 много — `tools/deploy-check`, `tools/deploy`, `tools/ci`, `tofu/tests/*.mjs`. Нужны `javascript-typescript` во входе и проверка «CodeQL / analyze (javascript-typescript)» в ruleset `main` (Д9 RUN.md `spec`) | T26, переход на `spec` v0.12.0 | Код приходит в `main` без анализа CodeQL, и правилу 12 о находках нечего держать | своей задачей до T25; проверку в ruleset ставит автор |
+| Д8 | Платёжный аккаунт проекта `novatrail` — на пробном периоде Google Cloud: «Blaze \| Free Trial, 42 Days, $300 remaining» в консоли Firebase 2026-11-09, то есть до 2026-12-21 или до трат в $300. Перевести его в платный — Billing → Upgrade, шаг автора | T23 | «If you don't upgrade to a Paid billing account before 90 days pass or if you spend the $300 in free credit, then your Free Trial billing account will be closed and all of its associated projects and resources will be stopped» (Google Cloud, Free Trial, обновлено 2026-10-27): платформа остановится | до 2026-12-21, лучше до первой выкладки, T24 |
 
 ## Эпик E2. Первый код
 
@@ -902,6 +905,44 @@
 - **Стоимость:** назвать до шага, по правилу 4.
 - **Как проверить:** `apply` без изменений во втором прогоне; проверки R07 записаны.
 - **Разделы:** R04, R06, R07; правило 4.
+- **Решено автором (2026-11-09):**
+  - ID проекта — `novatrail`, адреса `novatrail.web.app` и `novatrail.firebaseapp.com`; бюджет — 5 USD в месяц, только оповещение;
+  - `gcloud` — в контейнере, 592.0.0 через `tools/ci/install.sh` во временную папку; `bootstrap.sh` и вход — автор, проверки только на чтение — я, на его входе;
+  - первый `apply` — через CI, как `infra-config` (R13, R18); окружения GitHub завёл я через `gh api`, по подтверждению автора, а секреты — автор;
+  - Cloud Trace API остаётся включённым: его не выключить без Cloud Scheduler (третья поправка 2026-11-09 к R07; В16);
+  - `firebase-adminsdk-fbsvc` с её ролями остаётся (пятая поправка 2026-11-09 к R13).
+- **Сделано (2026-11-09):**
+  - предупреждение по правилу 4 — что создаётся, где и сколько стоит, с ценами Google и Firebase (architecture 4). До первой выкладки — около $0 в месяц;
+  - `bootstrap.sh`, второй запуск — проект `novatrail` (номер 306463944576) с оплатой, бакет `novatrail-tofu-state` в `US-EAST4`, пулы `infra-github` и `github-eval`, `infra-config`, роли `apiDeployer`, `hostingPublisher` и `signInUsers`. Первый запуск упал на `hostingPublisher`: «INVALID_ARGUMENT: Permission resourcemanager.projects.list is not valid.» Право убрано, а заглушка `gcloud` отказывает в нём так же (четвёртая поправка 2026-11-09 к R12);
+  - pull request 35 — `tofu/production.auto.tfvars`, `tofu/backend.hcl` и `tofu/ci.env`. `tofu test` читает и `production.auto.tfvars`, поэтому `tests/terraform.tfvars` задаёт каждую переменную, которую задаёт он;
+  - окружения GitHub `production-config`, `production` и `production-hosting` — политика ветки `main`, без reviewers; секреты `TF_VAR_billing_account` и `TF_VAR_operator_email` в `production-config`;
+  - первый `apply` — прогон `Deploy` 42707166366 после мержа: «Apply complete! Resources: 48 added, 0 changed, 0 destroyed», без единого отказа прав; платёжный аккаунт в журнале — `<billing account>`;
+  - проверки, только чтение:
+    - политика проекта в версии 3, условие `projectIamAdmin` — как написано; Owner — только у автора, Editor — ни у кого;
+    - провайдеры обоих пулов — с условиями R13 и R120 spec;
+    - sink `_Default` пишет в `default-us-east4`, 30 дней, с исключениями: запросы Cloud Run, Data Access, запросы Hosting и Identity Platform. `_Required` — в `global`, 400 дней. Журналов запросов Cloud Run нет — сервиса ещё нет;
+    - место трасс по умолчанию — `us-east4`. Cloud Trace API включён самим Google и не выключается (третья поправка 2026-11-09 к R07);
+    - вход: доменов два, почта, телефон, анонимный вход, MFA и журнал запросов выключены; Web App есть, его ключ читается без `apikeys.googleapis.com` (вторая поправка 2026-11-09 к R17);
+  - шаг оператора «Вход через Google» — автор в консоли: провайдер `google.com` включён, OAuth-клиента консоль создала сама; Audience Google Auth Platform — External и In production, по снимку экрана автора. Второй прогон `Deploy`, 42709532157, запущенный руками без частей, — «No changes» (поправка к R16);
+  - документы: поправки 2026-11-09 к R07 (третья), R12 (четвёртая), R13 (пятая), R16 и R17 (вторая); [docs/architecture.md](docs/architecture.md), разделы 1, 3.3, 3.4, 3.6 и 4; таблица 3 — В16 и В17; таблица 4 — Д8;
+  - проверки: `just tf-check` — 76, `just bootstrap-test` — 33 из 33, `just -f spec/justfile docs-check-repo` — ok;
+  - `/code-review high`, один круг — 8 находок, исправлены все:
+    - группа цен затёрла заголовок источников `bootstrap.sh` в architecture 4 — он возвращён;
+    - разделы 1, 3.4 и 3.6 [docs/architecture.md](docs/architecture.md) ещё говорили, что трасс нет;
+    - поправки к R07 и R17 повторяли номер уже бывших — теперь третья и вторая;
+    - поправки к R13 и R17 сливались с соседними в один абзац;
+    - пятая поправка к R13 говорила о ключе, которого нет, — теперь со ссылкой на проверку ключей;
+    - Audience Google Auth Platform выглядел сделанным, хотя его никто не подтвердил, — автор подтвердил его снимком экрана;
+    - цена Cloud Storage была без региона — теперь сказано, что строка `us-east4` не прочитана.
+- **Открыто:**
+  - Д8 — перевести платёжный аккаунт в платный до 2026-12-21;
+  - T24:
+    - трассы Cloud Run на первом трафике — их атрибуты сверить с privacy 4 spec (В16);
+    - журналов запросов Cloud Run в бакете нет;
+    - окно входа на `novatrail.web.app` — не владельцем проекта, а другим аккаунтом Google, что и проверит Audience;
+    - права `api`;
+    - значения секретов `api-migrate-database-url` и `api-migrate-openfga-database-url` кладёт автор;
+  - eval — значения `eval-key-anthropic` и `eval-key-openai` и лимиты трат — автор, когда `modules` и `tutor` будут готовы (В17).
 
 #### T24. Первая выкладка и проверки после неё
 
