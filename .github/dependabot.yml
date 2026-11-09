@@ -20,3 +20,18 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
+
+  # The providers of the root module in tofu/ (R10). The two are released together and Firebase
+  # needs both, so they move as one pull request. Dependabot locks the new version for the
+  # platforms whose hashes the lock file already holds, which are all the release ships. OpenTofu
+  # itself, an ARG of .devcontainer/Dockerfile and required_version in tofu/versions.tf, it does
+  # not see, and that is raised by hand (R09).
+  - package-ecosystem: opentofu
+    directory: /tofu
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    groups:
+      google-providers:
+        patterns: ["hashicorp/google", "hashicorp/google-beta"]
