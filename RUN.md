@@ -112,7 +112,7 @@
 | [x] | T14 | Модуль: Artifact Registry, Secret Manager, бюджет и оповещения (R04, R05, R07) | Claude | — | T12 |
 | [x] | T15 | Модуль: Cloud Run `api`, задания и расписание, учётные записи (R05) | Claude | да | T12, T14 |
 | [x] | T16 | Модуль: Firebase и сайт Hosting (R06) | Claude | да | T12 |
-| [ ] | T17 | `bootstrap.sh` | Claude | да | T13–T16 |
+| [x] | T17 | `bootstrap.sh` | Claude | да | T13–T16 |
 | [ ] | T18 | `deploy/`: схема списка и проверки pull request (R05) | Claude | да | T11 |
 | [ ] | T19 | Рецепты выкладки `api` (R05) | Claude | да | T15, T18 |
 | [ ] | T20 | Рецепты выпуска сборки `app` на Hosting (R06) | Claude | да | T16, T18, T27 |
@@ -171,11 +171,12 @@
 
 Д4 закрыт 2026-11-09 тем же Rebuild Container, ради которого заведён (T11, R09): в контейнере `tofu version` — «OpenTofu v1.13.9 on linux_amd64», `just ci-tofu` — «OpenTofu 1.13.9», `just ci-tofu-test` — ok. Стадию на amd64 первым собрал job CI `OpenTofu` pull request 20; arm64 её не собирал никто.
 
-Номера не переиспользуются: следующий — Д5.
+Номера не переиспользуются: следующий — Д6.
 
 | ID | Долг | Откуда | Чем грозит, пока не закрыт | Когда вернуться |
 |---|---|---|---|---|
 | Д3 | Бакет `_Required` Cloud Logging — в `global`: регион ему даёт только настройка организации или папки Google Cloud до создания проекта, а организация связана с доменом, которого нет до О-16 ([docs/architecture.md](docs/architecture.md), разделы 3.1 и 4; R04). Решение автора при планировании T01, 2026-11-08 | T01 | журналы `_Required` лежат вне региона П-11; у проектов, созданных до организации, бакет так и останется в `global` — место существующего бакета не меняется | когда после О-16 зарегистрирован домен: решить, заводить ли организацию с регионом по умолчанию до создания проектов платформы |
+| Д5 | Rebuild Container ради ShellCheck: стадию `toolchain` с ним собирает CI, а контейнер автора — нет (поправка 2026-11-09 к R09; T17) | T17 | `just ci-shellcheck` в контейнере говорит «no shellcheck on PATH», а `bootstrap.sh` проверяет только CI | Rebuild Container: `shellcheck --version` — 0.11.0, `just ci-shellcheck` — ok |
 
 ## Эпик E2. Первый код
 
@@ -473,6 +474,43 @@
 - **Решить при планировании:** проверка shell — shellcheck под GPL-3.0, а значит названное исключение лицензии (R12 spec), или без него.
 - **Как проверить:** тест зелёный; `/code-review high`, один круг.
 - **Разделы:** R11 spec, R12 spec; R04; architecture 3.
+- **Решено автором (2026-11-09):**
+  - ShellCheck — в стадии `toolchain`, v0.11.0, по `ARG` и суммам sha256, с названным исключением GPL-3.0 поправкой к R09; CI гоняет его в job `OpenTofu`;
+  - учётную запись конфигурации берут только задания своего окружения, `production-config`, где работает один `main`; plan на pull request её не получает, задания выкладки `api` и публикации — тоже;
+  - провайдер пула пускает только токены `infra` — по числовым ID владельца и репозитория; workflow не закрепляется, а другие репозитории в пул вводит T22;
+  - тест — в три слоя: скрипт на подставном `gcloud`, сверка условия скрипта с ролями модуля в `tofu test`, как у canvas-api, и линт типов ресурсов против ролей;
+  - в задаче, по факту IAM: свои роли `apiDeployer` и `hostingPublisher` создаёт и держит `bootstrap.sh`, а модуль даёт их по имени, и `iam.roleAdmin` у учётной записи конфигурации нет — поправки 2026-11-09 к R11 и R12;
+  - в задаче, по находке ревью: скрипт при каждом запуске забирает Owner и Editor у учётных записей самого проекта — через них `infra-config`, которая может действовать как любая учётная запись проекта, дотянулась бы до владельца; окно между запусками записано в R13.
+- **Выяснилось при планировании (2026-11-09):**
+  - `gh api repos/altnovatrail/infra/actions/oidc/customization/sub` — `use_immutable_subject: true`, префикс `repo:altnovatrail@344507087/infra@1425816333`;
+  - ShellCheck v0.11.0 от 2025-08-04 — последний релиз, под GPL-3.0; списка сумм нет, есть поле `digest` ассетов в API GitHub;
+  - тест canvas-api — только регулярка по условию в `bootstrap.sh`: подставного прогона скрипта нет, ShellCheck запускали руками;
+  - `gcloud` в контейнере нет;
+  - в задаче: страница IAM Set limits on granting roles запрещает класть в условие «Custom roles that the limited IAM admin can modify» — а модуль создавал `hostingPublisher` сам, и учётной записи конфигурации нужна была бы `iam.roleAdmin`; с ней она дописала бы в роль `setIamPolicy` и стала бы владельцем проекта ([docs/architecture.md](docs/architecture.md), раздел 4).
+- **Сделано (2026-11-09):**
+  - перед задачей, правило 12: у SonarCloud открытых находок и hotspots нет, в code scanning — те же 6 алертов Scorecard (R33 spec);
+  - `tofu/bootstrap.sh`: значения — из `production.auto.tfvars` и `backend.hcl` рядом, с отказом на пустое, `REPLACE…` и не ту форму; валюта аккаунта против `budget_currency`; проект и привязка к оплате — проект, который платит через другой аккаунт, не переносится; API; свои роли `apiDeployer` и `hostingPublisher`; бакет состояния с версиями; пул и провайдер `github` с условием по ID; `infra-config` с тринадцатью ролями проекта, `storage.objectAdmin` на бакете, `billing.costsManager` на аккаунте и `projectIamAdmin` под условием двух ролей публикации; заёмщик — только `:environment:production-config`. Повтор приводит провайдер, роли, права и заёмщиков к записанному и забирает лишнее — на проекте, бакете, аккаунте и самой учётной записи, под любым условием; Owner и Editor снимаются с учётных записей проекта; удалённые недавно пул, провайдер и роли восстанавливаются, а проект, помеченный к удалению, — отказ; платёжный аккаунт не печатается и в ошибках `gcloud`;
+  - модуль: `tofu/identities.tf` — своих ролей больше нет, `apiDeployer` и `hostingPublisher` даются по имени; `apis.tf` и `variables.tf` — что делает и читает скрипт, а `deploy_environment` и `hosting_environment` не пускают `production-config`;
+  - тесты: `tofu/tests/bootstrap.test.mjs` на `tofu/tests/gcloud-stub.mjs` — 23 проверки; `tofu/tests/bootstrap.tftest.hcl` — 4 `run`; права своих ролей ушли из `api.tftest.hcl` и `firebase.tftest.hcl` в тест скрипта;
+  - `justfile` — `ci-shellcheck`, `ci-shellcheck-test`, `_tf-roles` в `tf-check`, `bootstrap`, `bootstrap-test`; `ci.yml` — три новых шага job `OpenTofu`; `.devcontainer/Dockerfile` — ShellCheck v0.11.0;
+  - R13; поправки 2026-11-09 к R09, R11 и R12; следующий номер — R14; [docs/architecture.md](docs/architecture.md), разделы 3, 3.2, 3.3, 3.6 и 4; CLAUDE.md и README.md — ShellCheck и `bootstrap.sh`; Д5;
+  - проверки: `just bootstrap-test` — 23 из 23; `just tf-check` — «60 passed, 0 failed»; `just ci-shellcheck` с ShellCheck из скачанного архива — без замечаний; `just ci-shellcheck-test` и `just ci-tofu-test` — ok; `just -f spec/justfile docs-check-repo` — ok. Тесты ловят поломку: лишняя роль в условии скрипта — падает `tofu test`; тип ресурса без роли и роль с типом, которого нет, — `_tf-roles`; печать платёжного аккаунта, окружение `production` у `infra-config`, повтор без изъятия лишней роли и лишнее право в `hostingPublisher` — тест скрипта; ослабленная проверка `deploy_environment` — `tofu test`;
+  - `/code-review high`, один круг — 10 находок. Исправлены девять:
+    - `infra-config` через учётную запись проекта с Editor дотянулась бы до владельца — скрипт снимает Owner и Editor с учётных записей проекта, решение автора;
+    - заёмщики, роли под условием, бакет и аккаунт не приводились к записанному — теперь лишнее забирается везде, а названное даётся после, и тест нашёл, что `--all` снял бы и нужную привязку, если она висит ещё и под условием, — отсюда порядок «забрать, потом дать»;
+    - `production-config` держал только скрипт — теперь и проверки переменных модуля;
+    - любая ошибка чтения роли вела к её созданию — роль создаётся только на `NOT_FOUND`;
+    - удалённые недавно пул и провайдер и проект, помеченный к удалению, не обрабатывались — восстанавливаются или отказ;
+    - подставной `gcloud` печатал политику, какой не бывает, — теперь как в версии 3, а какую версию читает настоящий, проверит T23;
+    - лишние `update` сразу после `create` — убраны.
+    Не исправлена одна: имена ролей в `api.tftest.hcl` и `firebase.tftest.hcl` пишутся строкой — эти тесты держат то, что даёт модуль, сами по себе, а со скриптом их связывает `bootstrap.tftest.hcl`.
+- **Открыто** — для других задач, их тела не тронуты (правило 1):
+  - Д5 — Rebuild Container;
+  - T23: `tofu/production.auto.tfvars` и `tofu/backend.hcl` с тем, что читает скрипт; где запускать его с `gcloud` — в контейнере его нет; `just bootstrap` до первого `apply`; там же проверить, что `infra-config` хватает прав — в частности, давать свои роли без `iam.roles.get` и `firebase.admin` для `google_firebase_project`, — что условие `projectIamAdmin` с ролью вида `projects/<проект>/roles/…` IAM принимает, что `gcloud` отдаёт политику с условиями, а не с суффиксом `_withcond_`, и после первого `apply` — что ни одна учётная запись проекта не держит Owner или Editor: подставной `gcloud` этого не проверяет;
+  - T21: окружение `production-config` — только `main`; `apply` — от `infra-config`; куда лягут `GCP_WORKLOAD_IDENTITY_PROVIDER` и `GCP_CONFIG_SERVICE_ACCOUNT`; plan на pull request, если понадобится, — своей учётной записью только на чтение;
+  - T22: провайдер пускает только `infra` — как в пул войдут `modules` и `tutor`;
+  - T19: `gcloud` для выкладки — в контейнере его нет;
+  - роль, которую модуль начнёт давать на проекте, сначала встаёт в условие скрипта, новый тип ресурса — в строку роли, а право своей роли меняется в скрипте; скрипт повторяют до мержа.
 
 #### T18. `deploy/`: схема списка и проверки pull request (R05)
 

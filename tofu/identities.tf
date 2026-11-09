@@ -3,7 +3,13 @@
 # The pool a deployment's tokens are exchanged in is not described here. It is what this
 # configuration itself is applied through, and a door is not built by whoever walks in by it: the
 # pool, its provider and the identity that applies the configuration are made once, from outside,
-# by bootstrap.sh (T17), and named here by id.
+# by bootstrap.sh, and named here by id (R13).
+#
+# Nor are the two custom roles below, the deployment's and the publisher's: bootstrap.sh makes
+# them and holds their permissions, and the configuration grants them by name. The identity that
+# applies the configuration may grant the publisher's role on the project, and IAM's limit on such
+# a grant holds only while that identity cannot change the role itself, so it holds no right to
+# change any role (R13).
 #
 # The deployment's identity is lent to the jobs of one GitHub environment, by the subject GitHub
 # gives such a job, which names the environment: infra's workflow of the deployment alone, never a
@@ -69,40 +75,15 @@ resource "google_secret_manager_secret_iam_member" "deployer_adds_facts" {
 
 # run the jobs with the new image and roll a revision of the one service — and only those. The
 # ready-made developer role carries far more, deleting the service among it; a deployment needs
-# these. They are granted on the service and on each job; canvas-api's deployment ran on such grants,
-# run.operations.get among them, and the first deployment shows it here too (T24).
-resource "google_project_iam_custom_role" "deployer" {
-  role_id     = "${replace(var.api_service_name, "-", "")}Deployer"
-  title       = "Deploys ${var.api_service_name}"
-  description = "Reads the service and its jobs, sets the image of each, runs the jobs and rolls a new revision. Nothing else."
-
-  permissions = local.deployer_permissions
-
-  depends_on = [google_project_service.enabled]
-}
-
-locals {
-  deployer_permissions = [
-    "run.services.get",
-    "run.services.update",
-    "run.revisions.get",
-    "run.revisions.list",
-    "run.operations.get",
-    "run.jobs.get",
-    "run.jobs.update",
-    "run.jobs.run",
-    "run.jobs.runWithOverrides",
-    "run.executions.get",
-    "run.executions.list",
-  ]
-}
-
+# the eleven permissions of bootstrap.sh's role apiDeployer. It is granted on the service and on
+# each job; canvas-api's deployment ran on such grants, run.operations.get among them, and the
+# first deployment shows it here too (T24).
 resource "google_cloud_run_v2_service_iam_member" "deployer" {
   count = local.api_serving ? 1 : 0
 
   location = google_cloud_run_v2_service.api[0].location
   name     = google_cloud_run_v2_service.api[0].name
-  role     = google_project_iam_custom_role.deployer.name
+  role     = local.deployer_role
   member   = "serviceAccount:${google_service_account.deployer.email}"
 }
 
@@ -111,7 +92,7 @@ resource "google_cloud_run_v2_job_iam_member" "deployer" {
 
   location = each.value.location
   name     = each.value.name
-  role     = google_project_iam_custom_role.deployer.name
+  role     = local.deployer_role
   member   = "serviceAccount:${google_service_account.deployer.email}"
 }
 
@@ -142,23 +123,13 @@ resource "google_service_account_iam_member" "hosting_from_github" {
   member             = "${local.github_subject}:environment:${var.hosting_environment}"
 }
 
-# Hosting takes no grant on a site, so its rights are on the project. The ready-made Firebase
-# Hosting Admin role, less the making and the deleting of sites: a release goes through
-# firebasehosting.sites.update, and the site app's address is stays out of the CLI's reach.
-resource "google_project_iam_custom_role" "hosting" {
-  role_id     = "hostingPublisher"
-  title       = "Publishes app's build"
-  description = "Reads the project and its Hosting sites and releases new versions of them. It makes and deletes no site."
-
-  permissions = local.hosting_permissions
-
-  depends_on = [google_project_service.enabled]
-}
-
-# The project's Hosting rights, and the reading of its API keys, which the CLI's deploy asks for
-# (canvas-api).
+# Hosting takes no grant on a site, so its rights are on the project: bootstrap.sh's role
+# hostingPublisher, the ready-made Firebase Hosting Admin less the making and the deleting of
+# sites — a release goes through firebasehosting.sites.update, and the site app's address is stays
+# out of the CLI's reach — and the reading of API keys, which the CLI's deploy asks for
+# (canvas-api). These two are all the configuration may grant on the project: the condition
+# bootstrap.sh puts on that right names the same two, and a test holds them together.
 resource "google_project_iam_member" "hosting" {
-  # By keys known before any apply: the custom role's name is known only once the role is made.
   for_each = local.hosting_project_roles
 
   project = var.project_id
@@ -167,19 +138,12 @@ resource "google_project_iam_member" "hosting" {
 }
 
 locals {
-  hosting_permissions = [
-    "firebase.clients.get",
-    "firebase.clients.list",
-    "firebase.projects.get",
-    "firebasehosting.sites.get",
-    "firebasehosting.sites.list",
-    "firebasehosting.sites.update",
-    "resourcemanager.projects.get",
-    "resourcemanager.projects.list",
-  ]
+  # The custom roles bootstrap.sh makes, by the names IAM gives them.
+  deployer_role = "projects/${var.project_id}/roles/apiDeployer"
+  hosting_role  = "projects/${var.project_id}/roles/hostingPublisher"
 
   hosting_project_roles = {
-    hosting  = google_project_iam_custom_role.hosting.name
+    hosting  = local.hosting_role
     api_keys = "roles/serviceusage.apiKeysViewer"
   }
 }

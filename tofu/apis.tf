@@ -1,8 +1,9 @@
 # The APIs this project is allowed to use (R10). Service Usage and Resource Manager are not in the
 # list: they are what enables the rest. bootstrap.sh turns them on before this configuration can be
-# applied at all, and with them whatever it needs for what it creates itself — the state bucket
-# and the federated pool CI signs in through (T17); those that the configuration stands on too are
-# named here as well, because this is the list of what it stands on.
+# applied at all, and with them whatever it needs for what it creates itself — the state bucket,
+# the federated pool CI signs in through and the custom roles, whose permissions are of Cloud Run
+# and Firebase (R13); those that the configuration stands on too are named here as well, because
+# this is the list of what it stands on.
 #
 # Cloud Trace is not here, on purpose: with its API off, no trace is written, and the platform's
 # first slice keeps none (R07).

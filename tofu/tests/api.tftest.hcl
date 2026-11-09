@@ -251,26 +251,10 @@ run "the_deployment_holds_what_its_steps_need_and_no_more" {
     error_message = "Only the jobs of the environment production of the repository may borrow the deployment's identity."
   }
 
+  # What the role holds is bootstrap.sh's, and its test holds it to the steps' rights.
   assert {
-    condition = toset(google_project_iam_custom_role.deployer.permissions) == toset([
-      "run.services.get",
-      "run.services.update",
-      "run.revisions.get",
-      "run.revisions.list",
-      "run.operations.get",
-      "run.jobs.get",
-      "run.jobs.update",
-      "run.jobs.run",
-      "run.jobs.runWithOverrides",
-      "run.executions.get",
-      "run.executions.list",
-    ])
-    error_message = "The deployment's role holds exactly the rights of its steps: no create, no delete, no IAM."
-  }
-
-  assert {
-    condition     = google_cloud_run_v2_service_iam_member.deployer[0].role == google_project_iam_custom_role.deployer.name && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["migrate"])
-    error_message = "The role is granted on the service and on each job, not on the project."
+    condition     = google_cloud_run_v2_service_iam_member.deployer[0].role == "projects/novatrail-test-0/roles/apiDeployer" && toset([for m in values(google_cloud_run_v2_job_iam_member.deployer) : m.role]) == toset(["projects/novatrail-test-0/roles/apiDeployer"]) && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["migrate"])
+    error_message = "The deployment's role, apiDeployer, which bootstrap.sh makes, is granted on the service and on each job, not on the project."
   }
 
   assert {
