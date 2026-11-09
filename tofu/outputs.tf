@@ -85,3 +85,13 @@ output "admission_facts_file" {
   description = "Where api's revision reads the deployment facts, the file of the secret's version mounted as a volume: the path in API_ADMISSION_FACTS_FILE."
   value       = "${local.admission_dir}/${local.admission_file}"
 }
+
+# What modules and tutor sign in with and read, for the operator to hand them: the provider of the
+# pool bootstrap.sh makes, and the secrets by provider (R120 spec; R20). null with no eval.
+output "eval_access" {
+  description = "The workload identity provider of the pool github-eval and the eval secrets by provider, or null with no eval."
+  value = length(var.eval_github_subject_prefixes) == 0 ? null : {
+    workload_identity_provider = "projects/${data.google_project.this.number}/locations/global/workloadIdentityPools/${local.eval_pool}/providers/${local.eval_provider}"
+    secrets                    = { for code, secret in google_secret_manager_secret.eval : code => secret.id }
+  }
+}

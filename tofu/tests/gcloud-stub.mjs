@@ -189,7 +189,9 @@ switch (true) {
       if (verb === "create-oidc" && state.providers[key]) fail("ALREADY_EXISTS: provider");
       if (verb === "update-oidc" && !state.providers[key]) notFound(`provider ${key}`);
       if (verb === "update-oidc" && state.providers[key].state === "DELETED") fail("FAILED_PRECONDITION: the provider is deleted");
-      state.providers[key] = { issuer: flag("issuer-uri"), mapping: flag("attribute-mapping"), condition: flag("attribute-condition"), state: "ACTIVE" };
+      // An update changes what it is given, as gcloud's does, and keeps the rest.
+      const given = Object.entries({ issuer: flag("issuer-uri"), mapping: flag("attribute-mapping"), condition: flag("attribute-condition") }).filter(([, value]) => value !== undefined);
+      state.providers[key] = { ...(verb === "update-oidc" ? state.providers[key] : {}), ...Object.fromEntries(given), state: "ACTIVE" };
     } else {
       fail(`stub: unknown command ${args.join(" ")}`, 2);
     }

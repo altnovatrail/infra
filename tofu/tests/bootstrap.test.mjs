@@ -114,6 +114,60 @@ test("the pool admits the jobs of the one repository, by the numbers of its owne
   });
 });
 
+// modules and tutor, as the platform names them: their subjects are public (R120 spec).
+const evalList = 'eval_github_subject_prefixes = ["repo:altnovatrail@344507087/modules@1425775415", "repo:altnovatrail@344507087/tutor@1425813274"]';
+const evalCondition =
+  "assertion.repository_owner_id=='344507087' && (assertion.repository_id=='1425775415' || assertion.repository_id=='1425813274') && assertion.environment=='eval' && assertion.actor!='dependabot[bot]'";
+
+test("with repositories of eval, the pool github-eval admits their jobs of eval alone, and Dependabot's not", () => {
+  const w = world({ values: tfvars(evalList) });
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  const s = w.read();
+  assert.ok(s.pools["github-eval"]);
+  assert.deepEqual(s.providers["github-eval/github"], {
+    issuer: "https://token.actions.githubusercontent.com",
+    mapping: "google.subject=assertion.sub",
+    condition: evalCondition,
+    state: "ACTIVE",
+  });
+  // The pool the configuration signs in through still admits infra alone.
+  assert.equal(s.providers["infra-github/github"].condition, "assertion.repository_owner_id=='1000' && assertion.repository_id=='2000'");
+  assert.match(r.stdout, /^GCP_EVAL_WORKLOAD_IDENTITY_PROVIDER=projects\/123456789012\/locations\/global\/workloadIdentityPools\/github-eval\/providers\/github$/m);
+});
+
+test("with no repository of eval, there is no pool of eval, and one made before admits nobody", () => {
+  const none = world();
+  const r = none.run();
+  assert.equal(r.status, 0, r.output);
+  assert.ok(!none.calls().some((c) => c.includes("create") && c.includes("github-eval")), "no pool of eval is made");
+  assert.ok(!none.read().pools["github-eval"]);
+  assert.doesNotMatch(r.stdout, /GCP_EVAL_WORKLOAD_IDENTITY_PROVIDER/);
+
+  const before = world({ values: tfvars(evalList) });
+  assert.equal(before.run().status, 0);
+  fs.writeFileSync(path.join(before.dir, "tofu", "production.auto.tfvars"), tfvars("eval_github_subject_prefixes = []"));
+  assert.equal(before.run().status, 0);
+  assert.ok(before.read().pools["github-eval"], "the pool is kept");
+  assert.equal(before.read().providers["github-eval/github"].condition, "false");
+});
+
+test("the list of eval may end its line with a comment", () => {
+  const w = world({ values: tfvars(`${evalList} # modules and tutor`) });
+  assert.equal(w.run().status, 0);
+  assert.equal(w.read().providers["github-eval/github"].condition, evalCondition);
+});
+
+test("a run again gives the pool of eval its condition back", () => {
+  const w = world({ values: tfvars(evalList) });
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  s.providers["github-eval/github"].condition = "true";
+  w.seed(s);
+  assert.equal(w.run().status, 0);
+  assert.equal(w.read().providers["github-eval/github"].condition, evalCondition);
+});
+
 test("the identity holds exactly its roles, the conditioned admin and nothing of who may change a role", () => {
   const w = world();
   assert.equal(w.run().status, 0);
@@ -274,6 +328,12 @@ test("refusals, each before any call to gcloud", async (t) => {
     ["a billing account of another form", {}, { TF_VAR_billing_account: "billingAccounts/0A1B2C-3D4E5F-6A7B8C" }, /TF_VAR_billing_account is not set, or is not the id/],
     ["api's deployment in the configuration's environment", { values: tfvars('deploy_environment = "Production-Config"') }, {}, /the configuration's own, production-config/],
     ["the publisher in the configuration's environment", { values: tfvars('hosting_environment = "production-config"') }, {}, /the configuration's own, production-config/],
+    ["repositories of eval on more lines than one", { values: tfvars('eval_github_subject_prefixes = [\n  "repo:altnovatrail@344507087/modules@1425775415",\n]') }, {}, /eval_github_subject_prefixes in production\.auto\.tfvars is not a list on one line/],
+    ["repositories of eval not apart by commas", { values: tfvars('eval_github_subject_prefixes = ["repo:a@1/b@2" "repo:a@1/c@3"]') }, {}, /is not a list on one line/],
+    ["a repository of eval of another form", { values: tfvars('eval_github_subject_prefixes = ["altnovatrail/modules"]') }, {}, /holds altnovatrail\/modules, not of the form/],
+    ["a repository of eval named twice", { values: tfvars('eval_github_subject_prefixes = ["repo:a@1/b@2", "repo:a@1/b@2"]') }, {}, /names the repository 2 twice/],
+    ["repositories of eval of two owners", { values: tfvars('eval_github_subject_prefixes = ["repo:a@1/b@2", "repo:c@3/d@4"]') }, {}, /of more than one owner/],
+    ["the configuration's pool named as eval's", { values: tfvars().replace('"infra-github"', '"github-eval"') }, {}, /workload_identity_pool_id is github-eval, the pool of eval/],
   ];
   for (const [name, setup, env, message] of cases) {
     await t.test(name, () => {
