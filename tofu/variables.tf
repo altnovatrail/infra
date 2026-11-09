@@ -286,7 +286,7 @@ variable "api_request_timeout" {
 # Who may deploy: the jobs of one GitHub environment of infra's repository (R11).
 
 variable "workload_identity_pool_id" {
-  description = "The federated pool the repository's tokens are exchanged in. It exists before this configuration is ever applied, since the apply itself signs in through it, so it is named here rather than made: bootstrap.sh prints it."
+  description = "The federated pool the repository's tokens are exchanged in. It exists before this configuration is ever applied, since the apply itself signs in through it, so it is named here rather than made: bootstrap.sh makes it under this id, which it reads from the same file of values (R13)."
   type        = string
 
   validation {
@@ -296,7 +296,7 @@ variable "workload_identity_pool_id" {
 }
 
 variable "github_oidc_subject_prefix" {
-  description = "How GitHub begins the subject of the repository's tokens: the owner and the repository, each with its numeric id, as `gh api repos/OWNER/NAME/actions/oidc/customization/sub --jq .sub_claim_prefix` prints it. A job's subject goes on to name its environment, so an identity bound to one subject is lent to the jobs of one environment alone."
+  description = "How GitHub begins the subject of the repository's tokens: the owner and the repository, each with its numeric id, as `gh api repos/OWNER/NAME/actions/oidc/customization/sub --jq .sub_claim_prefix` prints it. A job's subject goes on to name its environment, so an identity bound to one subject is lent to the jobs of one environment alone. bootstrap.sh reads it from the same file of values, and its pool admits the tokens of these two numbers alone (R13)."
   type        = string
 
   validation {
@@ -315,6 +315,13 @@ variable "deploy_environment" {
     condition     = can(regex("^[A-Za-z0-9_.-]{1,255}$", var.deploy_environment))
     error_message = "deploy_environment is the name of a GitHub environment: letters, digits, dots, hyphens and underscores."
   }
+
+  # production-config is the environment whose jobs borrow the identity this configuration is applied
+  # as, which bootstrap.sh lends to them alone (R13).
+  validation {
+    condition     = lower(var.deploy_environment) != "production-config"
+    error_message = "deploy_environment is not production-config, in any case of letters: that environment's jobs apply this configuration, and no other identity is lent to them."
+  }
 }
 
 variable "hosting_environment" {
@@ -331,5 +338,10 @@ variable "hosting_environment" {
   validation {
     condition     = lower(var.hosting_environment) != lower(var.deploy_environment)
     error_message = "hosting_environment is not deploy_environment, in any case of letters, as GitHub compares the names: the publisher of app's build and api's deployment are lent to the jobs of different environments."
+  }
+
+  validation {
+    condition     = lower(var.hosting_environment) != "production-config"
+    error_message = "hosting_environment is not production-config, in any case of letters: that environment's jobs apply this configuration, and no other identity is lent to them."
   }
 }

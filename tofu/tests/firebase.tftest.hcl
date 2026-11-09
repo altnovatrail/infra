@@ -43,8 +43,9 @@ run "the_site_is_the_projects_and_kept" {
 }
 
 # The publisher of app's build: lent to the jobs of production-hosting alone, holding Hosting's
-# rights less the making and deleting of sites and the reading of API keys, and nothing of api's
-# nor of sign-in (R12). With api's service made too, and the publisher given an address of its own,
+# rights less the making and deleting of sites — bootstrap.sh's role hostingPublisher, whose
+# permissions its test holds — and the reading of API keys, and nothing of api's nor of sign-in
+# (R12). With api's service made too, and the publisher given an address of its own,
 # so that a grant to it among api's would show.
 run "the_publisher_holds_hosting_alone" {
   command = plan
@@ -73,22 +74,8 @@ run "the_publisher_holds_hosting_alone" {
   }
 
   assert {
-    condition     = toset([for m in google_project_iam_member.hosting : m.role]) == toset([google_project_iam_custom_role.hosting.name, "roles/serviceusage.apiKeysViewer"])
-    error_message = "On the project the publisher holds its own Hosting role and the reading of API keys, and no other role."
-  }
-
-  assert {
-    condition = toset(google_project_iam_custom_role.hosting.permissions) == toset([
-      "firebase.clients.get",
-      "firebase.clients.list",
-      "firebase.projects.get",
-      "firebasehosting.sites.get",
-      "firebasehosting.sites.list",
-      "firebasehosting.sites.update",
-      "resourcemanager.projects.get",
-      "resourcemanager.projects.list",
-    ])
-    error_message = "The publisher's role is Firebase Hosting Admin less firebasehosting.sites.create and .delete: no making and no deleting of sites, and nothing of sign-in."
+    condition     = toset([for m in google_project_iam_member.hosting : m.role]) == toset(["projects/novatrail-test-0/roles/hostingPublisher", "roles/serviceusage.apiKeysViewer"])
+    error_message = "On the project the publisher holds bootstrap.sh's role hostingPublisher and the reading of API keys, and no other role."
   }
 
   assert {

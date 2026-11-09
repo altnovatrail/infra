@@ -1,9 +1,9 @@
 # infra's own recipes. spec's, the documents check among them, run from spec's justfile:
-# `just -f spec/justfile docs-check-repo`. CI runs the ci- recipes and tf-check in the toolchain
-# stage of .devcontainer/Dockerfile, through spec/tools/toolchain/toolchain.sh (R30 spec): the job
-# OpenTofu, required in the ruleset of main.
+# `just -f spec/justfile docs-check-repo`. CI runs the ci- recipes, tf-check and bootstrap-test in
+# the toolchain stage of .devcontainer/Dockerfile, through spec/tools/toolchain/toolchain.sh
+# (R30 spec): the job OpenTofu, required in the ruleset of main.
 
-# The Dockerfile whose ARG ci-tofu reads; ci-tofu-test points it at broken copies.
+# The Dockerfile whose ARGs ci-tofu and ci-shellcheck read; their tests point it at broken copies.
 dockerfile := env("INFRA_DOCKERFILE", ".devcontainer/Dockerfile")
 
 # The OpenTofu on PATH is the one the toolchain stage installs, at the version its ARG names (R09).
@@ -83,6 +83,66 @@ ci-tofu-test:
     env PATH="$work/bin:$PATH" "$just" ci-tofu >"$work/out" 2>&1 || { echo "ci-tofu-test: ci-tofu refused tofu ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-tofu-test: ok"
 
+# ShellCheck over tofu/bootstrap.sh, by the ShellCheck the toolchain stage installs, at the version
+# its ARG names (the 2026-11-09 amendment to R09).
+ci-shellcheck:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    want=$(sed -n 's/^ARG SHELLCHECK_VERSION=//p' {{quote(dockerfile)}} | tr -d '"\r' | sed 's/[[:space:]]*$//')
+    if ! [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "ci-shellcheck: {{dockerfile}} names no single exact ARG SHELLCHECK_VERSION" >&2
+        exit 1
+    fi
+    if ! command -v shellcheck >/dev/null; then
+        echo "ci-shellcheck: no shellcheck on PATH: the toolchain stage installs it, at ${want}" >&2
+        exit 1
+    fi
+    got=$(shellcheck --version | sed -n 's/^version: //p')
+    if [ "$got" != "$want" ]; then
+        echo "ci-shellcheck: shellcheck is ${got:-of no version}, and {{dockerfile}} names ${want}" >&2
+        exit 1
+    fi
+    shellcheck {{ quote(tofu_dir) }}/bootstrap.sh
+    echo "ci-shellcheck: ShellCheck ${got}, {{ tofu_dir }}/bootstrap.sh clean"
+
+# ci-shellcheck's own test, with no real shellcheck: a stand-in ahead on PATH, of another version,
+# of none and of the right one, which finds a script clean or not as it is told.
+ci-shellcheck-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work=$(mktemp -d)
+    trap 'rm -rf "$work"' EXIT
+    mkdir "$work/bin"
+    want=$(sed -n 's/^ARG SHELLCHECK_VERSION=//p' {{quote(dockerfile)}})
+    just={{quote(just_executable())}}
+    stub() {
+    cat > "$work/bin/shellcheck" <<EOF
+    #!/bin/sh
+    if [ "\$1" = --version ]; then printf '%s\n' 'ShellCheck - shell script analysis tool' '$1'; exit 0; fi
+    echo "In \$1 line 1: SC2086"
+    exit ${2:-0}
+    EOF
+        chmod +x "$work/bin/shellcheck"
+    }
+    refuses() {
+        local reason="$1"; shift
+        if "$@" >"$work/out" 2>&1; then
+            echo "ci-shellcheck-test: ci-shellcheck passed where it must refuse: ${reason}" >&2; exit 1
+        fi
+        grep -qF "$reason" "$work/out" || { echo "ci-shellcheck-test: the refusal does not say \"${reason}\":" >&2; cat "$work/out" >&2; exit 1; }
+    }
+    stub 'version: 0.0.1'
+    refuses "shellcheck is 0.0.1" env PATH="$work/bin:$PATH" "$just" ci-shellcheck
+    stub 'license: none'
+    refuses "shellcheck is of no version" env PATH="$work/bin:$PATH" "$just" ci-shellcheck
+    stub "version: ${want}" 1
+    refuses "SC2086" env PATH="$work/bin:$PATH" "$just" ci-shellcheck
+    sed 's/^ARG SHELLCHECK_VERSION=.*/ARG SHELLCHECK_VERSION=latest/' {{quote(dockerfile)}} > "$work/latest"
+    refuses "names no single exact ARG" env INFRA_DOCKERFILE="$work/latest" PATH="$work/bin:$PATH" "$just" ci-shellcheck
+    stub "version: ${want}"
+    env PATH="$work/bin:$PATH" "$just" ci-shellcheck >"$work/out" 2>&1 || { echo "ci-shellcheck-test: ci-shellcheck refused shellcheck ${want}:" >&2; cat "$work/out" >&2; exit 1; }
+    echo "ci-shellcheck-test: ok"
+
 # The root module in tofu/, by the OpenTofu of the toolchain stage (R10).
 tofu_dir := "tofu"
 
@@ -93,7 +153,7 @@ tf-fmt:
 # What CI runs on the module: its format, an init with no backend that installs the providers by
 # the lock file and refuses one the lock file does not name, a validate, and the tests, which run
 # against mock providers and need no credential.
-tf-check: _tf-sinks
+tf-check: _tf-sinks _tf-roles
     tofu -chdir={{ tofu_dir }} fmt -check -recursive -diff
     tofu -chdir={{ tofu_dir }} init -backend=false -input=false -lockfile=readonly
     tofu -chdir={{ tofu_dir }} validate
@@ -111,3 +171,35 @@ _tf-sinks:
         echo "$stray" >&2
         exit 1
     fi
+
+# Every type of resource and data in tofu/*.tf is named by a role that bootstrap.sh gives the
+# identity the configuration is applied as, and every type a role names is still there (R13): a type
+# no role is held for would pass every other check and be refused at the apply, after the merge.
+_tf-roles:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    used=$(grep -hoE '^[[:space:]]*(resource|data)[[:space:]]+"[a-z0-9_]+"' {{ quote(tofu_dir) }}/*.tf | tr -d '"' | awk '{ print ($1 == "data" ? "data." : "") $2 }' | sort -u)
+    named=$(grep -oE '^[[:space:]]*"roles/[A-Za-z.]+( [a-z0-9_.]+)*"$' {{ quote(tofu_dir) }}/bootstrap.sh | tr -d '"' | awk '{ for (i = 2; i <= NF; i++) print $i }' | sort -u)
+    missing=$(comm -23 <(printf '%s\n' "$used") <(printf '%s\n' "$named"))
+    stale=$(comm -13 <(printf '%s\n' "$used") <(printf '%s\n' "$named"))
+    if [ -n "$missing" ]; then
+        echo "tf-check: no role in {{ tofu_dir }}/bootstrap.sh is held for these types of {{ tofu_dir }}/ (R13):" >&2
+        echo "$missing" >&2
+        exit 1
+    fi
+    if [ -n "$stale" ]; then
+        echo "tf-check: {{ tofu_dir }}/bootstrap.sh names types {{ tofu_dir }}/ no longer has (R13):" >&2
+        echo "$stale" >&2
+        exit 1
+    fi
+
+# Run once, by someone who may make projects and link them to the billing account, with
+# TF_VAR_billing_account set and tofu/production.auto.tfvars and tofu/backend.hcl filled in; again
+# whenever the script changes, before the merge that needs it (R13).
+# Make the project, its state bucket, the federated pool and the identity CI applies the configuration as
+bootstrap:
+    bash {{ quote(tofu_dir) }}/bootstrap.sh
+
+# bootstrap.sh against a stand-in gcloud, with synthetic values: no cloud, no credential.
+bootstrap-test:
+    node --test {{ quote(tofu_dir) }}/tests/bootstrap.test.mjs
