@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "The deployment's list",
+  "description": "deploy/production.json, format 1: the exact releases of api and of app's build that the deployment ships, by tag and sha256 of each file, and the lowest admission rung of api's models (R05). A pull request changes it by hand, and its merge into main is the deployment. A field this schema does not know is an error.",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": 1,
+      "description": "The version of this list's format."
+    },
+    "api": {
+      "type": "object",
+      "properties": {
+        "release": {
+          "$ref": "#/$defs/tag",
+          "description": "The tag of the release of altnovatrail/api whose binary and Dockerfile the image is built from."
+        },
+        "binary": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^api_v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)_linux_amd64$",
+              "description": "The binary's file in the release, api_<tag>_linux_amd64, as api's release names it (R28 api); the check holds its tag to release."
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": ["name", "sha256"],
+          "unevaluatedProperties": false
+        },
+        "dockerfile": {
+          "type": "object",
+          "properties": {
+            "sha256": {
+              "$ref": "#/$defs/sha256",
+              "description": "The sha256 of the release's file Dockerfile."
+            }
+          },
+          "required": ["sha256"],
+          "unevaluatedProperties": false
+        }
+      },
+      "required": ["release", "binary", "dockerfile"],
+      "unevaluatedProperties": false,
+      "description": "The release of api. The packages of the modules are not named here: the build of api's image puts them in by the modules.json its binary holds (R07 api)."
+    },
+    "app": {
+      "type": "object",
+      "properties": {
+        "release": {
+          "$ref": "#/$defs/tag",
+          "description": "The tag of the release of altnovatrail/app whose build is shipped."
+        },
+        "archive": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.tar\\.gz$",
+              "description": "The build's archive in the release, as app's release names it."
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": ["name", "sha256"],
+          "unevaluatedProperties": false
+        },
+        "deployment": {
+          "type": "object",
+          "properties": {
+            "sha256": {
+              "$ref": "#/$defs/sha256",
+              "description": "The sha256 of deploy/production/deployment.json, the /deployment.json shipped beside the build (Т-19)."
+            }
+          },
+          "required": ["sha256"],
+          "unevaluatedProperties": false
+        }
+      },
+      "required": ["release", "archive", "deployment"],
+      "unevaluatedProperties": false,
+      "description": "The release of app's build, and the file of its deployment's values."
+    },
+    "admission": {
+      "type": "object",
+      "properties": {
+        "rung": {
+          "enum": ["author", "full"],
+          "description": "The lowest admission rung of api's models, by tutor's code. The schema knows both; the deployment ships only full, which a check of its own holds (R25 api)."
+        }
+      },
+      "required": ["rung"],
+      "unevaluatedProperties": false
+    }
+  },
+  "required": ["format", "api", "app", "admission"],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "tag": {
+      "type": "string",
+      "pattern": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "description": "An exact tag of a release, vMAJOR.MINOR.PATCH."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "A sha256, as 64 lowercase hexadecimal digits."
+    }
+  }
+}
