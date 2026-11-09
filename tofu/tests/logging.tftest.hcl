@@ -1,13 +1,23 @@
 # The logs and the traces as R04 and R07 decided them, checked against mock providers, as the
 # configuration's other tests are: no credential, no call to Google. The values are synthetic.
 
-mock_provider "google" {}
+mock_provider "google" {
+  mock_data "google_project" {
+    defaults = {
+      number = "123456789012"
+    }
+  }
+}
 
 mock_provider "google-beta" {}
 
 variables {
   project_id = "novatrail-test-0"
   region     = "us-east4"
+
+  billing_account = "0A1B2C-3D4E5F-6A7B8C"
+  budget_amount   = "10"
+  budget_currency = "USD"
 }
 
 # Every sink the project has excludes Cloud Run's request logs, which hold the client's address,
