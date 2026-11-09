@@ -22,25 +22,30 @@ mock_provider "google" {
 mock_provider "google-beta" {}
 
 # The variables every run starts from are in tests/terraform.tfvars. What the script says is read
-# out of it here: the ids of its two roles, and the roles its condition lets the configuration's
-# identity grant on the project, with the shell's ${project} and ${publisher_role} put in.
+# out of it here: the ids of its three roles, and the roles its condition lets the configuration's
+# identity grant on the project, as the script writes them; the run puts the shell's ${project},
+# ${publisher_role} and ${sign_in_role} in.
 
 variables {
   bootstrap_deployer_role  = regex("(?m)^deployer_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
   bootstrap_publisher_role = regex("(?m)^publisher_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
+  bootstrap_sign_in_role   = regex("(?m)^sign_in_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
   bootstrap_grantable = [
-    for role in regexall("'([^']+)'", regex("hasOnly\\(\\[([^\\]]*)\\]\\)", file("bootstrap.sh"))[0]) :
-    replace(replace(role[0], "$${project}", "novatrail-test-0"), "$${publisher_role}", regex("(?m)^publisher_role=([A-Za-z]+)$", file("bootstrap.sh"))[0])
+    for role in regexall("'([^']+)'", regex("hasOnly\\(\\[([^\\]]*)\\]\\)", file("bootstrap.sh"))[0]) : role[0]
   ]
 }
 
 # The roles granted on the project are those the condition of the identity's IAM admin lets it
-# grant, and no other.
+# grant, and no other. Every grant on the project is in google_project_iam_member.grants, and
+# tf-check refuses one declared anywhere else.
 run "the_project_grants_are_what_bootstrap_lets_the_configuration_grant" {
   command = plan
 
   assert {
-    condition     = toset([for m in google_project_iam_member.hosting : m.role]) == toset(var.bootstrap_grantable)
+    condition = toset([for g in google_project_iam_member.grants : g.role]) == toset([
+      for role in var.bootstrap_grantable :
+      replace(replace(replace(role, "$${project}", var.project_id), "$${publisher_role}", var.bootstrap_publisher_role), "$${sign_in_role}", var.bootstrap_sign_in_role)
+    ])
     error_message = "The roles granted on the project are the ones the condition in bootstrap.sh lets the configuration's identity grant: change both together, and run bootstrap.sh again before the merge."
   }
 }
@@ -61,8 +66,13 @@ run "the_custom_roles_granted_are_bootstraps" {
   }
 
   assert {
-    condition     = google_project_iam_member.hosting["hosting"].role == "projects/${var.project_id}/roles/${var.bootstrap_publisher_role}"
+    condition     = google_project_iam_member.grants["hosting"].role == "projects/${var.project_id}/roles/${var.bootstrap_publisher_role}"
     error_message = "The publisher's role on the project is the one bootstrap.sh makes."
+  }
+
+  assert {
+    condition     = google_project_iam_member.grants["api_sign_in"].role == "projects/${var.project_id}/roles/${var.bootstrap_sign_in_role}"
+    error_message = "api's role of sign-in on the project is the one bootstrap.sh makes."
   }
 }
 

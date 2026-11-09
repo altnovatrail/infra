@@ -80,7 +80,7 @@ const makes = (calls) => calls.filter((c) => c.includes("create") || c.includes(
 const unconditioned = (state) =>
   state.projectPolicy[project].filter((b) => b.member === account && b.condition === "").map((b) => b.role).sort();
 
-const expression = `api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/hostingPublisher', 'roles/serviceusage.apiKeysViewer'])`;
+const expression = `api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/hostingPublisher', 'roles/serviceusage.apiKeysViewer', 'projects/${project}/roles/signInUsers'])`;
 
 test("a first run makes the project, its state, the pool and the configuration's identity", () => {
   const w = world();
@@ -96,7 +96,7 @@ test("a first run makes the project, its state, the pool and the configuration's
     versioning: true,
     policy: [{ role: "roles/storage.objectAdmin", member: account, condition: "" }],
   });
-  for (const api of ["serviceusage.googleapis.com", "cloudresourcemanager.googleapis.com", "iam.googleapis.com", "sts.googleapis.com", "iamcredentials.googleapis.com", "storage.googleapis.com", "observability.googleapis.com", "run.googleapis.com", "firebase.googleapis.com", "firebasehosting.googleapis.com"]) {
+  for (const api of ["serviceusage.googleapis.com", "cloudresourcemanager.googleapis.com", "iam.googleapis.com", "sts.googleapis.com", "iamcredentials.googleapis.com", "storage.googleapis.com", "observability.googleapis.com", "run.googleapis.com", "firebase.googleapis.com", "firebasehosting.googleapis.com", "identitytoolkit.googleapis.com"]) {
     assert.ok(s.services[project].includes(api), `${api} is enabled`);
   }
   assert.ok(s.pools["infra-github"]);
@@ -152,7 +152,7 @@ test("only the jobs of production-config may borrow the identity", () => {
   assert.match(r.stdout, new RegExp(`^GCP_CONFIG_SERVICE_ACCOUNT=infra-config@${project}\\.iam\\.gserviceaccount\\.com$`, "m"));
 });
 
-test("the custom roles hold exactly the permissions of the deployment's steps and of a release", () => {
+test("the custom roles hold exactly the permissions of the deployment's steps, of a release and of api's users", () => {
   const w = world();
   assert.equal(w.run().status, 0);
   const s = w.read();
@@ -178,6 +178,11 @@ test("the custom roles hold exactly the permissions of the deployment's steps an
     "firebasehosting.sites.update",
     "resourcemanager.projects.get",
     "resourcemanager.projects.list",
+  ]);
+  assert.deepEqual(s.roles[`${project}/signInUsers`].permissions.sort(), [
+    "firebaseauth.users.delete",
+    "firebaseauth.users.get",
+    "firebaseauth.users.update",
   ]);
 });
 
@@ -209,6 +214,7 @@ test("a run again takes back what drifted: a role not named, a condition rewritt
   );
   s.roles[`${project}/hostingPublisher`].permissions.push("firebasehosting.sites.delete");
   s.roles[`${project}/apiDeployer`].deleted = true;
+  s.roles[`${project}/signInUsers`].permissions.push("firebaseauth.configs.update");
   w.seed(s);
 
   const r = w.run();
@@ -223,6 +229,7 @@ test("a run again takes back what drifted: a role not named, a condition rewritt
   assert.deepEqual(after.accounts[`infra-config@${project}.iam.gserviceaccount.com`].policy.map((b) => b.member), [borrower]);
   assert.ok(!after.roles[`${project}/hostingPublisher`].permissions.includes("firebasehosting.sites.delete"));
   assert.equal(after.roles[`${project}/apiDeployer`].deleted, false);
+  assert.ok(!after.roles[`${project}/signInUsers`].permissions.includes("firebaseauth.configs.update"));
 });
 
 test("the billing account is printed nowhere, not even in gcloud's error about it", () => {

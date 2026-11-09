@@ -41,6 +41,7 @@ run "the_apis_the_parts_need_are_on" {
       "iamcredentials.googleapis.com",
       "firebase.googleapis.com",
       "firebasehosting.googleapis.com",
+      "identitytoolkit.googleapis.com",
       "billingbudgets.googleapis.com",
       "monitoring.googleapis.com",
       "logging.googleapis.com",

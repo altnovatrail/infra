@@ -175,8 +175,9 @@ run "migrate_reads_its_secrets_as_files" {
       } == {
       API_MIGRATE_DATABASE_URL_FILE         = "/secrets/api-migrate-database-url/value"
       API_MIGRATE_OPENFGA_DATABASE_URL_FILE = "/secrets/api-migrate-openfga-database-url/value"
+      API_FIREBASE_PROJECT_ID               = "novatrail-test-0"
     }
-    error_message = "migrate reads each connection string from a file, by the variable with the suffix _FILE."
+    error_message = "migrate reads each connection string from a file, by the variable with the suffix _FILE, and is told the Firebase project."
   }
 
   assert {

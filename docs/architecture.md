@@ -191,7 +191,7 @@
 Новый релиз `app`:
 1. `release-verify` архива и sha256 — как в шаге 2;
 2. архив раскладывается на хостинг, `/deployment.json` пишется из `deploy/production/deployment.json`, заголовок CSP собирается по `csp.json` архива, и всё выходит одним выпуском хостинга (R85 spec; R09 app). На Firebase Hosting — раздел 3.3 (R06);
-3. домен `app` — в разрешённых доменах проекта Firebase (Т-19).
+3. домен `app` — в разрешённых доменах проекта Firebase (Т-19): их ставит модуль, конфигурацией облака той же выкладки (R16).
 
 **Выкладка `api` в коде** (R15; T19) — `tools/deploy/api.sh`, рецепты `just deploy-api-image`, `deploy-api` и `deploy-api-facts`, на выходах модуля после `apply`:
 - `image` — файлы релиза снова через `release-verify` и sha256, образ `<реестр>/api:<тег>`, digest после push;
@@ -249,14 +249,34 @@
 | `authDomain` Firebase Auth | `<проект>.firebaseapp.com` | не меняется: `app` входит окном (R09 app) |
 | основной домен и домен виджетов | нет | покупаются вместе после О-16, до публичного запуска (О-16, Т-17); виджеты — этап 4, хостинг бандлов — Т-17 |
 
-Сайт по умолчанию отвечает на двух адресах, `web.app` и `firebaseapp.com`, с одним содержимым. Origin `app` — только `web.app`: его называют CORS `api` и `/deployment.json`. Выкатка добавляет его в разрешённые домены проекта Firebase (Т-19) и не убирает тех, что ставит туда сам Firebase.
+Сайт по умолчанию отвечает на двух адресах, `web.app` и `firebaseapp.com`, с одним содержимым. Origin `app` — только `web.app`: его называют CORS `api` и `/deployment.json`. В разрешённых доменах проекта Firebase (Т-19) — он и `firebaseapp.com`, полным списком модуля (R16).
 
 **Страница образцов `canvas`** на хостинг пока не переезжает. Переедет — отдельным сайтом проекта и своим origin, когда так решит автор после ответа юриста о сроке IP-адресов Hosting: выход `app` стирает хранилище своего origin, а в журналы Firebase тогда попадут и IP-адреса устройств, на которых делают образцы детей (вторая поправка 2026-11-08 к R25 spec; П-9).
 
 **В модуле** (R12; T16):
 - `tofu/firebase.tf` — Firebase в проекте и сайт Hosting с ID проекта, `deletion_policy = "PREVENT"`;
 - `tofu/identities.tf` — `hosting-publish`: окружение GitHub `production-hosting`, на проекте — роль `hostingPublisher`, Firebase Hosting Admin без создания и удаления сайтов, которую создаёт и держит `bootstrap.sh` (поправка 2026-11-09 к R12), и `roles/serviceusage.apiKeysViewer`. До `api`, до конфигурации и до настроек входа эта учётная запись не дотягивается;
-- вход в production и то, кто ставит `<проект>.web.app` в разрешённые домены, — T27.
+- `tofu/sign_in.tf` — вход в production (R16; T27): Identity Platform, `google_identity_platform_config`, и её API, `identitytoolkit.googleapis.com`. Разрешённые домены — ровно `<проект>.firebaseapp.com` и `<проект>.web.app`, без `localhost`. Вход по почте, по телефону и анонимный выключены, журнал активности выключен, арендаторов и второго фактора нет, а пользователя удаляет только `api`, `disabled_user_deletion = true`. Переход на Identity Platform не отменяется, а `destroy` ресурс только забывает;
+- `tofu/identities.tf` — у `api-run` на проекте роль `signInUsers` из `bootstrap.sh`: `firebaseauth.users.get`, `.update` и `.delete`, без права менять настройки входа; `tofu/api.tf` — `API_FIREBASE_PROJECT_ID` у сервиса.
+
+**Вход** — Firebase Auth с Identity Platform, только окном Google (R03 api; R09 app; R16):
+
+| Что | Кто ставит | Где лежит |
+|---|---|---|
+| Identity Platform и её настройки, разрешённые домены | модуль, учётной записью конфигурации | `tofu/sign_in.tf` |
+| вход через Google, OAuth-клиент, экран согласия | оператор, один раз, после первого `apply` | в проекте; секрет клиента — только у Google |
+| права `api` на пользователей входа | `bootstrap.sh` создаёт роль, модуль её даёт | `tofu/bootstrap.sh`, `tofu/identities.tf` |
+
+Цена — по активным пользователям за месяц: вход через Google бесплатен до 50 000, дальше $0.0055 за каждого (раздел 4).
+
+**Шаг оператора: вход через Google.** Программно его не сделать: OAuth-клиент и экран согласия API больше не заводит, а провайдер Google в модуле держал бы секрет клиента в состоянии (R16). После первого `apply`, когда модуль перевёл проект на Identity Platform (T23):
+1. консоль Firebase проекта → Authentication → Sign-in method → Add new provider → Google → Enable;
+2. публичное имя проекта — «NovaTrail»; почта поддержки — та, что пользователи увидят на экране согласия, адрес оператора. Если консоль просит Web client ID и Web client secret, клиента `Web application` создать в Google Cloud → APIs & Services → Credentials, с Authorized redirect URI `https://<проект>.firebaseapp.com/__/auth/handler` — обработчиком входа на `authDomain` (раздел 4), — а секрет вставить только в эту форму: ни в репозиторий, ни в переменные, ни в секреты GitHub он не идёт;
+3. Google Auth Platform: Audience — External и In production: в режиме Testing входят только названные тестовые пользователи, не больше 100 (раздел 4). Областей — только по умолчанию, email, profile и openid; проверка приложения для них не нужна. Имя и логотип пользователь увидит после brand verification, а до неё — адрес `<проект>.firebaseapp.com`; brand verification — со своим доменом, после О-16;
+4. разрешённые домены в консоли не трогать: их держит модуль, и следующий `apply` уберёт добавленный руками;
+5. `tofu plan` после шага — без изменений: шаг меняет провайдера входа, а не настройки, которые держит модуль.
+
+Self-hosting делает тот же шаг в своём проекте.
 
 **Не проверено — первый код:** умеют ли rewrites исключить `/assets/**` и `/deployment.json` (иначе — явный список путей SPA) и шлёт ли Hosting сам HSTS или `Cross-Origin-Opener-Policy`.
 
@@ -285,7 +305,7 @@
 | System Event | действия самого Google с ресурсами проекта | `_Required`, `global`, 400 дней |
 | Policy Denied | `callerIp` и почта того, кому политика отказала | бакет `us-east4`, 30 дней |
 | Data Access audit | был бы `callerIp` | не включается и исключён в каждом sink (поправка 2026-11-09 к R07) |
-| журнал активности Identity Platform | был бы каждый запрос входа | не включается и исключён в каждом sink (поправка 2026-11-09 к R07) |
+| журнал активности Identity Platform | был бы каждый запрос входа | выключен модулем, `monitoring.request_logging` (R16), и исключён в каждом sink (поправка 2026-11-09 к R07) |
 | выгрузка журналов Firebase Hosting | была бы `remoteIp` | не включается (R06) и исключена в каждом sink (вторая поправка 2026-11-09 к R07) |
 | журналы Firebase Auth и Firebase Hosting у самого Firebase | IP-адреса | у Firebase: Auth — «a few weeks», Hosting — «a few months» (П-9) |
 | трассы | — | нет: Cloud Trace API не включается |
@@ -306,7 +326,7 @@
 - sink `_Default` модуль берёт на себя: провайдер обновляет sink, который уже есть, а при удалении `_Default` не трогает. Прежний фильтр — дословно, назначение — бакет региона, а исключения — блоками `exclusions` самого sink: `cloud-run-request-logs`, `data-access-audit` и `identity-platform-requests`;
 - sink проекта перечислены одним списком, `local.sinks`, и каждый получает те же исключения; тест держит каждый sink этого списка, а `tf-check` не пускает sink или исключение, объявленные вне него;
 - место `_Trace` — `google_observability_project_settings` с `default_storage_location` региона: настройку провайдер ставит через PATCH, и второй `apply` её повторяет без вреда, а бакет `_Trace` он создаёт через POST, который отказывает, если бакет уже есть, и удалить его не может (поправка 2026-11-09 к R04; раздел 4);
-- Data Access audit и журнал активности Identity Platform выключены по умолчанию Google, модуль их не включает, а sink их исключает (поправка 2026-11-09 к R07).
+- Data Access audit и журнал активности Identity Platform выключены по умолчанию Google, модуль их не включает, а sink их исключает (поправка 2026-11-09 к R07). Журнал активности, кроме того, явно выключен в `tofu/sign_in.tf` (R16).
 
 **Не проверено — первый код:** точное имя журнала запросов в фильтре; что без Cloud Trace API у Cloud Run нет трасс, а если есть — их атрибуты; вызывает ли что-то в проекте `SignUp` Identity Platform и что лежит в его записи Admin Activity (П-9).
 
@@ -318,6 +338,7 @@ Self-hosting — копия платформы, которую оператор 
 - **те же проверки и шаги выкладки** — рецептами, без GitHub Actions, в своём проекте (R05);
 - **хостинг сборки `app`** — любой, который шлёт свои заголовки; без них — более слабая защита (R06; Т-17);
 - **журналы** — то же исключение журналов запросов и те же правила для метрик и трасс, если копия на Google Cloud (R07);
+- **вход** — тот же модуль и тот же шаг оператора «Вход через Google», если копия на Google Cloud (R16; раздел 3.3);
 - **регион** — у копии свой: R109 spec и R04 — о платформе.
 
 Что сверх этого — свой `bootstrap.sh`, переменные корневого модуля, свой проект Firebase — и локальный запуск всей платформы отложены: раздел 2.6.
@@ -433,6 +454,23 @@ Self-hosting — копия платформы, которую оператор 
   - [Usage, quotas, and pricing](https://firebase.google.com/docs/hosting/usage-quotas-pricing): «Storage for your Hosting content is at no cost up to 10 GB»; «Data transfer from the CDN to your end users is at no cost up to 10 GB/month»; на плане Spark при превышении — «your sites will be disabled»;
   - [Serve dynamic content with Cloud Run](https://firebase.google.com/docs/hosting/cloud-run): «Firebase Hosting is subject to a 60-second request timeout»; `us-east4` — среди регионов rewrites.
 - **Firebase Auth** (раздел 3.3; R06), прочитано 2026-11-08: [Best practices for using signInWithRedirect](https://firebase.google.com/docs/auth/web/redirect-best-practices) — «If you host your app with a service other than Firebase, use Option 2, Option 3, Option 4, or Option 5», а Option 2, вход окном, — «popups are occasionally blocked by the device or platform, and the flow is less smooth for mobile users»; [Email link authentication](https://firebase.google.com/docs/auth/web/email-link-auth) — «In projects created after April 28, 2025, Firebase Authentication no longer includes localhost as an authorized domain by default».
+- **Вход в production** (раздел 3.3; R16), прочитано 2026-11-09:
+  - Firebase, [Get started with Terraform and Firebase](https://firebase.google.com/docs/projects/terraform/get-started): `google_identity_platform_config` — «enable[s] Google Cloud Identity Platform (GCIP) (which is the backend for Firebase Authentication)»; «The project in which Terraform will enable GCIP and/or Firebase Authentication must be on the Blaze pricing plan»;
+  - Firebase, [Firebase Authentication](https://firebase.google.com/docs/auth), «Last updated 2026-11-05 UTC»: «Firebase Authentication with Identity Platform has a different pricing scheme compared to the base product. When upgraded, no-cost (Spark) plan projects will be limited to 3,000 daily active users, and pay-as-you-go (Blaze) plan projects will be charged for usage beyond the free tier of 50,000 monthly active users»;
+  - Google Cloud, [Identity Platform pricing](https://cloud.google.com/identity-platform/pricing), даты на странице нет: Tier 1 (Email, Phone, Anonymous, Social) — «0 to 50,000» MAU бесплатно, от 50 000 до 100 000 — $0.0055 за MAU; «Any account that has signed in within a given month is considered an active user. Inactive users are stored at no cost»;
+  - terraform-provider-google v8.10.0, [`identity_platform_config.html.markdown`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/website/docs/r/identity_platform_config.html.markdown): «This entity is created only once during intialization and cannot be deleted, individual Identity Providers may be disabled instead. This resource may only be created in billing-enabled projects»; `authorized_domains` — «List of domains authorized for OAuth redirects». В [`resource_identity_platform_config.go`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/google/services/identityplatform/resource_identity_platform_config.go) удаление только пишет «IdentityPlatform Config resources cannot be deleted from Google Cloud. The resource %s will be removed from Terraform state, but will still be present on Google Cloud» и `deletion_policy` не читает;
+  - terraform-provider-google v8.10.0, [`identity_platform_default_supported_idp_config.html.markdown`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/website/docs/r/identity_platform_default_supported_idp_config.html.markdown): `client_secret` — «OAuth client secret», обязателен; в исходнике ресурса он не `Sensitive` и читается обратно из ответа API, а write-only варианта нет;
+  - terraform-provider-google v8.10.0, [`version_8_upgrade.html.markdown`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/website/docs/guides/version_8_upgrade.html.markdown): «`google_iap_brand` and `google_iap_client` have been removed following the permanent shutdown of the Google Cloud IAP OAuth Admin APIs. OAuth consent screens (brands) and OAuth clients can no longer be managed programmatically via the API and must be configured directly in the Google Cloud Console»;
+  - Google Cloud, [Programmatically create OAuth clients for IAP](https://docs.cloud.google.com/iap/docs/programmatic-oauth-clients), обновлено 2026-10-26: «The IAP OAuth Admin API was shut down on March 19, 2026. You can no longer create or manage OAuth brands or clients programmatically using this API»;
+  - Google Cloud, [Manage OAuth application](https://docs.cloud.google.com/iam/docs/workforce-manage-oauth-app), обновлено 2026-11-07: «These steps and the `projects.locations.oauthClients` API are only for Workforce Identity Federation»;
+  - Firebase, [Best practices for using signInWithRedirect](https://firebase.google.com/docs/auth/web/redirect-best-practices): адрес, который OAuth-провайдер должен пускать, — «`https://<the-domain-that-serves-your-app>/__/auth/handler` --- the trailing `/__/auth/handler` is important»;
+  - Google Cloud, [Signing in users with Google](https://docs.cloud.google.com/identity-platform/docs/web/google), обновлено 2026-11-05: «Enter your Google Web Client ID and Web Secret. If you don't already have an ID and secret, you can obtain one from the API's & Services page»;
+  - Google, [Get your Google API client ID](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid), обновлено 2026-04-06: «For the authentication, default scope (email, profile, openid) is sufficient, you don't need to add any sensitive scopes»; Google Cloud Help, [OAuth App Verification](https://support.google.com/cloud/answer/9110914), даты на странице нет: «If your app utilizes only non-sensitive scopes, it is not mandatory for your app to complete the app verification process», а имя и логотип на экране согласия — после «brand-verification»; [Manage App Audience](https://support.google.com/cloud/answer/15549945), даты на странице нет: в режиме Testing — «limited to up to 100 test users listed in the OAuth consent screen», а после «Publish app» — «available to any user with a Google Account»;
+  - Google Cloud, [Firebase Authentication roles](https://docs.cloud.google.com/iam/docs/roles-permissions/firebaseauth), обновлено 2026-11-07: Firebase Authentication Admin — `firebaseauth.*`, с `firebaseauth.configs.update`; [Firebase roles](https://docs.cloud.google.com/iam/docs/roles-permissions/firebase): в Firebase Admin — `firebaseauth.*`, с `firebaseauth.configs.create` и `.update`;
+  - Google Cloud, [Identity Platform access control](https://docs.cloud.google.com/identity-platform/docs/access-control), обновлено 2026-11-03: DeleteAccount — `firebaseauth.users.delete`, GetAccountInfo — `firebaseauth.users.get`, SetAccountInfo — `firebaseauth.users.update`;
+  - Google Cloud, [Custom roles permissions support](https://docs.cloud.google.com/iam/docs/custom-roles-permissions-support): `firebaseauth.users.delete`, `.get` и `.update` — «SUPPORTED»;
+  - `api`, релиз [v0.1.6](https://github.com/altnovatrail/api/releases/tag/v0.1.6), через API GitHub: R03 api — «сервис входа — Firebase Auth без перехода на Identity Platform», а против перехода — предел плана Spark в 3 000 активных пользователей в день; R32 api — порт входа зовёт `accounts:lookup`, `accounts:update`, `accounts:delete` и `accounts:batchGet`, а на Cloud Run берёт токен сервисного аккаунта у сервера метаданных; README — `API_FIREBASE_PROJECT_ID` «the Firebase project whose ID tokens are accepted; required by `serve`»;
+  - `app`, [`main` 375a09b](https://github.com/altnovatrail/app/tree/375a09b): R09 app — вход `signInWithPopup` с провайдером Google, `authDomain` — `<проект>.firebaseapp.com`; удаление аккаунта — через `api` (architecture 3.2 app).
 - **Отвергнутые хостинги** (R06), прочитано 2026-11-08:
   - Google Cloud, [External Application Load Balancer logging](https://docs.cloud.google.com/load-balancing/docs/https/https-logging-monitoring), обновлено 2026-11-03: «For external Application Load Balancers with backend buckets, logging is automatically enabled and cannot be disabled»; [Web serving overview](https://docs.cloud.google.com/architecture/web-serving-overview), обновлено 2026-02-18: для «Static website» — «Cloud Storage», «Firebase Hosting»;
   - Cloudflare, [Serving Pages](https://developers.cloudflare.com/pages/configuration/serving-pages/): «If your project does not include a top-level 404.html file, Pages assumes that you are deploying a single-page application»;

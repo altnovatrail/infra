@@ -1,5 +1,5 @@
 # Firebase in the project, and the Hosting site app's build is served from (R06, R12). Both
-# resources are in the beta provider alone. Sign-in in this project comes with its own task (T27).
+# resources are in the beta provider alone. Sign-in in this project is sign_in.tf's (R16).
 #
 # The export of Hosting's request logs to Cloud Logging is switched on only by a button in
 # Firebase's console, and nothing here switches it on. Every sink excludes those logs all the same
