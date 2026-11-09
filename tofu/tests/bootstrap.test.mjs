@@ -231,7 +231,6 @@ test("the custom roles hold exactly the permissions of the deployment's steps, o
     "firebasehosting.sites.list",
     "firebasehosting.sites.update",
     "resourcemanager.projects.get",
-    "resourcemanager.projects.list",
   ]);
   assert.deepEqual(s.roles[`${project}/signInUsers`].permissions.sort(), [
     "firebaseauth.users.delete",
