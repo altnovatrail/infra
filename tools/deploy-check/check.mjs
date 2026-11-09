@@ -7,9 +7,11 @@
 //   3. the files of both releases — api's binary and Dockerfile, app's archive —, each downloaded
 //      with its bundle from the release on GitHub, accepted by spec's release-verify and of the
 //      sha256 the list names (R77 spec);
-//   4. production/deployment.json, by the deployment.schema.json of the archive of that build, and
-//      of the sha256 the list names; the archive holding what a release of the build is made of,
-//      and its csp.json making the header of that deployment.json (R17);
+//   4. production/deployment.json, of the sha256 the list names; accepted by spec's reading of the
+//      deployment configuration at the tag of the submodule — its schema and its rules — and by the
+//      deployment.schema.json of the archive of that build, whose version is spec's (R85 spec); the
+//      archive holding what a release of the build is made of, and its csp.json making the header
+//      of that deployment.json (R17);
 //   5. production/facts.json, by the facts a deployment declares in spec's admission schemas, with
 //      every provider and fact of the dictionary of spec's admission table, at the tag of the
 //      submodule: an early sign, since api checks the file again with its own table (R25 api);
@@ -27,6 +29,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readingOf } from "./reading.mjs";
 
 const require = createRequire(import.meta.url);
 const Ajv2020 = require("ajv/dist/2020").default;
@@ -34,6 +37,14 @@ const Ajv2020 = require("ajv/dist/2020").default;
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SPEC = path.join(ROOT, "spec");
 const LIST_SCHEMA = path.join(ROOT, "deploy", "schema", "production.schema.json");
+// The path of the schema of /deployment.json stays the same from version to version, and its $id
+// names the version (spec's deployment/README.md, section 3).
+const SPEC_DEPLOYMENT_SCHEMA = path.join(SPEC, "deployment", "schemas", "deployment.schema.json");
+const DEPLOYMENT_ID = /^https:\/\/altnovatrail\.github\.io\/spec\/deployment\/([1-9]\d*)\/deployment\.schema\.json$/;
+// The platform's app is open on Hosting, at https://<site>.web.app (R06), never on a loopback host.
+// A pull request's check knows no site, and the rules of reading look at no more of the origin than
+// whether its host is a loopback one: it reads the file at the origin of web.app itself.
+export const HOSTED_ORIGIN = "https://web.app";
 const ORGANIZATION = "altnovatrail";
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -215,19 +226,73 @@ export function buildFiles(dir) {
     .sort((a, b) => a.localeCompare(b));
 }
 
-// /deployment.json against the deployment.schema.json at the root of the unpacked build.
-export function deploymentHoldsToItsBuild(build, deploymentFile) {
-  const schema = readJson(path.join(build, "deployment.schema.json"), "the build's deployment.schema.json");
-  if (schema.$schema !== DIALECT) throw new Refusal(`the build's deployment.schema.json is not of JSON Schema 2020-12, but ${schema.$schema ?? "of no dialect named"}`);
-  let check;
+// A schema of /deployment.json, of JSON Schema 2020-12 and compiled, and the version of spec's
+// deployment configuration its $id names: { validate, version }.
+function deploymentSchema(file, what) {
+  const schema = readJson(file, what);
+  if (schema.$schema !== DIALECT) throw new Refusal(`${what} is not of JSON Schema 2020-12, but ${schema.$schema ?? "of no dialect named"}`);
+  const version = DEPLOYMENT_ID.exec(typeof schema.$id === "string" ? schema.$id : "")?.[1];
+  if (!version) throw new Refusal(`${what} names no version of spec's deployment configuration: its $id is ${JSON.stringify(schema.$id ?? null)}`);
   try {
-    check = ajv().compile(schema);
+    return { validate: ajv().compile(schema), version: Number(version) };
   } catch (error) {
-    throw new Refusal(`the build's deployment.schema.json cannot be read: ${error.message}`);
+    throw new Refusal(`${what} cannot be read: ${error.message}`);
   }
-  if (!check(readJson(deploymentFile, "production/deployment.json"))) {
-    throw new Refusal(`production/deployment.json does not hold to the build's deployment.schema.json: ${explain(check.errors)}`);
+}
+
+// spec's deployment configuration at the submodule's tag, which the deployment reads its files by.
+export function specDeployment() {
+  return deploymentSchema(SPEC_DEPLOYMENT_SCHEMA, "spec's deployment.schema.json");
+}
+
+// The build's copy of that schema, at the root of the unpacked build.
+export function buildDeployment(build) {
+  return deploymentSchema(path.join(build, "deployment.schema.json"), "the build's deployment.schema.json");
+}
+
+export function readDeployment(deploymentFile) {
+  return readJson(deploymentFile, "production/deployment.json");
+}
+
+// deployment, the parsed /deployment.json, read as spec's deployment configuration reads it, with
+// app open at origin: its schema, then its rules of reading (R85 spec; reading.mjs).
+export function deploymentReadBySpec(spec, deployment, origin) {
+  const reading = readingOf(spec.validate, origin, deployment);
+  if (!reading.refused_by) return;
+  const by = reading.refused_by === "schema" ? `the schema: ${explain(spec.validate.errors)}` : `the rule ${reading.refused_by}`;
+  throw new Refusal(`production/deployment.json is refused by spec's deployment configuration ${spec.version}, at ${reading.fields.map((f) => f || "the root").join(", ")}, by ${by}`);
+}
+
+// The build reads the version of the deployment configuration that spec has at the submodule's tag,
+// or it is refused, naming both: a build of a higher version waits for infra to move to a tag of
+// spec of that version, by a task of its own, and a build of a lower one is not the build to list
+// (R85 spec).
+export function buildReadsSpecVersion(built, spec) {
+  if (built.version > spec.version) {
+    throw new Refusal(`the build reads the deployment configuration ${built.version}, and spec at the submodule's tag is of ${spec.version}: infra moves to a tag of spec of version ${built.version} first`);
   }
+  if (built.version < spec.version) {
+    throw new Refusal(`the build reads the deployment configuration ${built.version}, older than ${spec.version}, spec's at the submodule's tag: the list names a build of app that reads ${spec.version}`);
+  }
+}
+
+// deployment against the build's own schema.
+export function deploymentHoldsToItsBuild(built, deployment) {
+  if (!built.validate(deployment)) {
+    throw new Refusal(`production/deployment.json does not hold to the build's deployment.schema.json: ${explain(built.validate.errors)}`);
+  }
+}
+
+// What a release asks of its deployment.json, with the build unpacked and app open at origin, in the
+// order of the check of a pull request: the file passes spec's reading, the build reads spec's
+// version, and the file holds to the build's schema (R17).
+export function deploymentHolds(build, deploymentFile, origin) {
+  const spec = specDeployment();
+  const deployment = readDeployment(deploymentFile);
+  deploymentReadBySpec(spec, deployment, origin);
+  const built = buildDeployment(build);
+  buildReadsSpecVersion(built, spec);
+  deploymentHoldsToItsBuild(built, deployment);
 }
 
 // The Content-Security-Policy header of a release, out of the build's csp.json and the
@@ -344,10 +409,29 @@ export async function run(deployDir, base, standIns = {}) {
       if (!archive) return `${app.archive.name} is not unpacked: it was refused`;
       build = unpackBuild(archive, app.archive.name, path.join(work, "app-build"));
     });
+    // spec's schema, the build's and the file, each read once; null while a step has refused it.
+    let spec = null;
+    let built = null;
+    let deployment = null;
+    await step("production/deployment.json is accepted by spec's reading of the deployment configuration", () => {
+      if (!fs.existsSync(deploymentFile)) return "production/deployment.json is not read by spec's deployment configuration: it is not there";
+      spec = specDeployment();
+      deployment = readDeployment(deploymentFile);
+      deploymentReadBySpec(spec, deployment, HOSTED_ORIGIN);
+      return `production/deployment.json is accepted by spec's reading of the deployment configuration ${spec.version}`;
+    });
+    await step("the build reads spec's version of the deployment configuration", () => {
+      if (!build) return `the build's version of the deployment configuration is not read: ${app.archive.name} was refused`;
+      if (!spec) return "the build's version of the deployment configuration is not compared: spec's schema was not read";
+      built = buildDeployment(build);
+      buildReadsSpecVersion(built, spec);
+      return `app ${app.release} reads the deployment configuration ${built.version}, spec's at the submodule's tag`;
+    });
     await step("production/deployment.json holds to its build's deployment.schema.json", () => {
       if (!build) return `production/deployment.json is not checked against its build's schema: ${app.archive.name} was refused`;
-      if (!fs.existsSync(deploymentFile)) return "production/deployment.json is not checked against its build's schema: it is not there";
-      deploymentHoldsToItsBuild(build, deploymentFile);
+      if (!deployment) return "production/deployment.json is not checked against its build's schema: it was not read";
+      if (!built) return "production/deployment.json is not checked against its build's schema: that schema was refused";
+      deploymentHoldsToItsBuild(built, deployment);
     });
     await step("the build's csp.json makes the CSP header of production/deployment.json", () => {
       if (!build) return `the CSP header is not made: ${app.archive.name} was refused`;

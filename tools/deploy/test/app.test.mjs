@@ -28,6 +28,7 @@ const hash = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 const deploymentSchema = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://altnovatrail.github.io/spec/deployment/1/deployment.schema.json",
   type: "object",
   properties: {
     format: { const: 1 },
@@ -331,6 +332,31 @@ test("refusals before anything is made on Hosting", async (t) => {
     const w = world({ change: (b) => fs.writeFileSync(path.join(b, "deployment.schema.json"), JSON.stringify({ ...deploymentSchema, required: [...deploymentSchema.required, "extra"] })) });
     await assert.rejects(w.release(), /does not hold to the build's deployment\.schema\.json/);
   });
+  await t.test("a deployment.json its build's schema takes and spec's reading refuses", async () => {
+    const w = world({
+      edit: (list, { deploy }) => {
+        const text = JSON.stringify({ ...deployment, api: "http://localhost:8080" });
+        fs.writeFileSync(path.join(deploy, "production", "deployment.json"), text);
+        list.app.deployment.sha256 = hash(text);
+      },
+      change: (b) => fs.writeFileSync(path.join(b, "deployment.schema.json"), JSON.stringify({ ...deploymentSchema, properties: { ...deploymentSchema.properties, api: { type: "string" } } })),
+    });
+    await assert.rejects(w.release(), /refused by spec's deployment configuration 1, at api, by the rule deployment\.loopback/);
+    assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
+  });
+  await t.test("a build of another version of the deployment configuration", async () => {
+    const w = world({ change: (b) => fs.writeFileSync(path.join(b, "deployment.schema.json"), JSON.stringify({ ...deploymentSchema, $id: "https://altnovatrail.github.io/spec/deployment/2/deployment.schema.json" })) });
+    await assert.rejects(w.release(), /the build reads the deployment configuration 2, and spec at the submodule's tag is of 1/);
+    assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
+  });
+  for (const url of ["not a url", "foo://novatrail-test-0", "http://novatrail-test-0.web.app"]) {
+    await t.test(`outputs whose hosting_url is ${url}`, async () => {
+      const w = world();
+      fs.writeFileSync(w.outputsFile, JSON.stringify({ hosting_site: { value: "novatrail-test-0" }, hosting_url: { value: url } }));
+      await assert.rejects(w.release(), /name hosting_url .*, which is no https URL/);
+      assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
+    });
+  }
   await t.test("a deployment.json larger than app reads", async () => {
     const w = world({
       edit: (list, { deploy }) => {

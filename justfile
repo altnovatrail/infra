@@ -332,9 +332,10 @@ ci-deploy-check base="origin/main":
     fi
     just deploy-check "$base"
 
-# The checks' own tests, on synthetic releases, with no network.
+# The checks' own tests, on synthetic releases, with no network, and the reading of
+# /deployment.json on spec's vectors of reading.
 deploy-check-test: _tools
-    node --test tools/deploy-check/test/check.test.mjs
+    node --test tools/deploy-check/test/check.test.mjs tools/deploy-check/test/reading.test.mjs
 
 # The check of a release's files on a real release of api, against GitHub and Sigstore (R14).
 deploy-check-release-test: _tools

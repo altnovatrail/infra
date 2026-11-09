@@ -13,7 +13,8 @@
 //   1. production/deployment.json, of the sha256 the list names;
 //   2. the archive of the list's build, through check.mjs's releaseFile — the sha256 and
 //      release-verify again, so that what reaches production is the file verified (R05) — unpacked,
-//      and deployment.json by the build's deployment.schema.json;
+//      and deployment.json by spec's reading at the site's origin and by the build's
+//      deployment.schema.json, of the version of spec's deployment configuration at the submodule;
 //   3. the build before, by the message of the live channel's release: none, and this is the first
 //      release; a message not of this script's, and the release is refused; otherwise that build's
 //      archive, through releaseFile too, and its assets/ into the folder, which keep a page loaded
@@ -33,7 +34,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import zlib from "node:zlib";
-import { buildCsp, buildFiles, deploymentHoldsToItsBuild, deploymentOfTheList, readJson, readList, Refusal, releaseFile, ROOT, unpackBuild } from "../deploy-check/check.mjs";
+import { buildCsp, buildFiles, deploymentHolds, deploymentOfTheList, readJson, readList, Refusal, releaseFile, ROOT, unpackBuild } from "../deploy-check/check.mjs";
 
 export const HOSTING_API = "https://firebasehosting.googleapis.com/v1beta1";
 
@@ -97,7 +98,16 @@ function siteOf(outputsFile) {
   };
   let url = value("hosting_url");
   while (url.endsWith("/")) url = url.slice(0, -1);
-  return { site: value("hosting_site"), url };
+  // The origin app is open at, which spec's reading of deployment.json is held to: Hosting serves
+  // the site over https only.
+  let origin = null;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    // no URL: refused below
+  }
+  if (!origin?.startsWith("https://")) throw new Refusal(`the configuration's outputs name hosting_url ${url}, which is no https URL`);
+  return { site: value("hosting_site"), url, origin };
 }
 
 // The list's block of app, the list held to its schema, and its deployment.json, of the sha256
@@ -109,12 +119,12 @@ function theList(deployDir) {
   return { app, deploymentFile };
 }
 
-// The list's build, verified, unpacked, its deployment.json held to its schema and its CSP header
-// made.
-async function theBuild(app, deploymentFile, work, standIns) {
+// The list's build, verified, unpacked, its deployment.json accepted by spec's reading at the
+// site's origin and held to the build's schema, which is of spec's version, and its CSP header made.
+async function theBuild(app, deploymentFile, origin, work, standIns) {
   const archive = await releaseFile("app", app.release, app.archive.name, app.archive.sha256, path.join(work, "new"), standIns);
   const build = unpackBuild(archive, app.archive.name, path.join(work, "new-build"));
-  deploymentHoldsToItsBuild(build, deploymentFile);
+  deploymentHolds(build, deploymentFile, origin);
   return { build, csp: buildCsp(build, deploymentFile) };
 }
 
@@ -157,13 +167,13 @@ async function released(call, site) {
 }
 
 export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy"), token, api = HOSTING_API, standIns = {}, fetchSite } = {}) {
-  const { site, url } = siteOf(outputsFile);
+  const { site, url, origin } = siteOf(outputsFile);
   const { app, deploymentFile } = theList(deployDir);
   const call = client(api, token);
   const lines = [];
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-app-"));
   try {
-    const { build, csp } = await theBuild(app, deploymentFile, work, standIns);
+    const { build, csp } = await theBuild(app, deploymentFile, origin, work, standIns);
     lines.push(`app ${app.release}: ${app.archive.name} is verified and holds a build to release`);
 
     // The folder of the version: the new build, the assets of the one released, deployment.json.
@@ -263,11 +273,11 @@ async function answers({ url, build, deploymentFile, csp, fetchSite = fetch }) {
 }
 
 export async function check({ outputsFile, deployDir = path.join(ROOT, "deploy"), standIns = {}, fetchSite } = {}) {
-  const { url } = siteOf(outputsFile);
+  const { url, origin } = siteOf(outputsFile);
   const { app, deploymentFile } = theList(deployDir);
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-app-"));
   try {
-    const { build, csp } = await theBuild(app, deploymentFile, work, standIns);
+    const { build, csp } = await theBuild(app, deploymentFile, origin, work, standIns);
     return await answers({ url, build, deploymentFile, csp, fetchSite });
   } finally {
     fs.rmSync(work, { recursive: true, force: true });

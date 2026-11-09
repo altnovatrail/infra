@@ -4,7 +4,7 @@
 >
 > **Правило:** не предлагать повторно отвергнутое без новых фактов. Если решение нужно поменять, спросить автора и обновить этот файл. Запись не переписывается: её правит поправка с датой в конце записи или заменяет новая запись, а старая остаётся на месте с пометкой «Заменено».
 >
-> Репозиторий заведён 2026-10-19 из заготовки `spec` v0.1.0 (R21 spec), 2026-10-20 перешёл на `spec` v0.2.9 (R01), а 2026-11-08 — на v0.9.11 (R02), на v0.9.13 (R03) и на v0.9.16 (R08). Чем он со временем отличается от заготовки — инструментами в devcontainer, правилами в RUN.md, — записывается здесь решением, как R46 canvas-api записал отличия от своего образца: OpenTofu, ShellCheck и actionlint в devcontainer — R09 с поправками 2026-11-09. Следующий номер — R19.
+> Репозиторий заведён 2026-10-19 из заготовки `spec` v0.1.0 (R21 spec), 2026-10-20 перешёл на `spec` v0.2.9 (R01), а 2026-11-08 — на v0.9.11 (R02), на v0.9.13 (R03) и на v0.9.16 (R08), а 2026-11-09 — на v0.12.0 (R19). Чем он со временем отличается от заготовки — инструментами в devcontainer, правилами в RUN.md, — записывается здесь решением, как R46 canvas-api записал отличия от своего образца: OpenTofu, ShellCheck и actionlint в devcontainer — R09 с поправками 2026-11-09. Следующий номер — R20.
 >
 > Здесь записи цитируются как `R03`, в других репозиториях — как `R03 infra`. Решения `spec` цитируются как «R18 spec», решения MathTrail — как «R37 canvas-api», а списком — «canvas-api: R37, R38». У каждого журнала свои номера.
 >
@@ -175,6 +175,8 @@
 — *Следствие:* В4 — имена переменных и проверка конфигурации для `api`, В5 — формат `/deployment.json` в `spec` к первому коду `infra` (R85 spec), обе — в таблице 3 RUN.md, «в реестр spec». Как сборка `app` выходит на хостинг, дописывает T03. Код — рецепты проверок и выкладки, схема списка, workflow — первый код `infra`. — RUN.md, T02; [architecture.md](architecture.md), разделы 1, 2.2, 3.2 и 4.
 
 — *Поправка 2026-11-09:* **переменные `API_ADMISSION_FACTS_FILE` и `API_ADMISSION_RUNG` ставит ревизии модуль, а не выкладка: путь к файлу фактов не меняется, а ступень у развёртывания всегда `full`. Выкладка меняет у сервиса только образ и версию секрета фактов в томе. Путь «только ступень» уходит, «только факты» остаётся.** Решение автора в T15, 2026-11-09, по рекомендации исполнителя (RUN.md, T15; R11). — *Почему:* провайдер `google` 8.10.0 держит переменные сервиса Cloud Run множеством, и `ignore_changes` не может оставить выкладке одну из них; а выкладке и менять нечего: список выкатки пускает только ступень `full` — CI проверяет её, как и прежде, — и `api` другой ступени развёртыванию не даёт (R25 api). — *Отвергнуто:* модуль ставит переменные только при создании и потом не трогает весь список — тогда до сервиса не дойдёт и правка любой другой переменной в модуле. — *Следствие:* R11; [architecture.md](architecture.md), раздел 3.2.
+
+— *Поправка 2026-11-09:* **`deployment.json` проверяется ещё и чтением конфигурации развёртывания `spec` подмодуля — схемой `deployment/schemas/deployment.schema.json` и правилами section 5 of `deployment/README.md` spec, — а сборку, которая читает другую версию формата, проверка отклоняет, назвав обе (поправки 2026-11-08 и 2026-11-09 к R85 spec).** Переход на v0.12.0, T26 (R19). — *Следствие:* R14 и R17 — своими поправками того же дня.
 
 ## Хостинг и домены
 
@@ -489,6 +491,8 @@
 
 — *Поправка 2026-11-09:* **проверка сборки `app` в pull request — ещё и её раскладка, `csp.json` и размер `deployment.json`, не больше 16 KiB: архив распаковывается, только если его список показал одни файлы и папки без путей наружу; в корне — `index.html`, `assets/` с файлом, `deployment.schema.json` и `csp.json`, а своего `deployment.json` нет; `csp.json` с этим `deployment.json` даёт заголовок CSP. Это те же функции `check.mjs`, что у выпуска (R17).** Решение при выполнении T20. — *Почему:* сборку, которую выпуск отклонит, лучше отклонить до мержа. — *Следствие:* `tools/deploy-check/check.mjs`, `tools/deploy-check/test/check.test.mjs`.
 
+— *Поправка 2026-11-09:* **`deployment.json` проверяется ещё и чтением `spec` подмодуля, `tools/deploy-check/reading.mjs`: схема `spec/deployment/schemas/deployment.schema.json`, затем правила `deployment.api-origin` и `deployment.loopback`. Origin `app` здесь — `https://web.app`: сайта проверка pull request не знает, а `app` платформы на loopback-хосте не бывает. Эта проверка идёт и тогда, когда сборка отклонена. Версия сборки, которую называет `$id` её `deployment.schema.json`, должна быть версией `spec` подмодуля, иначе отказ. Вторая зависимость — `yaml` 2.9.1 под ISC, в `devDependencies`: её берут только тесты на векторах чтения `spec`, а код проверок и выкладки её не импортирует; `just ci-licenses` пускает все шесть пакетов без исключений.** T26 (R19). — *Почему:* выкатка — тоже читатель по section 5 of `deployment/README.md` spec, а векторы `spec` держат её чтение рядом с чтением `app`. — *Следствие:* `tools/deploy-check/reading.mjs`, `tools/deploy-check/check.mjs`, `tools/deploy-check/test/`, `tools/package.json`, `justfile`.
+
 ## Выкладка `api`
 
 **R15. Выкладку `api` по списку делает `tools/deploy/api.sh` — bash, по шагам R05, на том, что называют выходы модуля. Команды: `image` — образ релиза и его digest; `release` — новый релиз целиком; `facts` — только факты. Тег релиза, который принимает трафик, — тег его образа в реестре. Какие задания запускать и когда, говорит роль задания в `api_jobs`, а не его имя.** Решения автора при планировании T19, 2026-11-09 (RUN.md, T19).
@@ -633,6 +637,8 @@
 
 — RUN.md, T20; `tools/deploy/app.mjs`, `tools/deploy/test/app.test.mjs`, `tools/deploy-check/check.mjs`, `tools/deploy-check/test/check.test.mjs`, `justfile`, `.github/workflows/ci.yml`, `tofu/firebase.tf`, `tofu/outputs.tf`, `tofu/identities.tf`, `tofu/bootstrap.sh`, `tofu/tests/firebase.tftest.hcl`, `tofu/tests/bootstrap.test.mjs`; [architecture.md](architecture.md), разделы 3.2, 3.3 и 4.
 
+— *Поправка 2026-11-09:* **шаг 2 выпуска проверяет ещё чтение `deployment.json` `spec` подмодуля и версию сборки, в том же порядке, что проверка pull request. Origin `app` берётся из выхода модуля `hosting_url`, и он должен быть `https`. Сборку, которую чтение отклонило, выпуск отклоняет до первого вызова Hosting.** T26 (R19). — *Следствие:* `tools/deploy/app.mjs`, `tools/deploy/test/app.test.mjs`.
+
 ## Workflow выкладки
 
 **R18. Выкладку после мержа делает `.github/workflows/deploy.yml` четырьмя заданиями: `target` решает, что выкладывать, без доступа к чему-либо; `config` применяет конфигурацию от `infra-config` в окружении `production-config`; `api` выкладывает `api` от `api-deploy` в `production`; `app` выпускает сборку от `hosting-publish` в `production-hosting`. Выкладка идёт, только пока `main` стоит на коммите, а части списка считаются изменившимися против коммита последнего прогона, который выложил, — push в `main`, зелёный, и его задание `Configuration` прошло, — а не против прошлого push. Инструменты ставятся на раннер по точным версиям и суммам sha256, а workflow проверяет actionlint.** Решения автора при планировании T21, 2026-11-09, все четыре — по рекомендациям (RUN.md, T21). Образец — `deploy.yml` canvas-api, коммит 0901af0; источники — [architecture.md](architecture.md), раздел 4, прочитано 2026-11-09.
@@ -674,3 +680,47 @@
 - T24: первая выкладка — `config`, затем руками `image`, `api_image` в `production.auto.tfvars`, затем `api` (R11).
 
 — RUN.md, T21; `.github/workflows/deploy.yml`, `.github/actions/tools/action.yml`, `.github/workflows/ci.yml`, `tools/ci/`, `tools/deploy/target.mjs`, `tools/deploy/test/target.test.mjs`, `justfile`, `.devcontainer/Dockerfile`, `.gitignore`; [architecture.md](architecture.md), разделы 3.2, 3.6 и 4.
+
+## Тег `spec` с форматом `/deployment.json` и R120 spec
+
+**R19. `infra` стоит на `spec` v0.12.0 — последнем релизе. Тег приносит формат `/deployment.json` частью `spec` `deployment/`, версии 1, и проверка pull request и выпуск сборки `app` читают файл, как его читает `app`: схемой и правилами `spec` подмодуля, затем схемой сборки, а сборке другой версии формата отказывают. Тег отвечает на строки «в реестр spec» В11–В14 и закрывает Т-28 решением R120 spec: ключи eval — в Secret Manager `infra`, со своим пулом `github-eval` в модуле; T22 идёт по нему.** Задача T26 эпика E2; перейти на v0.12.0 велел автор 2026-11-09 (RUN.md, T26).
+- **Что тег приносит `infra`** (`git -C spec diff v0.9.16 v0.12.0`, прочитано 2026-11-09; строки таблицы 4 RUN.md `spec`, которые называют `infra`, — Д9, Д141, Д142, Д145, Д147 и Д149, — и строки 6.9 и 6.11 [COORDINATION.md](../spec/COORDINATION.md) `spec`):
+  - В12 — поправки 2026-11-09 к R85 spec (Д142):
+    - формат `/deployment.json` — часть `spec` `deployment/`, как таблица допуска: текст, версия — целое число в `VERSION` и в поле `format` файла, схема по постоянному пути `deployment/schemas/deployment.schema.json`, чей `$id` называет версию, примеры, векторы чтения и файл релиза `deployment-1.tar.gz`;
+    - версия 1 — формат R09 app: `format`, `api` и `signIn`;
+    - сборка `app` несёт копию схемы из релиза `spec`, на котором стоит, и этим называет версию, которую читает. Выкатка проверяет файл схемой подмодуля и схемой сборки, а сборке другой версии отказывает, назвав обе: тогда `infra` переходит на тег той версии своей задачей;
+    - читатель — `app` при старте и выкатка до того, как пишет файл, — принимает файл в два шага: схема, затем правила `deployment.api-origin` и `deployment.loopback` (section 5 of `deployment/README.md` spec). Выкатка платформы `http` не пишет и сверяет `deployment.loopback` с origin `app` платформы;
+  - В14 — третья поправка 2026-11-09 к R85 spec (Д147): `csp.json` в формат не входит и остаётся в сборке. Его форму и раскладку архива `app` закрепляет в architecture 3.7 app так, как их читает выпуск (R17);
+  - В11 и В13 — карточка architecture 3.11 spec и строка «сервис входа» таблицы 3.12 spec (Д141, Д145): вход в production-проекте настраивает `infra`, на Identity Platform (R16). Поправку к R03 api о dev-проекте пишет `api`;
+  - Т-28 — R120 spec и поправка 2026-11-09 к R24 spec (Д149):
+    - ключи — `eval-key-anthropic` и `eval-key-openai` в Secret Manager `infra`, с репликацией по выбору в `us-east4`, без значений в коде;
+    - читает их только job окружения GitHub `eval` репозиториев `modules` и `tutor`, прямым Workload Identity Federation, своим пулом `github-eval`;
+    - пул и провайдер описывает модуль, а не `bootstrap.sh`: пул `bootstrap.sh` и R13 не меняются. Это T22, а не T26;
+  - Д9 `spec`: в `codeql.yml` `infra` пуст вход `languages`, а кода на JavaScript с T17 стало много. Нужен `javascript-typescript` во входе и проверка в ruleset `main` — задачей `infra` и настройкой автора; это Д7 таблицы 4 RUN.md;
+  - таблица допуска — версии 0.2. У схем допуска сменился `$id`, а словарь провайдеров (`anthropic`, `google`, `openai`) и фактов тот же, так что проверка фактов (R14) не меняется;
+  - остальное между тегами — о других: формат модуля 0.4 (R111 spec), юридические вопросы, согласие, DPIA и поставщики ИИ (R112–R119 spec и R121–R123 spec), эпики E6 и E4 `spec`. `.devcontainer/` и RULES.md `spec` не менялись, а `spec/repo-template/` — только в виде `go`. `infra` — вида `docs`, и Rebuild Container не нужен (`git -C spec diff --stat v0.9.16 v0.12.0`).
+- **Что изменено здесь:**
+  - `spec/` — на v0.12.0, коммит 5b4640a; тег — в CLAUDE.md, README.md и в начале RUN.md;
+  - `tools/deploy-check/reading.mjs` — чтение по section 5 of `deployment/README.md` spec: схема, затем правила по порядку таблицы; первый шаг, который нашёл ошибку, отказывает и называет пути полей в порядке кодовых единиц;
+  - `tools/deploy-check/check.mjs` — три проверки вместо одной:
+    - файл — чтением `spec` подмодуля;
+    - версия сборки — по `$id` её схемы — равна версии `spec`;
+    - файл — по схеме сборки;
+  - в pull request origin `app` — `https://web.app`: сайта проверка не знает, а правила смотрят только на то, loopback ли хост. Выпуск (`tools/deploy/app.mjs`) берёт origin сайта из выхода `hosting_url` и отказывает до первого вызова Hosting;
+  - тесты:
+    - `tools/deploy-check/test/reading.test.mjs` — каждый вектор чтения `spec` подмодуля даёт ровно то, что в нём записано;
+    - `check.test.mjs` и `app.test.mjs`: файл, который схема сборки пускает, а `spec` — нет; правила `deployment.api-origin` и `deployment.loopback`; сборка версии 2; схема без версии;
+  - `yaml` 2.9.1 в `devDependencies` — для векторов, которые написаны в YAML;
+  - RUN.md: В11–В14 ушли из таблицы 3, а её начало говорит, чем они закрыты; T22 получила то, что решил R120 spec; T26 стоит в таблице 1 перед T22; Д7 — CodeQL;
+  - [architecture.md](architecture.md): разделы 1, 3, 3.1, 3.2 и 4.
+
+— *Почему сейчас:* v0.11.0 принёс формат, а v0.12.0 ещё и R120 spec, так что одним переходом встают обе задачи: T26 и T22. Без T26 первая выкладка, T24, проверяла бы файл одной схемой сборки, и формат держала бы одна сторона. Без R120 spec T22 не знала, в какой пул войдут `modules` и `tutor`. v0.12.0 — последний релиз на 2026-11-09 и неизменяемый (`gh release view v0.12.0 -R altnovatrail/spec`: опубликован 2026-11-09T19:38:52Z, `isImmutable` — `true`); `gh release verify v0.12.0 -R altnovatrail/spec` подтвердил его аттестацией, тег — на коммите 5b4640a.
+
+— *Отвергнуто:*
+- v0.11.0: в нём формат есть, а R120 spec нет, и переходить пришлось бы дважды;
+- схема и векторы из файла релиза `deployment-1.tar.gz` через `release-verify`: `spec` велит проверять схемой подмодуля, путь её не меняется (sections 2 and 3 of `deployment/README.md` spec), а подмодуль стоит на теге, проверенном аттестацией;
+- одна схема `spec`, без правил чтения. Выкатка — тоже читатель и «MUST NOT accept a file that one step refuses»: `https://api.example.org:443` схема пускает, а `app` откажет, и после выпуска сайт не стартовал бы;
+- брать чтение самого `spec`, `tools/deployment/reading.mjs`, из подмодуля: проверки зависели бы от внутреннего устройства инструментов `spec`, как отвергнутый в R14 ajv из `spec/tools/node_modules`. Векторы держат две реализации вместе;
+- копия векторов в `infra`: она отстала бы от тега, а подмодуль даёт векторы того же тега, что и схему.
+
+— *Следствие:* T22 — по R120 spec: пул `github-eval`, секреты и привязки — в модуле, `bootstrap.sh` и R13 не меняются. T24 пишет `production/deployment.json` формата 1. Д7 — CodeQL для JavaScript. Копию схемы `spec` в своей сборке несёт `app` (Д142), а не `infra`. — RUN.md, T22, T26 и таблицы 1, 3 и 4; CLAUDE.md; README.md; `tools/deploy-check/`, `tools/deploy/app.mjs`, `tools/deploy/test/app.test.mjs`, `tools/package.json`, `justfile`; [architecture.md](architecture.md), разделы 1, 3, 3.1, 3.2 и 4.

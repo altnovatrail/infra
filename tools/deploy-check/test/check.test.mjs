@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { Refusal, run } from "../check.mjs";
+import { buildReadsSpecVersion, Refusal, run } from "../check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const main = path.join(here, "..", "main.mjs");
@@ -26,13 +26,29 @@ const hash = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 // The build's schema of /deployment.json, synthetic: what the check reads from the archive.
 const deploymentSchema = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://altnovatrail.github.io/spec/deployment/1/deployment.schema.json",
   type: "object",
   properties: {
     format: { const: 1 },
     api: { type: "string", pattern: "^https://" },
+    signIn: { type: "object" },
   },
-  required: ["format", "api"],
+  required: ["format", "api", "signIn"],
   unevaluatedProperties: false,
+};
+
+// /deployment.json, synthetic, of spec's deployment configuration 1.
+const deployment = {
+  format: 1,
+  api: "https://api-example.a.run.app",
+  signIn: { service: "firebase", apiKey: "synthetic-key", authDomain: "novatrail-test-0.firebaseapp.com", projectId: "novatrail-test-0", appId: "1:2:web:3" },
+};
+
+// An edit of the list's world that writes this deployment.json, and names it in the list.
+const withDeployment = (value) => (l, w) => {
+  const text = JSON.stringify(value);
+  fs.writeFileSync(path.join(w.deploy, "production", "deployment.json"), text);
+  l.app.deployment.sha256 = hash(text);
 };
 
 // The build's table of the CSP header, synthetic, with the place deployment.json fills.
@@ -70,7 +86,7 @@ function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, 
   assert.equal(spawnSync("/usr/bin/tar", ["-czf", archivePath, "-C", build, "."]).status, 0);
   const archive = put("app", "v0.3.0", "app_v0.3.0.tar.gz", fs.readFileSync(archivePath));
 
-  const deploymentText = JSON.stringify({ format: 1, api: "https://api-example.a.run.app" }, null, 2) + "\n";
+  const deploymentText = JSON.stringify(deployment, null, 2) + "\n";
   fs.writeFileSync(path.join(deploy, "production", "deployment.json"), deploymentText);
   fs.writeFileSync(path.join(deploy, "production", "facts.json"), JSON.stringify({ openai: { data_processing_agreement: ["adult"] } }));
 
@@ -135,6 +151,8 @@ test("a list that holds passes every check", async () => {
     "app v0.3.0: app_v0.3.0.tar.gz is verified, of the sha256 named",
     "production/deployment.json is of the sha256 named",
     "app v0.3.0: app_v0.3.0.tar.gz holds a build to release",
+    "production/deployment.json is accepted by spec's reading of the deployment configuration 1",
+    "app v0.3.0 reads the deployment configuration 1, spec's at the submodule's tag",
     "production/deployment.json holds to its build's deployment.schema.json",
     "the build's csp.json makes the CSP header of production/deployment.json",
     "facts of spec's admission table",
@@ -191,6 +209,11 @@ test("refusals, each on its own", async (t) => {
       l.app.deployment.sha256 = hash(text);
     } }, undefined, /production\/deployment\.json is larger than the 16384 bytes app reads/],
     ["a deployment.json its build's schema refuses", { schema: { ...deploymentSchema, properties: { ...deploymentSchema.properties, api: { type: "string", pattern: "^http://" } } } }, undefined, /does not hold to the build's deployment\.schema\.json: \/api must match pattern/],
+    ["a deployment.json its build's schema takes and spec's refuses", { edit: withDeployment({ ...deployment, signIn: { ...deployment.signIn, measurementId: "G-SYNTHETIC" } }) }, undefined, /production\/deployment\.json is refused by spec's deployment configuration 1, at signIn\.measurementId, by the schema/],
+    ["an api not written as its origin", { edit: withDeployment({ ...deployment, api: "https://api-example.a.run.app:443" }) }, undefined, /refused by spec's deployment configuration 1, at api, by the rule deployment\.api-origin/],
+    ["an api in clear text, with app on no loopback host", { edit: withDeployment({ ...deployment, api: "http://localhost:8080" }) }, undefined, /refused by spec's deployment configuration 1, at api, by the rule deployment\.loopback/],
+    ["a build of another version of the deployment configuration", { schema: { ...deploymentSchema, $id: "https://altnovatrail.github.io/spec/deployment/2/deployment.schema.json" } }, undefined, /the build reads the deployment configuration 2, and spec at the submodule's tag is of 1: infra moves to a tag of spec of version 2 first/],
+    ["a build's schema that names no version", { schema: { ...deploymentSchema, $id: undefined } }, undefined, /the build's deployment\.schema\.json names no version of spec's deployment configuration: its \$id is null/],
     ["a build with no schema", { schema: null }, undefined, /holds no deployment\.schema\.json at its root/],
     ["a build's schema of another dialect", { schema: { ...deploymentSchema, $schema: "http://json-schema.org/draft-07/schema#" } }, undefined, /is not of JSON Schema 2020-12/],
     ["a build with no csp.json", { csp: null }, undefined, /holds no csp\.json at its root/],
@@ -218,6 +241,19 @@ test("refusals, each on its own", async (t) => {
   }
 });
 
+test("a build's schema refused for its version is refused once, and not checked again", async () => {
+  const r = await world({ schema: { ...deploymentSchema, $id: undefined } }).check();
+  assert.ok(!r.ok, r.output);
+  assert.equal(r.stderr.match(/names no version of spec's deployment configuration/g)?.length, 1, r.output);
+  assert.match(r.stdout, /is not checked against its build's schema: that schema was refused/);
+});
+
+test("a build of a version other than spec's says which side moves", () => {
+  assert.throws(() => buildReadsSpecVersion({ version: 2 }, { version: 1 }), /infra moves to a tag of spec of version 2 first/);
+  assert.throws(() => buildReadsSpecVersion({ version: 1 }, { version: 2 }), /reads the deployment configuration 1, older than 2, spec's at the submodule's tag: the list names a build of app that reads 2/);
+  assert.doesNotThrow(() => buildReadsSpecVersion({ version: 1 }, { version: 1 }));
+});
+
 test("a higher tag by number, though lower as text, passes", async () => {
   for (const [tag, baseTag] of [["v0.10.0", "v0.9.0"], ["v0.2.10", "v0.2.9"]]) {
     const r = await world({ tag, baseTag }).check();
@@ -235,6 +271,9 @@ test("a refused file hides no other check: each file and the deployment.json are
 
   const archive = await world().check({ refuse: "app_v0.3.0" });
   assert.match(archive.stdout, /is not checked against its build's schema: app_v0\.3\.0\.tar\.gz was refused/);
+  assert.match(archive.stdout, /the build's version of the deployment configuration is not read: app_v0\.3\.0\.tar\.gz was refused/);
+  // spec's reading needs no build: it is said even when the build was refused.
+  assert.match(archive.stdout, /production\/deployment\.json is accepted by spec's reading of the deployment configuration 1/);
 });
 
 test("the command line, which takes no stand-ins, says each outcome by its exit", () => {
