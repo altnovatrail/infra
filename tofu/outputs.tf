@@ -40,3 +40,18 @@ output "api_service_url" {
   description = "api's address on run.app, the one app calls; null until the service exists."
   value       = one(google_cloud_run_v2_service.api[*].uri)
 }
+
+output "hosting_site" {
+  description = "The Hosting site app's build is published to."
+  value       = google_firebase_hosting_site.app.site_id
+}
+
+output "hosting_url" {
+  description = "The address app is served at."
+  value       = google_firebase_hosting_site.app.default_url
+}
+
+output "hosting_service_account" {
+  description = "The identity app's build is published with."
+  value       = google_service_account.hosting.email
+}

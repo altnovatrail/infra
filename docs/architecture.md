@@ -229,7 +229,7 @@
 | Журнал | IP-адрес | Где и сколько |
 |---|---|---|
 | журналы самого Firebase Hosting | да | у Firebase, глобально: «a few months», не настраивается (П-9; privacy 4 spec) |
-| выгрузка журналов Hosting в Cloud Logging | да, `remoteIp` | не включается: в Cloud Logging проекта журналов Hosting нет (вход T04) |
+| выгрузка журналов Hosting в Cloud Logging | да, `remoteIp` | не включается: включить её может только кнопка в консоли Firebase, а если её нажмут, каждый sink исключает `resource.type="firebase_domain"` (вторая поправка 2026-11-09 к R07) |
 
 **Адреса и домены:**
 
@@ -243,6 +243,11 @@
 Сайт по умолчанию отвечает на двух адресах, `web.app` и `firebaseapp.com`, с одним содержимым. Origin `app` — только `web.app`: его называют CORS `api` и `/deployment.json`. Выкатка добавляет его в разрешённые домены проекта Firebase (Т-19) и не убирает тех, что ставит туда сам Firebase.
 
 **Страница образцов `canvas`** на хостинг пока не переезжает. Переедет — отдельным сайтом проекта и своим origin, когда так решит автор после ответа юриста о сроке IP-адресов Hosting: выход `app` стирает хранилище своего origin, а в журналы Firebase тогда попадут и IP-адреса устройств, на которых делают образцы детей (вторая поправка 2026-11-08 к R25 spec; П-9).
+
+**В модуле** (R12; T16):
+- `tofu/firebase.tf` — Firebase в проекте и сайт Hosting с ID проекта, `deletion_policy = "PREVENT"`;
+- `tofu/identities.tf` — `hosting-publish`: окружение GitHub `production-hosting`, на проекте — своя роль `hostingPublisher`, Firebase Hosting Admin без создания и удаления сайтов, и `roles/serviceusage.apiKeysViewer`. До `api`, до конфигурации и до настроек входа эта учётная запись не дотягивается;
+- вход в production и то, кто ставит `<проект>.web.app` в разрешённые домены, — T27.
 
 **Не проверено — первый код:** умеют ли rewrites исключить `/assets/**` и `/deployment.json` (иначе — явный список путей SPA) и шлёт ли Hosting сам HSTS или `Cross-Origin-Opener-Policy`.
 
@@ -272,7 +277,7 @@
 | Policy Denied | `callerIp` и почта того, кому политика отказала | бакет `us-east4`, 30 дней |
 | Data Access audit | был бы `callerIp` | не включается и исключён в каждом sink (поправка 2026-11-09 к R07) |
 | журнал активности Identity Platform | был бы каждый запрос входа | не включается и исключён в каждом sink (поправка 2026-11-09 к R07) |
-| выгрузка журналов Firebase Hosting | была бы `remoteIp` | не включается (R06) |
+| выгрузка журналов Firebase Hosting | была бы `remoteIp` | не включается (R06) и исключена в каждом sink (вторая поправка 2026-11-09 к R07) |
 | журналы Firebase Auth и Firebase Hosting у самого Firebase | IP-адреса | у Firebase: Auth — «a few weeks», Hosting — «a few months» (П-9) |
 | трассы | — | нет: Cloud Trace API не включается |
 
@@ -354,6 +359,11 @@ Self-hosting — копия платформы, которую оператор 
   - «If the log entry matches the inclusion filter and at least one exclusion filter, then it isn't routed»;
   - «You can't use exclusion filters to reduce the consumption of your entries.write API quota or the number of entries.write API calls. Exclusion filters are applied after log entries are received by the Logging API»;
   - «For each Google Cloud project, billing account, folder, and organization, Cloud Logging creates two log sinks, one named _Required and the other named _Default».
+- **Firebase и публикация в модуле** (разделы 3.3, 3.4; R12; T16), прочитано 2026-11-09:
+  - Firebase, [Web request logs and metrics](https://firebase.google.com/docs/hosting/web-request-logs-and-metrics), «Last updated 2026-11-05 UTC»: «Monitored resource ( resource.type ) — firebase_domain ( Firebase Hosting Site Domain) Log name ( logName ) — webrequests ( Firebase Hosting )»; выгрузку включает кнопка Link в карточке интеграции с Cloud Logging консоли Firebase;
+  - Firebase, [Understand the default Hosting site](https://firebase.google.com/docs/hosting/default-site), даты на странице нет: «If you created your Firebase project or added Firebase to an existing Google Cloud project after October 15, 2026, then your project's default Hosting site is created on demand»; «The first Hosting site created in your Firebase project always becomes your default Hosting site»;
+  - Google Cloud, справочник IAM: [firebaseauth](https://docs.cloud.google.com/iam/docs/roles-permissions/firebaseauth) — `firebaseauth.configs.get`, `firebaseauth.configs.update`; [firebasehosting](https://docs.cloud.google.com/iam/docs/roles-permissions/firebasehosting) — «Firebase Hosting Admin ( roles/ firebasehosting.admin ) Full read/write access to Firebase Hosting resources. firebase.clients.get firebase.clients.list firebase.projects.get firebasehosting.* firebasehosting.sites.create firebasehosting.sites.delete firebasehosting.sites.get firebasehosting.sites.list firebasehosting.sites.update resourcemanager.projects.get resourcemanager.projects.list»; [serviceusage](https://docs.cloud.google.com/iam/docs/roles-permissions/serviceusage) — `roles/serviceusage.apiKeysViewer`, «API Keys Viewer»;
+  - схема провайдеров 8.10.0: `google_firebase_project` и `google_firebase_hosting_site` есть только в `google-beta`, у сайта — `deletion_policy`; `google_identity_platform_config` держит `authorized_domains`.
 - **Cloud Run `api` и учётные записи в модуле** (раздел 3.2; R11; T15), прочитано 2026-11-09:
   - Google Cloud, [Cloud Run IAM permissions](https://docs.cloud.google.com/run/docs/reference/iam/permissions), даты на странице нет: `run.services.get`, `run.services.update`, `run.revisions.get`, `run.revisions.list`, `run.jobs.get`, `run.jobs.update`, `run.jobs.run`, `run.jobs.runWithOverrides`, `run.executions.get`, `run.executions.list`; [IAM roles and permissions — Cloud Run](https://docs.cloud.google.com/iam/docs/roles-permissions/run) — ещё `run.operations.get`;
   - `api` — [`main` d54a2ae](https://github.com/altnovatrail/api/tree/d54a2ae), последний релиз v0.1.3: `README.md` — переменные `PORT` (8080), `API_SHUTDOWN_TIMEOUT` — «under `10s` when deployed», `API_HTTP_WRITE_TIMEOUT` — `60s`; «`api migrate` applies the migrations of the database `api` and of `openfga`», читает `API_MIGRATE_DATABASE_URL` и `API_MIGRATE_OPENFGA_DATABASE_URL`; «A secret … comes from its variable or from a file outside the repository whose absolute path the variable with the suffix `_FILE` names»; `cmd/api/main.go` — команды `serve`, `migrate`, `version`; `internal/server/routes.go` — `GET /health`. Неизвестных переменных `API_*` `internal/config` не отвергает;
