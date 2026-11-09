@@ -296,7 +296,7 @@
 
 — *Следствие:*
 - версия OpenTofu поднимается правкой `ARG` вместе с обеими суммами и ручной проверкой подписи; Dependabot `docker` её не видит;
-- пересобрать контейнер — шаг автора, Д4 в таблице 4 RUN.md; проверку `OpenTofu` обязательной в ruleset `main` ставит автор после мержа;
+- пересобрать контейнер — шаг автора: сделан 2026-11-09, `tofu version` в контейнере — v1.13.9 (Д4 в таблице 4 RUN.md закрыт); проверка `OpenTofu` обязательна в ruleset `main` с 2026-11-09 — её поставил исполнитель по поручению автора;
 - тем же pull request ссылки на общие workflow `.github` поднялись с v0.1.0 до v0.1.21, а Dependabot ведёт их одной группой, `shared-workflows`, по шаблону architecture 3.3 `.github`.
 
 — RUN.md, T11 и T12; `.devcontainer/Dockerfile`; `justfile`; `.github/workflows/ci.yml`; `.github/dependabot.yml`; CLAUDE.md, Environment; [architecture.md](architecture.md), разделы 3.6 и 4.
