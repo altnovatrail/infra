@@ -143,15 +143,11 @@ locals {
   project_grants = {
     # Hosting takes no grant on a site, so the publisher's rights are on the project:
     # bootstrap.sh's role hostingPublisher, the ready-made Firebase Hosting Admin less the making
-    # and the deleting of sites — a release goes through firebasehosting.sites.update, and the site
-    # app's address is stays out of the CLI's reach — and the reading of API keys, which the CLI's
-    # deploy asks for (canvas-api).
+    # and the deleting of sites. A release goes through firebasehosting.sites.update, and the site
+    # app's address is stays out of its reach. It is made by Hosting's REST API, which reads no API
+    # key, so the publisher holds no reading of them (R17).
     hosting = {
       role   = local.hosting_role
-      member = "serviceAccount:${google_service_account.hosting.email}"
-    }
-    hosting_api_keys = {
-      role   = "roles/serviceusage.apiKeysViewer"
       member = "serviceAccount:${google_service_account.hosting.email}"
     }
 

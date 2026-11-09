@@ -80,7 +80,7 @@ const makes = (calls) => calls.filter((c) => c.includes("create") || c.includes(
 const unconditioned = (state) =>
   state.projectPolicy[project].filter((b) => b.member === account && b.condition === "").map((b) => b.role).sort();
 
-const expression = `api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/hostingPublisher', 'roles/serviceusage.apiKeysViewer', 'projects/${project}/roles/signInUsers'])`;
+const expression = `api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/hostingPublisher', 'projects/${project}/roles/signInUsers'])`;
 
 test("a first run makes the project, its state, the pool and the configuration's identity", () => {
   const w = world();

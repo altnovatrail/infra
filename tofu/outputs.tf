@@ -51,6 +51,19 @@ output "hosting_url" {
   value       = google_firebase_hosting_site.app.default_url
 }
 
+# What production/deployment.json names in signIn, for the operator to write into it: the file is
+# the list's, reviewed in its pull request, and the deployment copies it as it is (R05; R17).
+output "app_sign_in" {
+  description = "The signIn block of /deployment.json: the Firebase web app app signs in as."
+  value = {
+    service    = "firebase"
+    apiKey     = data.google_firebase_web_app_config.app.api_key
+    authDomain = data.google_firebase_web_app_config.app.auth_domain
+    projectId  = var.project_id
+    appId      = google_firebase_web_app.app.app_id
+  }
+}
+
 output "hosting_service_account" {
   description = "The identity app's build is published with."
   value       = google_service_account.hosting.email

@@ -4,7 +4,7 @@
 >
 > **Правило:** не предлагать повторно отвергнутое без новых фактов. Если решение нужно поменять, спросить автора и обновить этот файл. Запись не переписывается: её правит поправка с датой в конце записи или заменяет новая запись, а старая остаётся на месте с пометкой «Заменено».
 >
-> Репозиторий заведён 2026-10-19 из заготовки `spec` v0.1.0 (R21 spec), 2026-10-20 перешёл на `spec` v0.2.9 (R01), а 2026-11-08 — на v0.9.11 (R02), на v0.9.13 (R03) и на v0.9.16 (R08). Чем он со временем отличается от заготовки — инструментами в devcontainer, правилами в RUN.md, — записывается здесь решением, как R46 canvas-api записал отличия от своего образца: OpenTofu и ShellCheck в devcontainer — R09 с поправкой 2026-11-09. Следующий номер — R17.
+> Репозиторий заведён 2026-10-19 из заготовки `spec` v0.1.0 (R21 spec), 2026-10-20 перешёл на `spec` v0.2.9 (R01), а 2026-11-08 — на v0.9.11 (R02), на v0.9.13 (R03) и на v0.9.16 (R08). Чем он со временем отличается от заготовки — инструментами в devcontainer, правилами в RUN.md, — записывается здесь решением, как R46 canvas-api записал отличия от своего образца: OpenTofu и ShellCheck в devcontainer — R09 с поправкой 2026-11-09. Следующий номер — R18.
 >
 > Здесь записи цитируются как `R03`, в других репозиториях — как `R03 infra`. Решения `spec` цитируются как «R18 spec», решения MathTrail — как «R37 canvas-api», а списком — «canvas-api: R37, R38». У каждого журнала свои номера.
 >
@@ -218,6 +218,9 @@
 — *Поправка 2026-11-09:* **разрешённые домены проекта Firebase ставит модуль, а не выкатка: весь список — `<проект>.firebaseapp.com` и `<проект>.web.app`. Сам Firebase ставит туда эти же два адреса, а `localhost`, который он ставил проектам, созданным до 28 апреля 2025 года, модуль убирает.** Решение автора при планировании T27 (R16). — *Почему:* право менять домены, `firebaseauth.configs.update`, и так держит учётная запись конфигурации, а выкатке его пришлось бы дать заново, и сузить его до доменов нельзя (R12). — *Следствие:* выкатка `app` доменов не трогает (T20); [architecture.md](architecture.md), разделы 3.2 и 3.3; `tofu/sign_in.tf`.
 
 
+— *Вторая поправка 2026-11-09:* **выпущенную сборку выкатка узнаёт по сообщению выпуска live-канала сайта: в нём — тег, имя архива и его sha256, `app <тег> <архив> <sha256>`, а после `keeping` — то же о сборке, чьи `assets/` этот выпуск сохранил. Прошлая сборка — выпущенная, а если список называет её же — та, чьи `assets/` сохранил её выпуск: повторный выпуск той же сборки держит то, что держал первый. Выпуска нет — это первый выпуск. Сообщение другое — выпуск сделан не выкаткой, и она отказывает: файлы такой сборки нечем проверить, чтобы держать их дальше.** Решение при выполнении T20, по «как — первый код» выше (R17). — *Почему:* у выпуска Hosting есть `message` до 512 знаков, и его отдаёт `channels/live` вместе с выпуском, а файлов выпущенной версии API Hosting скачать не даёт. Архив по сообщению проходит `release-verify` и sha256, как новый. — [architecture.md](architecture.md), раздел 3.3; `tools/deploy/app.mjs`.
+
+
 ## Журналы и трассы
 
 **R07. Журналы запросов Cloud Run исключаются все — фильтром `LOG_ID("run.googleapis.com/requests")` в sink `_Default` и в каждом sink, который заведёт проект. Для разбора сбоев остаются журнал `api` и встроенные метрики Cloud Run. Трасс у первого среза нет: Cloud Trace API не включается. Журналы платформы хранятся 30 дней в бакете `us-east4`, а аудит Google Cloud в `_Required` — 400 дней в `global`, и этот срок не настраивается.** Ответы автора 2026-11-08 при планировании T04, все три — по рекомендациям. Перечень журналов — [architecture.md](architecture.md), раздел 3.4, а источники — раздел 4, прочитано 2026-11-08.
@@ -401,6 +404,9 @@
 — *Вторая поправка 2026-11-09:* **разрешённые домены — в модуле (R16), хотя выше это отвергнуто.** Решение автора при планировании T27. Довод «Отвергнуто» — «их ставит и сам Firebase, а `<проект>.web.app` ставит выкладка, и self-hosting без модуля получает его тем же шагом» — снимает новый факт: `firebaseauth.configs.update` уже держит `infra-config` через `roles/firebase.admin`, а шагу выкладки понадобилась бы ещё одна учётная запись с этим правом. Домены Firebase модуль называет сам, полным списком, а self-hosting на Google Cloud берёт тот же модуль ([architecture.md](architecture.md), раздел 3.5). У `hosting-publish` прав на настройки входа по-прежнему нет.
 
 
+— *Третья поправка 2026-11-09:* **`roles/serviceusage.apiKeysViewer` у `hosting-publish` больше нет: сборку выпускает свой скрипт на REST API Hosting, а не Firebase CLI, и ключей API он не читает (R17). На проекте у издателя — только `hostingPublisher`.** Решение автора при планировании T20. — *Почему:* право было нужно только `firebase deploy` (canvas-api), а лишнего у учётной записи, которая выпускает сборку, не держат. — *Следствие:* `tofu/identities.tf`, условие `bootstrap.sh` (вторая поправка 2026-11-09 к R13), `tofu/tests/firebase.tftest.hcl`.
+
+
 ## Разовый шаг оператора
 
 **R13. `tofu/bootstrap.sh` один раз, правами оператора, делает то, чего конфигурация не может сделать сама: проект и его привязку к платёжному аккаунту, бакет состояния, пул Workload Identity Federation с провайдером `github`, учётную запись конфигурации `infra-config` с её правами и две свои роли, которые даёт модуль. Провайдер пускает только токены репозитория `infra` — по числовым ID владельца и репозитория, — а `infra-config` берут только задания окружения GitHub `production-config`. Роли `infra-config` перечислены, а не Owner; менять, кто что держит на проекте, она может только для двух ролей публикации и не может править ни одну роль.** Решения автора при планировании T17 и в ней, 2026-11-09 (RUN.md, T17). Образец — `infra/bootstrap.sh` canvas-api, коммит 0901af0 ([architecture.md](architecture.md), раздел 4).
@@ -447,6 +453,9 @@
 — *Поправка 2026-11-09:* **своих ролей у скрипта три: третья — `signInUsers`, роль `api-run` на вход — `firebaseauth.users.get`, `.update` и `.delete`. Условие `hasOnly` называет три роли: две роли публикации и её. `google_identity_platform_config` — в строке `roles/firebase.admin`, а `identitytoolkit.googleapis.com` скрипт включает до ролей.** Решение автора при планировании T27 (R16). — *Почему:* вход не даёт прав на чём-то меньше проекта, а готовая роль Firebase Authentication Admin дала бы `api` и правку настроек входа. Своя роль — в скрипте, а не в модуле, по той же причине, что `hostingPublisher`: роль, которую учётная запись конфигурации даёт под условием, она не должна уметь править (поправка 2026-11-09 к R12). — *Следствие:* все права на проекте модуль даёт одним списком, `google_project_iam_member.grants`, тест сверяет его роли с условием, а `just tf-check` не пускает выдачу прав на проекте вне этого списка; `tofu/bootstrap.sh`, `tofu/identities.tf`, `tofu/tests/bootstrap.test.mjs`, `tofu/tests/bootstrap.tftest.hcl`, `justfile`.
 
 
+— *Вторая поправка 2026-11-09:* **условие `hasOnly` называет две роли: `hostingPublisher` и `signInUsers`; `roles/serviceusage.apiKeysViewer` из него ушла вместе с правом издателя (третья поправка 2026-11-09 к R12). В строке `roles/firebase.admin` — ещё `google_firebase_web_app` и `data.google_firebase_web_app_config`: Web App `app` создаёт модуль (R17).** Решение автора при планировании T20. — *Почему:* условие пускает ровно то, что модуль даёт на проекте, а `roles/firebase.admin` уже держит `firebase.clients.*` и `apikeys.keys.getKeyString`, нужные Web App и его конфигурации. — *Следствие:* `tofu/bootstrap.sh`, `tofu/tests/bootstrap.test.mjs`.
+
+
 ## Проверки списка выкатки
 
 **R14. Список выкатки проверяют схема `deploy/schema/production.schema.json` и проверка `tools/deploy-check/` на Node: шесть пунктов R05 — схема, файлы релизов — `release-verify` и sha256, `deployment.json` — схемой своей сборки, факты — словарём таблицы допуска `spec`, ступень `full`, тег `api` не ниже, чем на `main`, — и ещё имя бинарника `api`, которого схеме не выразить. В CI job `Deploy` гоняет её тесты в каждом pull request, а сам список — когда pull request меняет то, чем он проверяется. Одна зависимость — ajv 8.20.0 по lock-файлу `tools/`.** Решения автора при планировании T18, 2026-11-09 (RUN.md, T18).
@@ -471,6 +480,8 @@
 - тест на настоящем релизе только руками — поломку проверки на настоящих подписях увидел бы только тот, кто его запустил, — решение автора.
 
 — *Следствие:* первый `deploy/production.json` с `production/deployment.json` и `facts.json` пишет T24, когда будут релизы `api` и `app`; выкладка (T19–T21) повторяет `release-verify` и сверку тега — уже с ревизией, которая принимает трафик (R05); схема `spec` для `deployment.json` встаёт рядом со схемой сборки в T26; обязательную проверку `Deploy` в ruleset `main` ставит автор или по его поручению исполнитель. — RUN.md, T18; `deploy/schema/production.schema.json`, `tools/deploy-check/`, `tools/package.json`, `justfile`, `.github/workflows/ci.yml`, `.github/dependabot.yml`; [architecture.md](architecture.md), разделы 3.2 и 4.
+
+— *Поправка 2026-11-09:* **проверка сборки `app` в pull request — ещё и её раскладка, `csp.json` и размер `deployment.json`, не больше 16 KiB: архив распаковывается, только если его список показал одни файлы и папки без путей наружу; в корне — `index.html`, `assets/` с файлом, `deployment.schema.json` и `csp.json`, а своего `deployment.json` нет; `csp.json` с этим `deployment.json` даёт заголовок CSP. Это те же функции `check.mjs`, что у выпуска (R17).** Решение при выполнении T20. — *Почему:* сборку, которую выпуск отклонит, лучше отклонить до мержа. — *Следствие:* `tools/deploy-check/check.mjs`, `tools/deploy-check/test/check.test.mjs`.
 
 ## Выкладка `api`
 
@@ -560,3 +571,58 @@
 - T20: выпуск доменов не трогает.
 
 — RUN.md, T27; `tofu/sign_in.tf`, `tofu/identities.tf`, `tofu/api.tf`, `tofu/apis.tf`, `tofu/bootstrap.sh`, `tofu/tests/sign_in.tftest.hcl`, `tofu/tests/bootstrap.tftest.hcl`, `tofu/tests/bootstrap.test.mjs`; [architecture.md](architecture.md), разделы 3.2–3.5 и 4.
+
+## Выпуск сборки `app`
+
+**R17. Сборку `app` на Firebase Hosting выпускает свой скрипт, `tools/deploy/app.mjs`, через REST API Hosting, а не Firebase CLI. Выпущенную сборку он узнаёт по сообщению выпуска, держит её `assets/` в новой версии и проверяет ответы сайта после выпуска. Заголовок CSP он собирает из `csp.json` сборки — таблицы «директива → строка источников» с местами `{api}` и `{authDomain}`, — а другую форму отклоняет. Web App, которое даёт `apiKey` и `appId` для `/deployment.json`, создаёт модуль.** Решения автора при планировании T20, 2026-11-09, все четыре — по рекомендациям (RUN.md, T20). Источники — [architecture.md](architecture.md), раздел 4, прочитано 2026-11-09.
+- **Шаги `release`** — по R06:
+  1. список — по своей схеме, а `production/deployment.json` — того sha256, что в списке, и не больше 16 KiB, которые читает `app` (architecture 3.7 app). Это те же функции `check.mjs`, что у проверки pull request;
+  2. архив новой сборки — снова `releaseFile` из `check.mjs`, sha256 и `release-verify`. Распаковка — только после того, как список архива показал одни файлы и папки, без ссылок и путей наружу; в корне — `index.html`, `assets/` с файлом, `deployment.schema.json` и `csp.json`, а своего `deployment.json` нет. `deployment.json` — по схеме сборки;
+  3. прошлая сборка — по сообщению выпуска live-канала, `app <тег> <архив> <sha256>` и, после `keeping`, сборка, чьи `assets/` он сохранил (вторая поправка 2026-11-09 к R06). Её архив проходит те же проверки, а её `assets/` идут в новую версию; файл того же пути берётся из новой сборки. Загрузка идёт по восемь файлов разом;
+  4. `deployment.json` из списка;
+  5. версия — `versions.create` с конфигурацией, `populateFiles` пачками по 1000 путей, загрузка того, что Hosting попросил, `FINALIZED` и `releases.create` с сообщением этой сборки. Файл Hosting называет sha256 его байтов в gzip, а версия — полный набор файлов;
+  6. проверка ответов.
+- **Конфигурация версии** — два набора путей, которые не пересекаются, так что ни один заголовок не зависит от того, какое из двух правил Hosting применит:
+  - вне `/assets/**`, `!/@(assets)/**` — `nosniff`, HSTS, CSP и `Cache-Control: no-cache`;
+  - под `/assets/**` — `nosniff`, HSTS и `public, max-age=31536000, immutable`;
+  - rewrite на `/index.html` — тоже вне `/assets/**`. Hosting переписывает только путь, где нет файла, и `/deployment.json` в каждой версии есть, так что отдельного исключения ему не нужно;
+  - `Cross-Origin-Opener-Policy` нет. HSTS на `*.web.app` Hosting ставит свой — «overwrites the Strict-Transport-Security configuration on default Hosting subdomains»; свой заголовок — для своего домена.
+- **CSP** — каждая директива таблицы с местами, заполненными из `deployment.json`: `{api}` — origin `api`, `{authDomain}` — хост окна входа. `frame-ancestors` — `'none'`, и таблица без неё её получает. Отказ — не таблица, имя не директивы, значение не одной строкой или с `;` и `,`, другое место, `frame-ancestors` не `'none'`. Ту же форму проверка pull request смотрит у сборки из списка (R14).
+- **Проверка ответов** — `check`, и после выпуска, и отдельной командой:
+  - у `/` и у случайного пути SPA — байты `index.html`, CSP, `nosniff`, `no-cache` и HSTS;
+  - у файла `assets/` — его байты, `immutable` и `nosniff`;
+  - на неизвестный файл в `/assets/` — `404`;
+  - `/deployment.json` — 200 без редиректа, `application/json`, байты из списка;
+  - нигде — `Cross-Origin-Opener-Policy: same-origin`.
+
+  Говорит каждый неверный ответ, а не первый.
+- **Вход** — токен доступа `hosting-publish` в `HOSTING_ACCESS_TOKEN`. Рецепт `just deploy-app` берёт его у `gcloud auth print-access-token` и передаёт через окружение, а не в командной строке; `deploy-app-check` к API Hosting не ходит, и токен ему не нужен. Своих прав сверх `hostingPublisher` выпуску не нужно (третья поправка 2026-11-09 к R12).
+- **Web App** — `google_firebase_web_app` в `tofu/firebase.tf`, `deletion_policy = "PREVENT"`: новое Web App пришло бы с новым ключом, а смена ключа стирает вход на всех устройствах (architecture 3.7 app). Выход `app_sign_in` — блок `signIn` для `/deployment.json`: `service`, `apiKey`, `authDomain`, `projectId`, `appId`. Ключ создаёт Firebase и ограничивает API Firebase, а секретом он не считается (R09 app). Файл пишет автор, и он проходит ревью pull request (R05).
+- **Тест** — `tools/deploy/test/app.test.mjs`: подставное API Hosting на этой машине, синтетические релизы `app`, подставной `release-verify` и подставной сайт, построенный отвечать по R06 и сломанный по одному ответу.
+- **Не проверено — первый выпуск (T24):**
+  - работает ли своя роль: Firebase пишет «Custom roles cannot currently be used for controlling access to Firebase Hosting resources», а справочник IAM помечает `firebasehosting.sites.*` как «SUPPORTED»;
+  - пускает ли production `!/@(assets)/**`;
+  - какой выпуск у нового сайта до первого выпуска выкатки;
+  - что Hosting шлёт сам сверх названного;
+  - нужен ли Web App включённый API Keys API, `apikeys.googleapis.com`: ключ Firebase создаёт сам, а модуль этот API не включает (T23).
+
+— *Почему:*
+- выпуск — пять вызовов описанного API, а `firebase-tools` 15.35.0 с версии 15.34.1 перед `deploy` спрашивает Service Usage, включён ли API Hosting, и без `serviceusage.services.get` падает (issue #11335 открыт). К тому же это чужая большая программа в задании с правом выпуска (R12);
+- эмулятор Hosting — superstatic из `firebase-tools`, а сопоставитель путей production закрыт, и ничто не говорит, что они совпадают. Поведение production проверяет проверка после выпуска на настоящем сайте;
+- форма `csp.json` нужна выкатке сейчас, а `app` назвал только «одна таблица директив с местами `{api}` и `{authDomain}`». Самая прямая её запись — объект; строка «в реестр spec» просит закрепить её;
+- Web App без кода создавали бы руками, а его `appId` и ключ должны жить столько же, сколько проект.
+
+— *Отвергнуто:*
+- `firebase-tools` по точной версии — довод выше — решение автора;
+- эмулятор Hosting в devcontainer — довод выше — решение автора;
+- метки версии вместо сообщения выпуска — их допустимая форма не проверена, а сообщение `channels/live` отдаёт;
+- Web App шагом автора в консоли — решение автора;
+- ждать релиза `app`, а CSP собрать потом — решение автора.
+
+— *Следствие:*
+- В14 таблицы 3 RUN.md, «в реестр spec», — форма `csp.json` и раскладка архива `app`;
+- T21 зовёт `just deploy-app` от `hosting-publish` в окружении `production-hosting`;
+- T24: первый выпуск и `deployment.json` из выхода `app_sign_in`;
+- T26: и схема `spec` для `deployment.json`.
+
+— RUN.md, T20; `tools/deploy/app.mjs`, `tools/deploy/test/app.test.mjs`, `tools/deploy-check/check.mjs`, `tools/deploy-check/test/check.test.mjs`, `justfile`, `.github/workflows/ci.yml`, `tofu/firebase.tf`, `tofu/outputs.tf`, `tofu/identities.tf`, `tofu/bootstrap.sh`, `tofu/tests/firebase.tftest.hcl`, `tofu/tests/bootstrap.test.mjs`; [architecture.md](architecture.md), разделы 3.2, 3.3 и 4.

@@ -213,7 +213,7 @@ project_roles=(
     "roles/iam.serviceAccountUser google_cloud_run_v2_service google_cloud_run_v2_job google_cloud_scheduler_job"
     "roles/secretmanager.admin google_secret_manager_secret google_secret_manager_secret_iam_member"
     "roles/cloudscheduler.admin google_cloud_scheduler_job"
-    "roles/firebase.admin google_firebase_project google_firebase_hosting_site google_identity_platform_config"
+    "roles/firebase.admin google_firebase_project google_firebase_hosting_site google_firebase_web_app data.google_firebase_web_app_config google_identity_platform_config"
     "roles/monitoring.notificationChannelEditor google_monitoring_notification_channel"
     "roles/monitoring.alertPolicyEditor google_monitoring_alert_policy"
     "roles/logging.configWriter google_logging_project_bucket_config google_logging_project_sink"
@@ -225,13 +225,14 @@ billing_roles=(
     "roles/billing.costsManager google_billing_budget"
 )
 
-# Who holds what in the project may be changed for three roles alone, the publisher's two and api's
-# role of sign-in: without the condition this role would make the identity the project's owner in all but name.
+# Who holds what in the project may be changed for two roles alone, the publisher's and api's of
+# sign-in: without the condition this role would make the identity the project's owner in all but
+# name.
 admin_roles=(
     "roles/resourcemanager.projectIamAdmin google_project_iam_member"
 )
 admin_role="${admin_roles[0]%% *}"
-expression="api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/${publisher_role}', 'roles/serviceusage.apiKeysViewer', 'projects/${project}/roles/${sign_in_role}'])"
+expression="api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/${publisher_role}', 'projects/${project}/roles/${sign_in_role}'])"
 
 # -- the steps ------------------------------------------------------------------
 
@@ -491,7 +492,7 @@ done
 # commas in it would split it on the command line.
 cat > "$work/condition" << CONDITION
 expression: ${expression}
-title: The publisher's roles and api's of sign-in alone
+title: The publisher's role and api's of sign-in alone
 description: Grants and revokes on the project only the roles the publisher of app's build and api's sign-in hold.
 CONDITION
 held="$(held_by "$member" "$policy" | awk -F '\t' -v role="$admin_role" 'index($1, role) == 1 { print "held under: " $2 }')"
@@ -504,7 +505,7 @@ if [[ "$held" != "held under: ${expression}" ]]; then
     retry gcloud projects add-iam-policy-binding "$project" \
         --member="$member" --role="$admin_role" --condition-from-file="$work/condition" --quiet
 fi
-echo "    ${admin_role}, for the publisher's two roles and api's of sign-in alone"
+echo "    ${admin_role}, for the publisher's role and api's of sign-in alone"
 
 # The identity may act as any service account of the project: it makes them, and the right to say
 # who may act as them is the right to act as them, for each of them. So none of the project's own

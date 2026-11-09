@@ -81,4 +81,5 @@ jobs:
           spec/tools/toolchain/toolchain.sh run just deploy-check-test
           spec/tools/toolchain/toolchain.sh run just deploy-check-release-test
           spec/tools/toolchain/toolchain.sh run just deploy-api-test
+          spec/tools/toolchain/toolchain.sh run just deploy-app-test
           spec/tools/toolchain/toolchain.sh run just ci-deploy-check origin/main
