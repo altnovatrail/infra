@@ -34,6 +34,10 @@ deploy_environment           = "production"
 hosting_environment          = "production-hosting"
 eval_providers               = ["anthropic", "openai"]
 api_jobs = {
+  check = {
+    args   = ["check"]
+    deploy = "check"
+  }
   migrate = {
     args   = ["migrate"]
     deploy = "migrate"

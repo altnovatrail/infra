@@ -79,12 +79,12 @@ run "the_first_image_makes_the_jobs_and_not_the_service" {
   }
 
   assert {
-    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["migrate", "sweep"]) && length(google_cloud_run_v2_service.api) == 0
+    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["check", "migrate", "sweep"]) && length(google_cloud_run_v2_service.api) == 0
     error_message = "With api_image and no api_serving, the jobs are made and the service is not."
   }
 
   assert {
-    condition     = length(google_cloud_run_v2_service_iam_member.public) == 0 && length(google_cloud_run_v2_service_iam_member.deployer) == 0 && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["migrate", "sweep"])
+    condition     = length(google_cloud_run_v2_service_iam_member.public) == 0 && length(google_cloud_run_v2_service_iam_member.deployer) == 0 && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["check", "migrate", "sweep"])
     error_message = "With no service, nobody may call it, and the deployment's role is on the jobs alone."
   }
 }
@@ -195,8 +195,8 @@ run "migrate_reads_its_secrets_as_files" {
   }
 
   assert {
-    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["migrate", "sweep"]) && google_cloud_run_v2_job.api["migrate"].name == "api-migrate"
-    error_message = "The jobs are api-migrate and api-sweep, the two api's binary has."
+    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["check", "migrate", "sweep"]) && google_cloud_run_v2_job.api["migrate"].name == "api-migrate"
+    error_message = "The jobs are api-check, api-migrate and api-sweep, the three api's binary has."
   }
 
   assert {
@@ -233,6 +233,31 @@ run "migrate_reads_its_secrets_as_files" {
   assert {
     condition     = length(google_cloud_scheduler_job.api) == 0 && length(google_service_account.scheduler) == 0
     error_message = "With the jobs and no service, nothing runs by the clock yet: the first deployment has not migrated the databases, and the service's secrets may have no value."
+  }
+}
+
+# check, by default: api's command that checks the facts and the rung, run by the deployment before
+# the migrations, with the facts first of its volumes and the rung, and no database.
+run "check_runs_before_the_migrations_by_default" {
+  command = plan
+
+  variables {
+    api_image = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  }
+
+  assert {
+    condition     = google_cloud_run_v2_job.api["check"].name == "api-check" && google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].args == tolist(["check"]) && output.api_jobs["check"].deploy == "check"
+    error_message = "api-check runs `api check`, and the deployment runs it in the part check, before the migrations."
+  }
+
+  assert {
+    condition     = google_cloud_run_v2_job.api["check"].template[0].template[0].volumes[0].secret[0].secret == "api-admission-facts" && one([for e in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env : e.value if e.name == "API_ADMISSION_RUNG"]) == "full"
+    error_message = "The check reads the facts, first of its volumes, and the rung full."
+  }
+
+  assert {
+    condition     = length(google_cloud_run_v2_job.api["check"].template[0].template[0].volumes) == 1 && length([for e in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env : e if endswith(e.name, "DATABASE_URL_FILE")]) == 0
+    error_message = "The check reads no database: the facts are its only volume."
   }
 }
 
@@ -413,7 +438,7 @@ run "the_deployment_holds_what_its_steps_need_and_no_more" {
 
   # What the role holds is bootstrap.sh's, and its test holds it to the steps' rights.
   assert {
-    condition     = google_cloud_run_v2_service_iam_member.deployer[0].role == "projects/novatrail-test-0/roles/apiDeployer" && toset([for m in values(google_cloud_run_v2_job_iam_member.deployer) : m.role]) == toset(["projects/novatrail-test-0/roles/apiDeployer"]) && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["migrate", "sweep"])
+    condition     = google_cloud_run_v2_service_iam_member.deployer[0].role == "projects/novatrail-test-0/roles/apiDeployer" && toset([for m in values(google_cloud_run_v2_job_iam_member.deployer) : m.role]) == toset(["projects/novatrail-test-0/roles/apiDeployer"]) && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["check", "migrate", "sweep"])
     error_message = "The deployment's role, apiDeployer, which bootstrap.sh makes, is granted on the service and on each job, not on the project."
   }
 

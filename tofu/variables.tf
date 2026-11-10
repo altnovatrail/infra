@@ -181,13 +181,19 @@ variable "api_jobs" {
   }))
   nullable = false
 
-  # The jobs api's binary has so far (api README, v0.1.14). migrate applies the migrations of both
+  # The jobs api's binary has so far (api README, v0.1.16). check checks the deployment's facts and
+  # rung for admission to AI, before the migrations, and reads no database: the configuration gives
+  # it the facts and the rung itself (R05; R45 api). migrate applies the migrations of both
   # databases with each deployment. sweep is the daily pass that finishes the deletions a request
   # left and deletes what is past its term: by the clock, at 09:00 UTC, night in every time zone of
   # the US, where the platform's learners are (R109 spec). A pass runs 9 minutes at most, sweep's
-  # -for, and reads what serve opens: the pooler's strings, the service's own secrets. The check of
-  # the configuration and the job after the rollout join the list when api's release names them.
+  # -for, and reads what serve opens: the pooler's strings, the service's own secrets. The job after
+  # the rollout joins the list when api's release names it.
   default = {
+    check = {
+      args   = ["check"]
+      deploy = "check"
+    }
     migrate = {
       args   = ["migrate"]
       deploy = "migrate"
