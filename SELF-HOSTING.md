@@ -153,11 +153,7 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-> **A first deployment cannot be finished yet, on the platform or a copy.** One thing stands in its way, and epic E4 of [RUN.md](RUN.md) removes it with the platform's first deployment:
->
-> - **`api` has no check of its configuration yet.** A release of `api` runs a job that checks the facts and the rung before the migrations (R05). `api`'s releases do not have that command yet, the default `api_jobs` has no job for it, and `just deploy-api` refuses a release without one.
->
-> This section and the next say what the list is made of and how the deployment goes once E4 is through. Do not merge a list into your `main` until then.
+> **A first deployment has not run yet, on the platform or a copy.** Nothing in the code stands in its way since `api` v0.1.16, whose `api check` the default `api_jobs` runs before the migrations. `app` has no release yet, and the job `api` runs after a rollout comes with a later release of `api`. This section and the next say what the list is made of and how the deployment goes; epic E4 of [RUN.md](RUN.md) checks both against the platform's first deployment.
 
 The deployment ships what `deploy/` names. A pull request that changes it is checked before the merge, and the merge deploys what changed (R05).
 
