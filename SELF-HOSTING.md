@@ -2,7 +2,7 @@
 
 This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). Those are in Russian, and this guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine).
 
-> **Status, 2026-11-10.** Everything up to [Your list](#8-your-list) has run on the platform's own project (`novatrail`) and is held by tests on a copy's values. A first deployment cannot be finished yet, on the platform or a copy: the start of [Your list](#8-your-list) says why, and epic E4 of [RUN.md](RUN.md) removes what stands in its way. Sections 8 and 9 are written from the code and will be checked against the platform's first deployment. Section 12, a local run, has not run either: `app` has no code yet.
+> **Status, 2026-11-10.** Everything up to [Your list](#8-your-list) has run on the platform's own project (`novatrail`) and is held by tests on a copy's values, except the steps it marks as not checked. A first deployment cannot be finished yet, on the platform or a copy: the start of [Your list](#8-your-list) says why, and epic E4 of [RUN.md](RUN.md) removes what stands in its way. Sections 8 and 9 are written from the code and will be checked against the platform's first deployment. Section 12, a local run, has not run either: `app` has no code yet.
 
 ## 1. What a copy is
 
@@ -13,7 +13,7 @@ A copy runs the same releases of `api` and `app` as the platform. They are downl
 - `tofu/ci.env` holds the two lines `bootstrap.sh` prints.
 - The `deploy/` directory holds your list of releases, your `/deployment.json` and your deployment facts.
 
-The full table of what a copy sets and what every copy shares is in [docs/architecture.md](docs/architecture.md), section 3.5. Nothing of the platform's own deployment reaches a copy: no project, region, pool or repository number. `tofu/tests/copy.tftest.hcl` and the copy tests of `tofu/tests/bootstrap.test.mjs` and `tools/deploy/test/` hold that.
+The full table of what a copy sets and what every copy shares is in [docs/architecture.md](docs/architecture.md), section 3.5. Nothing of the platform's own deployment reaches a copy: no project, region, pool or repository number. `tofu/tests/copy.tftest.hcl` and the copy tests of `tofu/tests/bootstrap.test.mjs` and `tools/deploy/test/` hold that. The name NovaTrail does reach a copy, on purpose: it is the display name of the project `bootstrap.sh` makes, and Hosting's versions carry the label `deployment-tool: novatrail-infra`.
 
 **The main path is a fork of this repository with GitHub Actions**, which is how the platform runs. Every merge to `main` applies the configuration and deploys what changed, as the limited identity `infra-config` (R13, R18). [Without GitHub Actions](#10-without-github-actions) covers the other path.
 
@@ -153,10 +153,11 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-> **A first deployment cannot be finished yet, on the platform or a copy.** Three things stand in its way, and epic E4 of [RUN.md](RUN.md) removes them with the platform's first deployment:
+> **A first deployment cannot be finished yet, on the platform or a copy.** Four things stand in its way, and epic E4 of [RUN.md](RUN.md) removes them with the platform's first deployment:
 >
 > - **`api` has no check of its configuration yet.** A release of `api` runs a job that checks the facts and the rung before the migrations (R05). `api`'s releases do not have that command yet, the default `api_jobs` has no job for it, and `just deploy-api` refuses a release without one.
 > - **The service gets no database settings.** `api` reads `API_DATABASE_URL`, `API_OPENFGA_DATABASE_URL` and `API_APP_ORIGIN` (its README), and the configuration does not give them to the service yet.
+> - **The jobs get no facts and no rung.** The job that checks the configuration needs the facts file and the rung, as the service does (R05). The configuration gives a job only `API_FIREBASE_PROJECT_ID` and its secrets.
 > - **The order is not settled.** Your `/deployment.json` names `api`'s address, which exists only once the service does. Yet the merge of a first list delivers `app` at once, with the image of `api`. E4 settles the order.
 >
 > This section and the next say what the list is made of and how the deployment goes once E4 is through. Do not merge a list into your `main` until then.
@@ -173,7 +174,7 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
 - **`deploy/production/deployment.json`** — the file your copy of `app` reads at its start. Its format is `spec`'s `deployment/`, version 1 (`spec/deployment/README.md`), and it holds:
   - `"format": 1`;
   - `"api"`, the origin of your `api`: `https://…run.app`, with no path. It exists once the service does;
-  - `"signIn"`, the output `app_sign_in` of your configuration. It is in the file `outputs.json` that every run of `Deploy` keeps as an artifact, or `tofu -chdir=tofu output -json app_sign_in` after you sign in as in [Without GitHub Actions](#10-without-github-actions).
+  - `"signIn"`, the output `app_sign_in` of your configuration. It is in the file `outputs.json` that a run of `Deploy` keeps as an artifact when it delivers something, or `tofu -chdir=tofu output -json app_sign_in` after you sign in as in [Without GitHub Actions](#10-without-github-actions).
 
   `spec`'s schema at the submodule's tag and the schema in the build of `app` must both accept it.
 - **`deploy/production/facts.json`** — the deployment facts your copy declares for `api`'s admission to AI, by provider and fact, each to the age categories it holds for. For example, `{"openai": {"data_processing_agreement": ["adult"]}}`. The providers and facts it may name, and its form, are `spec`'s admission table (`spec/admission/admission-table.json` and `$defs/declared_facts` in `spec/admission/schemas/answer-vector.schema.json`). A copy declares only what is true of its own contracts with AI providers. The platform's facts are not yours.
