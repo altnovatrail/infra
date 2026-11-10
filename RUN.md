@@ -103,7 +103,7 @@
 
 | Статус | ID | Задача | Кто | План | Зависит от |
 |---|---|---|---|---|---|
-| [ ] | T28 | CodeQL для JavaScript (Д7) | я + Claude | — | — |
+| [x] | T28 | CodeQL для JavaScript (Д7) | я + Claude | — | — |
 | [ ] | T29 | Копия на чужом проекте: что код берёт от платформы, и тесты на значениях копии | Claude | да | — |
 | [ ] | T30 | Руководство оператора `SELF-HOSTING.md` | Claude, проверяю я | да | T29 |
 | [ ] | T31 | Локальный запуск всей платформы — что даёт `infra` | Claude, проверяю я | да | T30 |
@@ -135,13 +135,14 @@ E4 предложила T25, итог E2, 2026-11-09. E3, который пре�
 
 В11–В14 закрыты 2026-11-09 переходом на `spec` v0.12.0 (T26, R19): автор решил все по рекомендациям строк, а их текст — в этом файле коммита e6c7717. В11 и В13 — карточка architecture 3.11 spec и строка «сервис входа» таблицы 3.12 spec: вход в production-проекте настраивает `infra`, на Identity Platform (R12, R16), а поправку к R03 api о dev-проекте пишет `api`. В12 — поправки 2026-11-09 к R85 spec: формат `/deployment.json` — часть `spec` `deployment/` со своей версией, схемой по постоянному пути и векторами чтения, а выкатка читает файл схемой и правилами подмодуля и отказывает сборке другой версии. В14 — третья поправка 2026-11-09 к R85 spec: `csp.json` в формат не входит, а его форму и раскладку архива `app` закрепляет в architecture 3.7 app так, как их читает выпуск (R17).
 
-Номера не переиспользуются: следующий — В18.
+Номера не переиспользуются: следующий — В19.
 
 | ID | Вопрос | Откуда | Варианты | Рекомендация |
 |---|---|---|---|---|
 | В15 | В реестр spec, к R120 spec: пул `github-eval` и его провайдер `github` делает `bootstrap.sh` `infra`, а не модуль. R120 spec положил их в модуль, но тогда `infra-config` нужна роль на пулы проекта: условия IAM пулы не сужают — `iam.googleapis.com` нет среди сервисов с атрибутами ресурса (Google Cloud, IAM Conditions, resource attributes, обновлено 2026-11-07). С такой ролью `infra-config` мог бы поменять условие пула, через который входит сам, а учётные записи выкладки он уже одалживает — production открылся бы любому репозиторию, против R13 infra. Условие провайдера, окружение `eval`, секреты, права на них и что делают `modules` и `tutor` — как в R120 spec. Имя провайдера и секретов `modules` и `tutor` получают после T23 | T22; R20, R13 | (а) поправка к R120 spec и карточке architecture 3.11 spec, где пул — «в модуле, отдельно от пула `bootstrap.sh`»: пул и провайдер делает `bootstrap.sh` `infra`, секреты и права — модуль; (б) как в R120 spec: роль на пулы у `infra-config` и поправка к R13 infra; (в) отдельный проект для eval — R120 spec его уже отверг | (а): граница та же, а `infra-config` не получает прав над своей дверью. Решение автора при планировании T22, 2026-11-09 |
 | В16 | В реестр spec, к карточке architecture 3.11 spec и к строке «Cloud Logging и Trace» таблицы 3.12 spec: «трасс у первого среза нет» — неверно. Cloud Trace API в проекте платформы включён и не выключается: от него зависят Cloud Scheduler, на котором идут задания `api` по расписанию, и `cloudapis.googleapis.com` (отказ Service Usage `COMMON_SU_SERVICE_HAS_DEPENDENT_SERVICES`, T23). Cloud Run сам трассирует часть входящих запросов; трассы лягут в `_Trace` в `us-east4`, а их атрибуты T24 сверит с privacy 4 spec | T23; третья поправка 2026-11-09 к R07 | (а) карточка и строка 3.12 — «трассы Cloud Run возможны, в `us-east4`; их атрибуты сверены с privacy 4 spec при первой выкладке (T24 `infra`)», а если в них окажется IP-адрес или идентификатор — новый вопрос; (б) убрать Cloud Scheduler из платформы и выключить Trace API силой — задания по расписанию шли бы иначе | (а): Scheduler нужен `api`, а место трасс уже верное. Ответ автора 2026-11-09 |
 | В17 | В реестр spec, к R120 spec и к строке Д149 `spec`: чем входят `modules` и `tutor`. Провайдер пула `github-eval` — `projects/306463944576/locations/global/workloadIdentityPools/github-eval/providers/github`; секреты — `projects/novatrail/secrets/eval-key-anthropic` и `projects/novatrail/secrets/eval-key-openai`, пока без значений (вывод `eval_access`, T23). Значения ключей и лимиты трат кладёт автор, а цену первого прогона eval называют `modules` и `tutor` (правило 4) | T22, T23; R20 | (а) `spec` передаёт имена `modules` и `tutor` строками своей таблицы 4, и они пишут их в свои workflow eval; (б) `modules` и `tutor` читают их прямо из RUN.md `infra` | (а): так `spec` передаёт всё, что идёт между репозиториями (R81 spec) |
+| В18 | В реестр spec, к строке Д9 таблицы 4 RUN.md `spec`: часть `infra` закрыта. Вход `languages: javascript-typescript` общего `codeql.yml` (T28), а «CodeQL / analyze (javascript-typescript)» — обязательная проверка в ruleset `main` `infra` (25506244), с 2026-11-10; первый анализ — 0 находок (Д7 закрыт) | T28; Д7 | (а) `spec` убирает `infra` из Д9; (б) — | (а): в Д9 остаются только `skill-map` и `app` |
 
 ## Таблица 4. Технический долг
 
@@ -155,12 +156,13 @@ E4 предложила T25, итог E2, 2026-11-09. E3, который пре�
 
 Д6 закрыт 2026-11-09 тем же Rebuild Container, ради которого заведён (T21; вторая поправка 2026-11-09 к R09): в контейнере `actionlint -version` — 1.7.12, `just ci-actionlint` — «actionlint 1.7.12, .github/workflows clean», `just ci-actionlint-test` — ok, а `tofu version` — «OpenTofu v1.13.9» и `shellcheck --version` — 0.11.0, как прежде. Стадию на amd64 первым собрал job CI `OpenTofu` pull request 32; arm64 её не собирал никто.
 
+Д7 закрыт 2026-11-10 задачей T28: CodeQL читает JavaScript `infra` — вход `languages: javascript-typescript` общего `codeql.yml`, — а проверка «CodeQL / analyze (javascript-typescript)» стоит обязательной в ruleset `main` (25506244). Первый анализ, pull request 39, — 0 находок.
+
 Номера не переиспользуются: следующий — Д9.
 
 | ID | Долг | Откуда | Чем грозит, пока не закрыт | Когда вернуться |
 |---|---|---|---|---|
 | Д3 | Бакет `_Required` Cloud Logging — в `global`: регион ему даёт только настройка организации или папки Google Cloud до создания проекта, а организация связана с доменом, которого нет до О-16 ([docs/architecture.md](docs/architecture.md), разделы 3.1 и 4; R04). Решение автора при планировании T01, 2026-11-08 | T01 | журналы `_Required` лежат вне региона П-11; у проектов, созданных до организации, бакет так и останется в `global` — место существующего бакета не меняется | когда после О-16 зарегистрирован домен: решить, заводить ли организацию с регионом по умолчанию до создания проектов платформы |
-| Д7 | CodeQL не читает JavaScript `infra`: вход `languages` общего `codeql.yml` в `.github/workflows/codeql.yml` пуст, а кода на JavaScript с T17–T21 много — `tools/deploy-check`, `tools/deploy`, `tools/ci`, `tofu/tests/*.mjs`. Нужны `javascript-typescript` во входе и проверка «CodeQL / analyze (javascript-typescript)» в ruleset `main` (Д9 RUN.md `spec`) | T26, переход на `spec` v0.12.0 | Код приходит в `main` без анализа CodeQL, и правилу 12 о находках нечего держать | T28, эпик E3; проверку в ruleset ставит автор |
 | Д8 | Платёжный аккаунт проекта `novatrail` — на пробном периоде Google Cloud: «Blaze \| Free Trial, 42 Days, $300 remaining» в консоли Firebase 2026-11-09, то есть до 2026-12-21 или до трат в $300. Перевести его в платный — Billing → Upgrade, шаг автора | T23 | «If you don't upgrade to a Paid billing account before 90 days pass or if you spend the $300 in free credit, then your Free Trial billing account will be closed and all of its associated projects and resources will be stopped» (Google Cloud, Free Trial, обновлено 2026-10-27): платформа остановится | до 2026-12-21, лучше до первой выкладки, T24 |
 
 ## Эпик E3. Self-hosting и локальный запуск
@@ -185,6 +187,17 @@ E4 предложила T25, итог E2, 2026-11-09. E3, который пре�
 - **Мой шаг:** обязательная проверка «CodeQL / analyze (javascript-typescript)» в ruleset `main` (25506244).
 - **Как проверить:** в pull request есть проверка «CodeQL / analyze (javascript-typescript)», она зелёная, а находки разобраны до мержа.
 - **Разделы:** Д7; Д9 RUN.md `spec`; поправка 2026-10-21 к R30 spec; R09 .github; правило 12.
+- **Решено автором (2026-11-10):** проверку в ruleset ставит исполнитель, по поручению автора, в pull request задачи.
+- **Сделано (2026-11-09–10):**
+  - правило 12: SonarCloud New Code — ничего; в Security — те же шесть находок Scorecard от 2026-10-20;
+  - вход общего `codeql.yml` `.github` v0.1.21 (706f406) — `languages`, строка; кроме `actions` он берёт `javascript-typescript` и `go` (файл workflow на этом SHA). В `.github/workflows/codeql.yml` — `languages: javascript-typescript`, с комментарием, что читается, а что нет: HCL и bash CodeQL не читает — его список языков их не называет ([docs/architecture.md](docs/architecture.md), раздел 1);
+  - [docs/architecture.md](docs/architecture.md), раздел 1 — что читает CodeQL;
+  - проверки: `just ci-actionlint` — clean, `just -f spec/justfile docs-check-repo` — ok;
+  - первый анализ `javascript-typescript` — в CI pull request 39: «CodeQL / analyze (javascript-typescript)» — pass, анализ `/language:javascript-typescript` — 103 правила, 0 находок; открытых предупреждений у pull request нет. Разбирать по правилу 12 нечего;
+  - ruleset `main` (25506244): «CodeQL / analyze (javascript-typescript)» — среди обязательных проверок, с той же интеграцией, что и «CodeQL / analyze (actions)». Остальной ruleset не изменился: сверено чтением до и после;
+  - Д7 закрыт; В18 — `spec`: Д9 `infra` закрыт целиком.
+- **Открыто:**
+  - в обязательных проверках ruleset нет `Deploy`, хотя R14 её предполагает: «обязательную проверку `Deploy` в ruleset `main` ставит автор или по его поручению исполнитель». Это вопрос автору, а не T28;
 
 #### T29. Копия на чужом проекте: что код берёт от платформы, и тесты на значениях копии
 
