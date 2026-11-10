@@ -196,6 +196,12 @@ E4 предложила T25, итог E2, 2026-11-09. E3, который пре�
   - первый анализ `javascript-typescript` — в CI pull request 39: «CodeQL / analyze (javascript-typescript)» — pass, анализ `/language:javascript-typescript` — 103 правила, 0 находок; открытых предупреждений у pull request нет. Разбирать по правилу 12 нечего;
   - ruleset `main` (25506244): «CodeQL / analyze (javascript-typescript)» — среди обязательных проверок, с той же интеграцией, что и «CodeQL / analyze (actions)». Остальной ruleset не изменился: сверено чтением до и после;
   - Д7 закрыт; В18 — `spec`: Д9 `infra` закрыт целиком.
+  - первый анализ `main` после мержа — 5 предупреждений medium: pull request показывал только изменённые строки. Все пять — задуманные потоки данных, и по правилу 12 они закрыты как «won't fix», с причиной у каждого, по разрешению автора 2026-11-10:
+    - 11 и 12, `tools/deploy-check/check.mjs`, `js/file-access-to-http` и `js/http-to-file-access`. Файл релиза скачивается с `github.com/altnovatrail`, тег и имя проходят схему списка и `encodeURIComponent`, а скачанное используется только после `release-verify` и sha256 (R05, R14);
+    - 8 и 9, `tools/deploy/app.mjs`, `js/file-access-to-http`. Выпуск отправляет файлы сборки в REST API Hosting или в `uploadUrl` из его ответа — это и есть его работа (R17);
+    - 10, `tools/deploy/app.mjs`, `js/file-access-to-http`. Проверка после выпуска читает свой сайт по `hosting_url` из выводов модуля, только `https` (R17).
+
+    Открытых предупреждений CodeQL нет;
 - **Открыто:**
   - в обязательных проверках ruleset нет `Deploy`, хотя R14 её предполагает: «обязательную проверку `Deploy` в ruleset `main` ставит автор или по его поручению исполнитель». Это вопрос автору, а не T28;
 
