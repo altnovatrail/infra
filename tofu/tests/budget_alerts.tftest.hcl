@@ -48,7 +48,7 @@ run "no_operator_makes_no_alert" {
   command = plan
 
   assert {
-    condition     = length(google_monitoring_notification_channel.operator) == 0 && length(google_monitoring_alert_policy.api) == 0
+    condition     = length(google_monitoring_notification_channel.operator) == 0 && length(google_monitoring_alert_policy.api) == 0 && length(google_monitoring_alert_policy.api_jobs) == 0
     error_message = "With no operator's address, neither the alerts nor their channel are made."
   }
 
@@ -107,6 +107,41 @@ run "an_operator_gets_the_load_and_the_error_alerts" {
   assert {
     condition     = length(google_billing_budget.spend.all_updates_rule[0].monitoring_notification_channels) == 1 && google_billing_budget.spend.all_updates_rule[0].disable_default_iam_recipients == false
     error_message = "With an operator, the budget mails the operator's channel too, and still the billing account's administrators and users."
+  }
+
+  assert {
+    condition     = length(google_monitoring_alert_policy.api_jobs) == 0
+    error_message = "With no service, nothing runs by the clock, and there is no alert on it."
+  }
+}
+
+# With an operator and the service: an alert on a failed execution of a job by the clock, read from
+# Cloud Run's count of a job's completed executions, mailed to the operator.
+run "an_operator_hears_of_a_failed_job_by_the_clock" {
+  command = plan
+
+  variables {
+    operator_email = "operator@example.com"
+    api_image      = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_serving    = true
+  }
+
+  assert {
+    condition     = length(google_monitoring_alert_policy.api_jobs) == 1 && google_monitoring_alert_policy.api_jobs[0].notification_channels == tolist([google_monitoring_notification_channel.operator[0].name])
+    error_message = "The alert on the jobs by the clock is made, and mails the operator."
+  }
+
+  assert {
+    condition = (
+      google_monitoring_alert_policy.api_jobs[0].conditions[0].condition_threshold[0].filter ==
+      "resource.type=\"cloud_run_job\" AND resource.labels.job_name=one_of(\"api-sweep\") AND metric.type=\"run.googleapis.com/job/completed_execution_count\" AND metric.labels.result!=\"succeeded\""
+    )
+    error_message = "It counts the executions of api-sweep, the one job by the clock, that did not succeed, and of no job the deployment runs."
+  }
+
+  assert {
+    condition     = google_monitoring_alert_policy.api_jobs[0].conditions[0].condition_threshold[0].threshold_value == 0 && google_monitoring_alert_policy.api_jobs[0].conditions[0].condition_threshold[0].comparison == "COMPARISON_GT"
+    error_message = "One failed execution is enough."
   }
 }
 

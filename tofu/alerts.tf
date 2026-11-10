@@ -4,7 +4,7 @@
 #
 # The spend alert hears of a burst only once Billing has counted it, hours later; these read the
 # platform's own count of api's requests and mail the operator while it lasts and again once it is
-# over. They point at the metrics and at api's own log, never at request logs: the platform keeps
+# over; the one on the jobs by the clock mails once, at a failed run. They point at the metrics and at api's own log, never at request logs: the platform keeps
 # none.
 #
 # The operator's address is a person's, so it is no part of the public description of the
@@ -105,6 +105,77 @@ resource "google_monitoring_alert_policy" "api" {
       - api's own log, in the bucket `${google_logging_project_bucket_config.logs.bucket_id}`, shows the method, the code and the reason of each refusal; the platform keeps no request logs.
 
       A second mail comes once the rate is back under the line.
+    EOT
+  }
+
+  depends_on = [google_project_service.enabled]
+}
+
+# A job by the clock that did not pass: sweep exits 1 unless its pass was clean, and the next pass
+# picks up what it left (README api). A pass that fails day after day leaves the deletions and the
+# terms of retention standing, with nobody told; this mails the operator at the first. It reads
+# Cloud Run's own count of a job's completed executions by their result: every result but
+# "succeeded". Google's list of metrics names the label and not its values; third-party guides give
+# "succeeded" and "failed", and the first deployment checks them (T24). Matching what is not a
+# success, a value spelled otherwise mails too many rather than none. One metric, charged as the
+# two above.
+locals {
+  # The names of the jobs by the clock, as Cloud Run knows them.
+  api_clock_job_names = [for name in keys(local.api_scheduled_jobs) : google_cloud_run_v2_job.api[name].name]
+}
+
+resource "google_monitoring_alert_policy" "api_jobs" {
+  count = local.operator_named && length(local.api_scheduled_jobs) > 0 ? 1 : 0
+
+  display_name = "${var.api_service_name} jobs by the clock"
+  combiner     = "OR"
+  severity     = "WARNING"
+
+  conditions {
+    display_name = "A failed execution of a job by the clock"
+
+    condition_threshold {
+      filter = join(" AND ", [
+        "resource.type=\"cloud_run_job\"",
+        "resource.labels.job_name=one_of(${join(",", [for name in local.api_clock_job_names : "\"${name}\""])})",
+        "metric.type=\"run.googleapis.com/job/completed_execution_count\"",
+        "metric.labels.result!=\"succeeded\"",
+      ])
+
+      # The failed executions of the last five minutes, every job summed: one is enough.
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+      }
+
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+
+      # A failure stays in the five minutes' sum long enough for the minute a condition must wait
+      # before it may take missing points as no incident: a day with no failure writes none.
+      duration                = "60s"
+      evaluation_missing_data = "EVALUATION_MISSING_DATA_INACTIVE"
+    }
+  }
+
+  alert_strategy {
+    auto_close           = "1800s"
+    notification_prompts = ["OPENED"]
+  }
+
+  notification_channels = [google_monitoring_notification_channel.operator[0].name]
+
+  documentation {
+    subject   = "${var.api_service_name}: a job by the clock failed"
+    mime_type = "text/markdown"
+    content   = <<-EOT
+      An execution of one of api's jobs by the clock (${join(", ", [for name in local.api_clock_job_names : "`${name}`"])}) failed.
+
+      - The job's executions in Cloud Run show which one failed and how long it ran.
+      - api's own log, in the bucket `${google_logging_project_bucket_config.logs.bucket_id}`, shows each step of the pass with its counts.
+
+      The next pass picks up what this one left. A failure day after day leaves deletions and the terms of retention standing.
     EOT
   }
 
