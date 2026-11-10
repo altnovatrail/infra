@@ -233,6 +233,14 @@ variable "api_jobs" {
     condition     = !contains(flatten([for job in values(var.api_jobs) : values(job.secrets)]), "api-admission-facts")
     error_message = "A job's secret is not the deployment facts' secret, api-admission-facts: that one the configuration makes, and the deployment adds its versions."
   }
+
+  # A job of the check gets the facts' volume, admission-facts, and API_ADMISSION_FACTS_FILE and
+  # API_ADMISSION_RUNG from the configuration itself: a secret of its own by those names would give
+  # it two of each, which Cloud Run refuses at the apply.
+  validation {
+    condition     = alltrue([for job in values(var.api_jobs) : !contains(values(job.secrets), "admission-facts") && length(setintersection(keys(job.secrets), ["API_ADMISSION_FACTS", "API_ADMISSION_RUNG"])) == 0])
+    error_message = "A job's secret is not named admission-facts, nor read as API_ADMISSION_FACTS or API_ADMISSION_RUNG: those are the facts' volume and variables the configuration sets."
+  }
 }
 
 variable "api_max_instances" {

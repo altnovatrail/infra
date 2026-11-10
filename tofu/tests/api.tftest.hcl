@@ -305,6 +305,55 @@ run "a_job_naming_a_service_secret_reads_the_services_own" {
   }
 }
 
+# A job of the check gets what the revision will run with: the facts, first of its volumes, at the
+# path the service reads them, and the same rung. The other jobs get neither.
+run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
+  command = plan
+
+  variables {
+    api_image   = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_serving = true
+    api_jobs = {
+      check = {
+        args   = ["check"]
+        deploy = "check"
+      }
+      migrate = {
+        args   = ["migrate"]
+        deploy = "migrate"
+        secrets = {
+          API_MIGRATE_DATABASE_URL = "api-migrate-database-url"
+        }
+      }
+    }
+  }
+
+  assert {
+    condition = (
+      google_cloud_run_v2_job.api["check"].template[0].template[0].volumes[0].secret[0].secret == "api-admission-facts" &&
+      google_cloud_run_v2_job.api["check"].template[0].template[0].volumes[0].secret[0].items[0].path == "facts.json" &&
+      one([for m in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].volume_mounts : m.mount_path if m.name == google_cloud_run_v2_job.api["check"].template[0].template[0].volumes[0].name]) == "/etc/api/admission"
+    )
+    error_message = "The job of the check mounts the facts first, where the service mounts them: the deployment sets that volume's version."
+  }
+
+  assert {
+    condition = alltrue([for name in ["API_ADMISSION_RUNG", "API_ADMISSION_FACTS_FILE"] :
+      one([for e in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env : e.value if e.name == name]) ==
+      one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == name])
+    ])
+    error_message = "The job of the check is told the rung and the facts' path the service is told."
+  }
+
+  assert {
+    condition = (
+      !contains([for v in google_cloud_run_v2_job.api["migrate"].template[0].template[0].volumes : v.secret[0].secret], "api-admission-facts") &&
+      length([for e in google_cloud_run_v2_job.api["migrate"].template[0].template[0].containers[0].env : e if startswith(e.name, "API_ADMISSION_")]) == 0
+    )
+    error_message = "A job of another part reads neither the facts nor the rung."
+  }
+}
+
 # A job with a schedule gets Cloud Scheduler, and an identity of its own that may run the jobs
 # that run by the clock and nothing else.
 run "a_job_with_a_schedule_runs_by_the_clock" {
@@ -422,6 +471,24 @@ run "a_job_secret_not_named_by_an_api_variable_is_refused" {
       migrate = {
         args    = ["migrate"]
         secrets = { DATABASE_URL = "api-migrate-database-url" }
+      }
+    }
+  }
+
+  expect_failures = [var.api_jobs]
+}
+
+# A secret of a job's own by the names of the facts' volume or variables would give a job of the
+# check two of each, which Cloud Run refuses at the apply: the plan refuses it first.
+run "a_job_secret_by_the_facts_volumes_or_variables_name_is_refused" {
+  command = plan
+
+  variables {
+    api_jobs = {
+      check = {
+        args    = ["check"]
+        deploy  = "check"
+        secrets = { API_ADMISSION_RUNG = "admission-facts" }
       }
     }
   }

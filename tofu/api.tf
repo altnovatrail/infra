@@ -1,9 +1,9 @@
 # api's Cloud Run service and jobs, and the schedule of the jobs that run by the clock (R11).
 #
 # Which image they run is the deployment's to say, and so is the one value a deployment changes
-# beside it: the version of the facts secret the service mounts (R05; the second 2026-11-08
-# amendment to R106 spec). The configuration sets the two only when it creates the service, and
-# owns everything around them, the lowest admission rung among it: a deployment takes only full
+# beside it: the version of the facts secret that the service and the jobs of the check mount (R05;
+# the second 2026-11-08 amendment to R106 spec). The configuration sets the two only when it creates
+# the service or a job, and owns everything around them, the lowest admission rung among it: a deployment takes only full
 # (R05; R25 api), so there is nothing for the deployment to change there.
 #
 # Nothing here exists until api_image names an image in this project's registry: a Cloud Run
@@ -18,9 +18,15 @@ locals {
   api_created = var.api_image != null
   api_serving = local.api_created && var.api_serving
 
-  # Where the service reads the deployment facts: the file's path is in API_ADMISSION_FACTS_FILE.
+  # Where the service and the jobs of the check read the deployment facts: the file's path is in
+  # API_ADMISSION_FACTS_FILE.
   admission_dir  = "/etc/api/admission"
   admission_file = "facts.json"
+  admission_path = "${local.admission_dir}/${local.admission_file}"
+
+  # The lowest admission rung: full, the only one a deployment takes (R05; R25 api). The service and
+  # the jobs of the check are told the same.
+  admission_rung = "full"
 
   # The service's secrets, by api's variable: the pooler's connection strings of its two databases,
   # which serve opens at its start (README api).
@@ -104,15 +110,14 @@ resource "google_cloud_run_v2_service" "api" {
         failure_threshold = 30
       }
 
-      # The lowest admission rung: full, the only one a deployment takes (R05; R25 api).
       env {
         name  = "API_ADMISSION_RUNG"
-        value = "full"
+        value = local.admission_rung
       }
 
       env {
         name  = "API_ADMISSION_FACTS_FILE"
-        value = "${local.admission_dir}/${local.admission_file}"
+        value = local.admission_path
       }
 
       # The Firebase project whose ID tokens api accepts: the platform's own (R16).
@@ -247,6 +252,29 @@ resource "google_cloud_run_v2_job" "api" {
           value = var.project_id
         }
 
+        # A job of the check checks the facts and the rung the revision will run with: the same
+        # rung, and the facts at the same path (R05; the second 2026-11-08 amendment to R106 spec).
+        dynamic "env" {
+          for_each = each.value.deploy == "check" ? {
+            API_ADMISSION_RUNG       = local.admission_rung
+            API_ADMISSION_FACTS_FILE = local.admission_path
+          } : {}
+
+          content {
+            name  = env.key
+            value = env.value
+          }
+        }
+
+        dynamic "volume_mounts" {
+          for_each = each.value.deploy == "check" ? ["admission-facts"] : []
+
+          content {
+            name       = volume_mounts.value
+            mount_path = local.admission_dir
+          }
+        }
+
         dynamic "env" {
           for_each = each.value.secrets
 
@@ -262,6 +290,29 @@ resource "google_cloud_run_v2_job" "api" {
           content {
             name       = volume_mounts.value
             mount_path = "/secrets/${volume_mounts.value}"
+          }
+        }
+      }
+
+      # The facts come first, in a job of the check: the deployment sets the version it has just
+      # added, the one the revision will mount, before it runs the job (R15), and the configuration
+      # leaves that version alone by the volume's place. In a job of another part the first volume is
+      # one of its own secrets, at the latest version, which nothing but the configuration sets. A
+      # job that leaves the check keeps in the state the version its facts had: name it anew, by
+      # its name, rather than moving it between parts.
+      dynamic "volumes" {
+        for_each = each.value.deploy == "check" ? ["admission-facts"] : []
+
+        content {
+          name = volumes.value
+
+          secret {
+            secret = google_secret_manager_secret.admission_facts.secret_id
+
+            items {
+              path    = local.admission_file
+              version = "latest"
+            }
           }
         }
       }
@@ -287,15 +338,18 @@ resource "google_cloud_run_v2_job" "api" {
 
   depends_on = [
     google_project_service.enabled,
+    google_secret_manager_secret_iam_member.api_reads_facts,
     google_secret_manager_secret_iam_member.api_reads_job_secrets,
     google_secret_manager_secret_iam_member.api_reads_service_secrets,
   ]
 
+  # The deployment owns the image of every job and the facts' version of a job of the check.
   lifecycle {
     ignore_changes = [
       client,
       client_version,
       template[0].template[0].containers[0].image,
+      template[0].template[0].volumes[0].secret[0].items[0].version,
     ]
   }
 }

@@ -74,6 +74,10 @@ function gcloud() {
     case command === "run jobs update":
       if (!state.jobs[subject]) fail(`NOT_FOUND: job ${subject}`);
       state.jobs[subject].image = flag("image");
+      if (flag("update-secrets")) {
+        const [file, secretVersion] = flag("update-secrets").split("=");
+        Object.assign(state.jobs[subject], { factsFile: file, facts: secretVersion });
+      }
       return;
     case command === "run jobs execute":
       if (!state.jobs[subject]) fail(`NOT_FOUND: job ${subject}`);

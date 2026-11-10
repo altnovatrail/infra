@@ -182,6 +182,12 @@ test("a release goes R05's way: image, facts, check and migrate on the new image
   const digest = `${image}@sha256:${pushed.digest}`;
   for (const job of Object.values(s.jobs)) assert.equal(job.image, digest, "every job runs the new image, by digest");
   assert.deepEqual(s.service.revisions["api-00002"], { image: digest, factsFile: "/etc/api/admission/facts.json", facts: "api-admission-facts:1" });
+  assert.deepEqual(
+    { factsFile: s.jobs["api-check"].factsFile, facts: s.jobs["api-check"].facts },
+    { factsFile: "/etc/api/admission/facts.json", facts: "api-admission-facts:1" },
+    "the check runs on the version of the facts the revision mounts, the one just added, not the latest",
+  );
+  for (const job of ["api-migrate", "api-after", "api-daily"]) assert.equal(s.jobs[job].facts, undefined, `${job} is given no facts`);
   assert.deepEqual(s.service.traffic, [{ revisionName: "api-00002", percent: 100 }]);
   assert.match(r.stdout, /api v0\.2\.0 after v0\.1\.0, which takes the traffic/);
   const build = w.calls().find((c) => c[0] === "docker" && c[1] === "build");
@@ -308,14 +314,27 @@ test("a revision that is not ready takes no traffic", () => {
   assert.deepEqual(w.read().service.traffic, [{ revisionName: "api-00001", percent: 100 }]);
 });
 
-test("the facts alone: a new version and a revision on the serving image, with no build and no job", () => {
+test("the facts alone: a new version, the check of it on the serving image, and a revision on that image, with no build and no migration", () => {
   const w = world();
   const r = w.run("facts");
   assert.equal(r.status, 0, r.output);
-  assert.deepEqual(steps(w.calls()), ["facts", "revision", "traffic"]);
+  assert.deepEqual(steps(w.calls()), ["facts", "image api-check", "execute api-check", "revision", "traffic"]);
   const s = w.read();
-  assert.deepEqual(s.service.revisions["api-00002"], { image: `${image}@sha256:${"a".repeat(64)}`, factsFile: "/etc/api/admission/facts.json", facts: "api-admission-facts:1" });
-  assert.deepEqual(s.executions, []);
+  const serving = `${image}@sha256:${"a".repeat(64)}`;
+  assert.deepEqual(s.service.revisions["api-00002"], { image: serving, factsFile: "/etc/api/admission/facts.json", facts: "api-admission-facts:1" });
+  assert.deepEqual(s.executions, [{ job: "api-check", image: serving }], "the check runs on the image that takes the traffic, and no other job runs");
+  assert.equal(s.jobs["api-check"].facts, "api-admission-facts:1", "the check runs on the new version of the facts");
+
+  const refused = world({ state: (st) => (st.failJobs = ["api-check"]) });
+  const stopped = refused.run("facts");
+  assert.notEqual(stopped.status, 0);
+  assert.match(stopped.stderr, /the job api-check did not end well/);
+  assert.ok(!steps(refused.calls()).includes("revision"), "facts the check refuses reach no revision");
+  assert.deepEqual(refused.read().service.traffic, [{ revisionName: "api-00001", percent: 100 }]);
+
+  const unchecked = world({ outputs: (o) => (o.api_jobs = { migrate: jobs.migrate, daily: jobs.daily }) }).run("facts");
+  assert.notEqual(unchecked.status, 0);
+  assert.match(unchecked.stderr, /new facts do not go without api's check of them/);
 
   const none = world({ serving: null }).run("facts");
   assert.notEqual(none.status, 0);
