@@ -178,8 +178,10 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
   `spec`'s schema at the submodule's tag and the schema in the build of `app` must both accept it.
 - **`deploy/production/facts.json`** — the deployment facts your copy declares for `api`'s admission to AI, by provider and fact, each to the age categories it holds for. For example, `{"openai": {"data_processing_agreement": ["adult"]}}`. The providers and facts it may name, and its form, are `spec`'s admission table (`spec/admission/admission-table.json` and `$defs/declared_facts` in `spec/admission/schemas/answer-vector.schema.json`). A copy declares only what is true of its own contracts with AI providers. The platform's facts are not yours.
 - **The databases.** `api` keeps its data in two Postgres databases, its own and OpenFGA's. The platform's are on Neon (R03 api). You add four connection strings yourself, as the values of secrets the configuration makes, with `gcloud secrets versions add`:
-  - the direct ones, for the migrations, before the first release of `api`: `api-migrate-database-url` and `api-migrate-openfga-database-url`;
-  - the pooler's, for the service, before you set `api_serving = true`: `api-database-url` and `api-openfga-database-url`. The service reads them at its start and does not start without them.
+  - the direct ones, for the migrations: `api-migrate-database-url` and `api-migrate-openfga-database-url`;
+  - the pooler's, for the service and for `sweep`: `api-database-url` and `api-openfga-database-url`. The service reads them at its start and does not start without them.
+
+  Add all four before you set `api_image`: the jobs that come with it mount them.
 
   Each with `sslmode=verify-full` (`api`'s README).
 
@@ -192,9 +194,9 @@ Run `just deploy-check` before you open the pull request. It downloads the relea
 After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. `api` goes in steps, because its jobs and its service are made with their first image (R11):
 
 1. With no `api_image` in your values, there are no jobs and no service. A run that delivers `api` builds and pushes its image alone, from the release, into your registry, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…`. To ask for that alone, run `Deploy` by hand with **image** chosen.
-2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made.
+2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made. Before this merge, add the values of the four connection strings ([Your list](#8-your-list)): the jobs mount them.
 3. Run `Deploy` by hand with **api** chosen. It runs the check of the configuration and the migrations, and adds a version of the facts.
-4. Add the values of `api-database-url` and `api-openfga-database-url`, the pooler's connection strings ([Your list](#8-your-list)): the service reads them at its start, and without them its first revision does not become ready. Then set `api_serving = true`, and merge. The service is made. Run **api** again to roll it out.
+4. Set `api_serving = true`, and merge. The values of the four connection strings must be there by now ([Your list](#8-your-list)): the service reads the pooler's at its start, and without them its first revision does not become ready. The service is made, and with it the schedule of `sweep`, every day at 09:00 UTC: before it, the databases are not migrated yet. Run **api** again to roll it out. If you named an operator, they get a mail when a run of `sweep` fails.
 5. Run `Deploy` by hand with **app** chosen. It ships the build with your `/deployment.json` to `https://<project_id>.web.app`.
 
 ## 10. Without GitHub Actions

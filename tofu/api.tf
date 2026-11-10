@@ -41,8 +41,11 @@ locals {
   # project (R06).
   app_origin = "https://${google_firebase_hosting_site.app.site_id}.web.app"
 
-  # The jobs that run by the clock, once the jobs exist.
-  api_scheduled_jobs = local.api_created ? { for name, job in var.api_jobs : name => job if job.schedule != null } : {}
+  # The jobs that run by the clock, once the service exists: before it, the first deployment has not
+  # migrated the databases yet, and the service's secrets may have no value. A job by the clock then
+  # would fail every day; the jobs themselves come with api_image, for the deployment to set their
+  # image.
+  api_scheduled_jobs = local.api_serving ? { for name, job in var.api_jobs : name => job if job.schedule != null } : {}
 
   # The memory of the container in MiB, whichever unit it is written in.
   api_memory_mib = tonumber(regex("^[0-9]+", var.api_memory)) * (endswith(var.api_memory, "Gi") ? 1024 : 1)
