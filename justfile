@@ -223,7 +223,7 @@ tf-fmt:
 # What CI runs on the module: its format, an init with no backend that installs the providers by
 # the lock file and refuses one the lock file does not name, a validate, and the tests, which run
 # against mock providers and need no credential.
-tf-check: _tf-sinks _tf-grants _tf-roles
+tf-check: _tf-sinks _tf-grants _tf-roles _tf-test-values
     tofu -chdir={{ tofu_dir }} fmt -check -recursive -diff
     tofu -chdir={{ tofu_dir }} init -backend=false -input=false -lockfile=readonly
     tofu -chdir={{ tofu_dir }} validate
@@ -253,6 +253,21 @@ _tf-grants:
     if [ -n "$stray" ]; then
         echo "tf-check: a grant on the project outside google_project_iam_member.grants in tofu/identities.tf (R13):" >&2
         echo "$stray" >&2
+        exit 1
+    fi
+
+# Every variable of the configuration is set in tofu/tests/terraform.tfvars: tofu test reads the
+# deployment's tofu/production.auto.tfvars too, and a variable this file leaves out would take the
+# deployment's value into every test (T30).
+_tf-test-values:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    declared=$(sed -n 's/^variable "\([a-z0-9_]*\)".*/\1/p' {{ quote(tofu_dir) }}/*.tf | sort -u)
+    set_in_tests=$(sed -n 's/^\([a-z0-9_]*\)[[:space:]]*=.*/\1/p' {{ quote(tofu_dir) }}/tests/terraform.tfvars | sort -u)
+    missing=$(comm -23 <(printf '%s\n' "$declared") <(printf '%s\n' "$set_in_tests"))
+    if [ -n "$missing" ]; then
+        echo "tf-check: tofu/tests/terraform.tfvars does not set these variables, so a deployment's values would reach the tests:" >&2
+        echo "$missing" >&2
         exit 1
     fi
 
