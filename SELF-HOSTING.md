@@ -1,8 +1,8 @@
 # Self-hosting NovaTrail
 
-This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). Those are in Russian, and this guide links to them only for the reasons behind a step.
+This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). Those are in Russian, and this guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine).
 
-> **Status, 2026-11-10.** Everything up to [Your list](#8-your-list) has run on the platform's own project (`novatrail`) and is held by tests on a copy's values. A first deployment cannot be finished yet, on the platform or a copy: the start of [Your list](#8-your-list) says why, and epic E4 of [RUN.md](RUN.md) removes what stands in its way. Sections 8 and 9 are written from the code and will be checked against the platform's first deployment.
+> **Status, 2026-11-10.** Everything up to [Your list](#8-your-list) has run on the platform's own project (`novatrail`) and is held by tests on a copy's values. A first deployment cannot be finished yet, on the platform or a copy: the start of [Your list](#8-your-list) says why, and epic E4 of [RUN.md](RUN.md) removes what stands in its way. Sections 8 and 9 are written from the code and will be checked against the platform's first deployment. Section 12, a local run, has not run either: `app` has no code yet.
 
 ## 1. What a copy is
 
@@ -233,3 +233,84 @@ The workflow's checks of `main` and of the environments do not apply either, so 
   - the platform's deployment facts.
 
   None of them reaches a copy.
+
+## 12. Running the whole platform on one machine
+
+> **Status, 2026-11-10.** Not run yet: `app` has no code. This section says how the pieces fit, by what `api`, `app` and `spec`'s format hold today (R22). Two questions are open in table 3 of [RUN.md](RUN.md): how the two containers reach each other (В19) and whose Firebase project serves a local run (В20). This section follows the recommendation of each, which needs changes in `app`, and it changes if `spec` decides otherwise.
+
+A local run is the platform from source: `api` and `app`, each in its own devcontainer and run by its own recipes, with the browser on your machine. It is how the author's first app runs (R76 spec). It needs no copy on Google Cloud, no list and nothing from this repository: `infra` deploys releases, and a local run has none. What `infra` gives here is this section.
+
+It is not offline. Sign-in goes to a Firebase project and `api`'s databases are on Neon. `api` puts it so: "the first app runs locally: `app` and `api` on one machine, preflight is local, and the token check, the database and the AI provider go over the network, as in a deployment" (`api`'s `docs/architecture.md`, «Протокол между `app` и `api`», in Russian). `api` has no setting for an AI provider yet.
+
+### `api`
+
+Follow "Run on the dev projects" in [`api`'s README](https://github.com/altnovatrail/api#run-on-the-dev-projects), in `api`'s devcontainer. In short:
+
+1. Write the configuration: the file `/home/vscode/.novatrail-dev/dev.env`, in a Docker volume of the container, outside the repository. It holds the databases' strings, the Firebase project, the path of the service account's key and `API_PACKAGES_DIR` (R39 api). For `app` on its own origin, add one more line: `API_APP_ORIGIN=http://127.0.0.1:<app's port>`, the origin your browser opens `app` at. `api` then answers CORS for that origin alone, and off a deployment it accepts `http` there.
+2. `just packages` lays the modules' packages into `/home/vscode/.novatrail-dev/packages`, the folder `API_PACKAGES_DIR` names. The release of modules that `api` pins holds no package of the current format yet, so the catalog is empty until `modules` moves to it (`api`'s README, Status).
+3. `just dev migrate`, then `just dev countries allow US` and `just dev invite`. The country lets the owner's profile be created; the invite code, printed once, lets one owner create an account.
+4. `just dev serve`. The server listens on `PORT`, 8080 by default, on every interface of its container. To take another port, set `PORT` in the shell: `dev.env` takes `API_*` names alone.
+
+`just dev-check` runs the whole way once by itself, with a test user, and is a quick check that the configuration holds. It also needs `API_DEV_WEB_API_KEY`, the project's Web API key, in `dev.env`.
+
+### `app`
+
+`app` has no code yet. When it has, its README will name the recipe that serves it, and the file its dev server serves as `/deployment.json`: its plan is a git-ignored `deployment.local.json` (`app`'s `docs/architecture.md`, «Конфигурация развёртывания», in Russian). The file has `spec`'s format, version 1 (`spec/deployment/README.md`):
+
+```json
+{
+  "format": 1,
+  "api": "http://127.0.0.1:8080",
+  "signIn": {
+    "service": "firebase",
+    "apiKey": "<the Web App's API key>",
+    "authDomain": "<project_id>.firebaseapp.com",
+    "projectId": "<project_id>",
+    "appId": "<the Web App's ID>"
+  }
+}
+```
+
+- `api` is the origin of `api` as your browser reaches it: put the port your machine has for it in place of 8080.
+- `projectId` is the project in `API_FIREBASE_PROJECT_ID`: `api` accepts ID tokens of that one project.
+- `api` may be `http` only because `app` itself is open on a loopback host: the rule `deployment.loopback`. A loopback host is `127.0.0.1`, `localhost` or `[::1]`, and nothing else.
+- `api` is an origin with no path and no default port: `http://127.0.0.1:80` is refused by the rule `deployment.api-origin`.
+- Open `app` at `http://127.0.0.1:<port>`, not at `localhost`. The Firebase project of a local run has `127.0.0.1` among its authorized domains (architecture 3.12 spec), and Firebase matches an IP address only exactly (`app`'s `docs/architecture.md`, «Конфигурация развёртывания»).
+
+**`app` as planned refuses this file.** Its plan puts `api` on `app`'s own origin, behind a proxy of its dev server, and its plugin refuses a `deployment.local.json` whose `api` is not the origin of that server. The file above needs `app` to drop that check, as В19's recommendation says.
+
+The file works with `app`'s dev server alone. `vite preview` serves the build with its lower layer of CSP, whose `connect-src` is `'self' https:`, so it lets no request go to `api` over `http`. The dev server has no lower layer (`app`'s `docs/architecture.md`, «Конфигурация развёртывания»).
+
+### The two containers
+
+The two devcontainers are on separate Docker networks, `novatrail-api` and `novatrail-app`, so neither reaches the other. Your browser reaches both, through ports that VS Code forwards to your machine ([Developing inside a Container](https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port), updated 2026-11-04, read 2026-11-10):
+
+- Open each repository in its own VS Code window. Once a server runs, look for its port in the Ports view of its window: 8080 in `api`'s, `app`'s port in `app`'s. If it is not there, run **Forward a Port** from the Command Palette. Neither `devcontainer.json` names a port to forward.
+- "A notification will tell you the localhost port you should use to access the port in the container". It may be another port: "it was mapped to port 4123 on localhost". Use the ports your machine has, in `/deployment.json` and in `API_APP_ORIGIN`.
+- A server bound to `127.0.0.1` in its container still answers: "Forwarded ports, on the other hand, actually look like localhost to the application".
+
+So `app` and `api` are two origins, as in a deployment, where `app` is on `web.app` and `api` on `run.app`. Whether a forwarded port answers on `127.0.0.1` as well as on `localhost` is checked with `app`'s first build.
+
+### A Firebase project
+
+A local run needs one. The format requires `signIn` with the service `firebase`, has no default and no field for an emulator, and `authDomain` is a host name with no port. `api` refuses to start with `FIREBASE_AUTH_EMULATOR_HOST` set, because the emulator verifies no signature (R32 api).
+
+A project on the free Spark plan with sign-in through Google is enough. `api`'s dev project is one (R39 api). For `app`, it also needs, in the Firebase console:
+
+- a Web App, in Project settings → Your apps, whose app ID goes in `signIn`. Its API key is the project's Web API key, which `api`'s `dev.env` already holds as `API_DEV_WEB_API_KEY`;
+- `127.0.0.1` in Authentication → Settings → Authorized domains.
+
+Whether `api`'s dev project has a Web App and `127.0.0.1` is not recorded. Which project serves a local run is В20; the recommendation is `api`'s dev project.
+
+Your copy's project is not for this. The module keeps its authorized domains to `<project_id>.firebaseapp.com` and `<project_id>.web.app`, with no loopback host (R16).
+
+### What `infra` does not give, and why
+
+- **A Firebase project for a local run.**
+  - The module turns on Identity Platform through OpenTofu, which needs a project with billing, on the Blaze plan. Its budget needs a billing account too. A local run needs neither.
+  - The module keeps loopback hosts out of a deployment's domains (R16).
+- **A compose file or emulators.**
+  - Work runs inside the devcontainers, and neither has Docker: a compose file would run on your machine, beside them.
+  - `api` keeps its databases on Neon, not in a container (R05 api).
+  - The Hosting emulator was rejected for `app`'s build (R17), and `api` refuses the sign-in emulator.
+- **A list, a `/deployment.json` or facts in `deploy/`.** They name releases and a deployment, and a local run has neither.
