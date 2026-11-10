@@ -58,7 +58,7 @@ const wantedCsp =
 let server;
 let base;
 const hosting = { reset() {
-  Object.assign(this, { calls: [], live: {}, versions: {}, uploads: {}, known: new Set(), fail: null, released: null });
+  Object.assign(this, { site: "novatrail-test-0", calls: [], live: {}, versions: {}, uploads: {}, known: new Set(), fail: null, released: null });
 } };
 hosting.reset();
 
@@ -78,35 +78,35 @@ before(async () => {
       if (req.headers.authorization !== "Bearer synthetic-token") return answer(401, { error: "no token" });
       if (hosting.fail && call.startsWith(hosting.fail)) return answer(403, { error: { message: "denied" } });
       let m;
-      if (req.method === "GET" && url.pathname === "/v1beta1/sites/novatrail-test-0/channels/live") return answer(200, { name: "sites/novatrail-test-0/channels/live", ...hosting.live });
-      if (req.method === "POST" && url.pathname === "/v1beta1/sites/novatrail-test-0/versions") {
-        const name = `sites/novatrail-test-0/versions/v${Object.keys(hosting.versions).length + 1}`;
+      if (req.method === "GET" && url.pathname === `/v1beta1/sites/${hosting.site}/channels/live`) return answer(200, { name: `sites/${hosting.site}/channels/live`, ...hosting.live });
+      if (req.method === "POST" && url.pathname === `/v1beta1/sites/${hosting.site}/versions`) {
+        const name = `sites/${hosting.site}/versions/v${Object.keys(hosting.versions).length + 1}`;
         hosting.versions[name] = { ...JSON.parse(body), files: {}, status: "CREATED" };
         return answer(200, { name, status: "CREATED" });
       }
-      if (req.method === "POST" && (m = url.pathname.match(/^\/v1beta1\/(sites\/novatrail-test-0\/versions\/v\d+):populateFiles$/))) {
+      if (req.method === "POST" && (m = url.pathname.match(/^\/v1beta1\/(sites\/[a-z0-9-]+\/versions\/v\d+):populateFiles$/))) {
         const version = hosting.versions[m[1]];
         const { files } = JSON.parse(body);
         Object.assign(version.files, files);
         return answer(200, { uploadRequiredHashes: [...new Set(Object.values(files))].filter((h) => !hosting.known.has(h) && !hosting.uploads[h]), uploadUrl: `${base}/upload/${m[1]}` });
       }
-      if (req.method === "POST" && (m = url.pathname.match(/^\/upload\/sites\/novatrail-test-0\/versions\/v\d+\/([0-9a-f]{64})$/))) {
+      if (req.method === "POST" && (m = url.pathname.match(/^\/upload\/sites\/[a-z0-9-]+\/versions\/v\d+\/([0-9a-f]{64})$/))) {
         if (req.headers["content-type"] !== "application/octet-stream" || hash(body) !== m[1]) return answer(400, { error: "not the file of that hash" });
         hosting.uploads[m[1]] = body;
         return answer(200);
       }
-      if (req.method === "PATCH" && (m = url.pathname.match(/^\/v1beta1\/(sites\/novatrail-test-0\/versions\/v\d+)$/)) && url.searchParams.get("update_mask") === "status") {
+      if (req.method === "PATCH" && (m = url.pathname.match(/^\/v1beta1\/(sites\/[a-z0-9-]+\/versions\/v\d+)$/)) && url.searchParams.get("update_mask") === "status") {
         const version = hosting.versions[m[1]];
         const missing = Object.values(version.files).filter((h) => !hosting.known.has(h) && !hosting.uploads[h]);
         if (missing.length) return answer(400, { error: "files not uploaded" });
         version.status = JSON.parse(body).status;
         return answer(200, { name: m[1], status: version.status });
       }
-      if (req.method === "POST" && url.pathname === "/v1beta1/sites/novatrail-test-0/releases") {
+      if (req.method === "POST" && url.pathname === `/v1beta1/sites/${hosting.site}/releases`) {
         const versionName = url.searchParams.get("versionName");
         if (hosting.versions[versionName]?.status !== "FINALIZED") return answer(400, { error: "not finalized" });
         hosting.released = { versionName, message: JSON.parse(body).message };
-        return answer(200, { name: "sites/novatrail-test-0/releases/r1", ...hosting.released });
+        return answer(200, { name: `sites/${hosting.site}/releases/r1`, ...hosting.released });
       }
       answer(404, { error: `stub: no ${call}` });
     });
@@ -412,4 +412,19 @@ test("the command line says how it is used, and refuses with no token before any
   const noToken = spawnSync(process.execPath, [script, "release", w.outputsFile, w.deploy], { encoding: "utf8", env: { ...process.env, HOSTING_ACCESS_TOKEN: "" } });
   assert.equal(noToken.status, 1);
   assert.match(noToken.stderr, /^app: HOSTING_ACCESS_TOKEN is not set/m);
+});
+
+// A self-hosted copy: the site and its address come from the configuration's outputs, and every
+// call to Hosting names the copy's site, through to the release (T29).
+test("a copy's release goes to the copy's site, every call of it", async () => {
+  const w = world();
+  hosting.site = "acme-learning-1";
+  fs.writeFileSync(w.outputsFile, JSON.stringify({ hosting_site: { value: "acme-learning-1" }, hosting_url: { value: "https://acme-learning-1.web.app" } }));
+  await w.release();
+  assert.match(hosting.released.versionName, /^sites\/acme-learning-1\/versions\/v\d+$/);
+  assert.ok(hosting.calls.length > 5, "the release went through");
+  for (const call of hosting.calls) {
+    assert.match(call, /\/sites\/acme-learning-1\//, call);
+    assert.doesNotMatch(call, /novatrail/, call);
+  }
 });

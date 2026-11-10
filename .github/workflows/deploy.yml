@@ -6,8 +6,10 @@
 #            that delivered (tools/deploy/target.mjs);
 #   config   applies the configuration as infra-config, in the environment production-config, and
 #            hands its outputs on;
-#   api      api's image, release or facts as api-deploy, in production (R15);
-#   app      app's build as hosting-publish, in production-hosting, once api is through (R17).
+#   api      api's image, release or facts as api-deploy, in the environment the configuration
+#            names for it, production by default (R15);
+#   app      app's build as hosting-publish, in the environment the configuration names for it,
+#            production-hosting by default, once api is through (R17).
 #
 # Each job signs in to Google through the federated pool, as the identity its environment alone may
 # borrow (R11, R12, R13); none of the environments asks for an approval, the review of the pull
@@ -112,10 +114,13 @@ jobs:
     environment: production-config
     permissions:
       contents: read
+      actions: read
       id-token: write
     outputs:
       deploy_service_account: ${{ steps.outputs.outputs.deploy_service_account }}
       hosting_service_account: ${{ steps.outputs.outputs.hosting_service_account }}
+      deploy_environment: ${{ steps.outputs.outputs.deploy_environment }}
+      hosting_environment: ${{ steps.outputs.outputs.hosting_environment }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -151,6 +156,15 @@ jobs:
         id: outputs
         run: just ci-tf-outputs "$RUNNER_TEMP/outputs.json" >> "$GITHUB_OUTPUT"
 
+      # The environments the configuration lends its identities to, as its outputs name them: each
+      # there and run from main alone, before a job of api or app runs in it (R18).
+      - name: The environments
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DEPLOY_ENVIRONMENT: ${{ steps.outputs.outputs.deploy_environment }}
+          HOSTING_ENVIRONMENT: ${{ steps.outputs.outputs.hosting_environment }}
+        run: just ci-deploy-environments production-config "$DEPLOY_ENVIRONMENT" "$HOSTING_ENVIRONMENT"
+
       # What the later jobs deploy on, as `tofu output -json` prints it; a job run again takes the
       # same file, and one applied again replaces it. Kept as long as GitHub lets a run be run again.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -166,7 +180,7 @@ jobs:
     if: needs.target.outputs.image == 'true' || needs.target.outputs.api == 'true' || needs.target.outputs.facts == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    environment: production
+    environment: ${{ needs.config.outputs.deploy_environment }}
     permissions:
       contents: read
       id-token: write
@@ -223,7 +237,7 @@ jobs:
       (needs.api.result == 'success' || needs.api.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    environment: production-hosting
+    environment: ${{ needs.config.outputs.hosting_environment }}
     permissions:
       contents: read
       id-token: write

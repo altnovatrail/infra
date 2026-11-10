@@ -309,6 +309,41 @@ test("a project paid for through another account is not moved", () => {
   assert.ok(!w.calls().some((c) => c.includes("link")));
 });
 
+// A self-hosted copy: its own project, region, currency, pool, repository and environments, and no
+// eval (T29). Nothing of the platform's own deployment may reach what the script makes or prints.
+test("a copy brings up its own project by its own values, and nothing of the platform's", () => {
+  const values = `project_id = "acme-learning-1"
+region     = "europe-west3"
+
+budget_amount   = "20"
+budget_currency = "EUR"
+
+workload_identity_pool_id  = "acme-ci"
+github_oidc_subject_prefix = "repo:acme@555/platform@777"
+deploy_environment         = "acme-api"
+hosting_environment        = "acme-site"
+`;
+  const w = world({ values, backend: 'bucket = "acme-learning-1-state"\nprefix = "tofu"\n' });
+  const r = w.run({ STUB_CURRENCY: "EUR" });
+  assert.equal(r.status, 0, r.output);
+  const s = w.read();
+  assert.deepEqual(Object.keys(s.projects), ["acme-learning-1"]);
+  assert.equal(s.buckets["gs://acme-learning-1-state"].location, "europe-west3");
+  assert.deepEqual(Object.keys(s.pools), ["acme-ci"], "the copy's pool alone, and no pool of eval");
+  assert.equal(s.providers["acme-ci/github"].condition, "assertion.repository_owner_id=='555' && assertion.repository_id=='777'");
+  assert.match(r.stdout, /repo:acme@555\/platform@777:environment:production-config/);
+  assert.match(r.stdout, /^GCP_WORKLOAD_IDENTITY_PROVIDER=projects\/\d+\/locations\/global\/workloadIdentityPools\/acme-ci\/providers\/github$/m);
+  assert.match(r.stdout, /^GCP_CONFIG_SERVICE_ACCOUNT=infra-config@acme-learning-1\.iam\.gserviceaccount\.com$/m);
+  assert.doesNotMatch(r.stdout, /GCP_EVAL_WORKLOAD_IDENTITY_PROVIDER/);
+  // The script looks whether a pool of eval was made before, to shut it; that look is the one
+  // mention of github-eval, and it makes nothing.
+  const asked = JSON.stringify(w.calls().filter((c) => !(c.includes("describe") && c.includes("github-eval"))));
+  const made = JSON.stringify({ state: s, out: r.stdout }) + asked;
+  for (const platform of ["novatrail", "us-east4", "344507087", "altnovatrail", "infra-github", "github-eval"]) {
+    assert.ok(!made.includes(platform), `${platform} reaches the copy`);
+  }
+});
+
 test("a billing account in another currency than the budget's is refused before anything is made", () => {
   const w = world();
   const r = w.run({ STUB_CURRENCY: "EUR" });

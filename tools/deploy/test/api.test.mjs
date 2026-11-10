@@ -53,7 +53,10 @@ const jobs = {
 
 // The layout of the repository, the release's files, the configuration's outputs, and the stand-ins'
 // state: the service serving `serving` (or none), the registry's tags.
-function world({ release = "v0.2.0", serving = "v0.1.0", outputs: change, state: edit } = {}) {
+// `project` and `region` are the copy's when a test is about a copy: its registry follows them.
+function world({ release = "v0.2.0", serving = "v0.1.0", outputs: change, state: edit, project = "novatrail-test-0", region = "us-east4" } = {}) {
+  const ownRepository = `${region}-docker.pkg.dev/${project}/images`;
+  const ownImage = `${ownRepository}/api`;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-api-test-"));
   made.push(dir);
   fs.mkdirSync(path.join(dir, "tools", "deploy"), { recursive: true });
@@ -83,9 +86,9 @@ function world({ release = "v0.2.0", serving = "v0.1.0", outputs: change, state:
   fs.writeFileSync(path.join(dir, "deploy", "production", "facts.json"), '{"openai":{"data_processing_agreement":["adult"]}}\n');
 
   const values = {
-    project_id: "novatrail-test-0",
-    region: "us-east4",
-    image_repository: repository,
+    project_id: project,
+    region,
+    image_repository: ownRepository,
     api_service_name: "api",
     admission_facts_secret: "api-admission-facts",
     admission_facts_file: "/etc/api/admission/facts.json",
@@ -97,12 +100,12 @@ function world({ release = "v0.2.0", serving = "v0.1.0", outputs: change, state:
 
   const servingDigest = "a".repeat(64);
   const state = {
-    jobs: Object.fromEntries(Object.values(jobs).map((j) => [j.job, { image: `${image}@sha256:${"f".repeat(64)}` }])),
-    tags: serving ? [{ image, tag: serving, digest: servingDigest }] : [],
+    jobs: Object.fromEntries(Object.values(jobs).map((j) => [j.job, { image: `${ownImage}@sha256:${"f".repeat(64)}` }])),
+    tags: serving ? [{ image: ownImage, tag: serving, digest: servingDigest }] : [],
     service: serving
       ? {
           name: "api",
-          revisions: { "api-00001": { image: `${image}@sha256:${servingDigest}`, facts: "1" } },
+          revisions: { "api-00001": { image: `${ownImage}@sha256:${servingDigest}`, facts: "1" } },
           traffic: [{ revisionName: "api-00001", percent: 100 }],
           latestCreated: "api-00001",
           latestReady: "api-00001",
@@ -346,4 +349,22 @@ test("an output the configuration does not give is refused before anything runs"
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /the configuration's outputs name no api_jobs/);
   assert.deepEqual(w.calls(), []);
+});
+
+// A self-hosted copy: its own project, region and registry come from the configuration's outputs,
+// and nothing of the platform's own deployment reaches a command, through a whole release (T29).
+test("a copy's release runs on the copy's project, region and registry, every command of it", () => {
+  const w = world({ project: "acme-learning-1", region: "europe-west3" });
+  const r = w.run("release");
+  assert.equal(r.status, 0, r.output);
+  const calls = w.calls();
+  assert.ok(steps(calls).includes("revision") && steps(calls).includes("execute api-migrate"), "the release went through");
+  for (const call of calls.filter((c) => c[0] === "gcloud")) {
+    // A command names the project by its flag, the path of the copy's image, or its registry's host.
+    assert.ok(call.includes("--project=acme-learning-1") || call.some((a) => a.startsWith("europe-west3-docker.pkg.dev")), call.join(" "));
+    if (call.some((a) => a.startsWith("--region="))) assert.ok(call.includes("--region=europe-west3"), call.join(" "));
+  }
+  assert.ok(JSON.stringify(calls).includes("europe-west3-docker.pkg.dev/acme-learning-1/images/api"), "the image is the copy's");
+  const said = JSON.stringify(calls) + r.stdout;
+  for (const platform of ["novatrail", "us-east4"]) assert.ok(!said.includes(platform), `${platform} reaches a command of the copy`);
 });
