@@ -12,14 +12,16 @@
 #
 # release runs the whole of a new release of api: a release lower than the one that takes the
 # traffic is refused; then the image; a new version of the facts' secret; the image set on every job
-# of the list; the jobs of the part check, then those of migrate, each to its end, any failure
+# of the list, and on a job of the part check that version of the facts too, the one the revision
+# will mount; the jobs of the part check, then those of migrate, each to its end, any failure
 # stopping the deployment before any revision; a revision by the image's digest with that version of
 # the facts, taking no traffic until it is ready, and then all of it; and last the jobs of the part
 # after. Before the configuration makes the service there is none to roll, and it says so.
 #
-# facts takes a new version of the facts alone: a new revision on the image that takes the traffic,
-# by its digest, with no build, no job and no release-verify, since the release's files have not
-# changed (R05).
+# facts takes a new version of the facts alone: the jobs of the part check on the image that takes
+# the traffic, with that version, and then a new revision on that image, by its digest, with it. No
+# build, no migration and no release-verify, since the release's files have not changed; facts that
+# api's check refuses stop before any revision (R05).
 #
 # What it works on comes from the configuration's outputs, as `tofu output -json` prints them after
 # the apply of the same commit: the project, the region, the registry, the service, the jobs with
@@ -188,11 +190,20 @@ add_facts() {
     printf '%s\n' "${BASH_REMATCH[1]}"
 }
 
+# The image on each job; with a version of the facts first, as set_image <version> <job>..., that
+# version too, in the same update: a job of the check gets the exact version the revision will
+# mount, which run as it is would be the latest, whichever that is by then (R15).
 set_image() {
-    local job
+    local version="" job flags
+    if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+        version="$1"
+        shift
+    fi
     for job in "$@"; do
-        gcloud run jobs update "$job" "${where[@]}" --image="$image" --quiet > /dev/null
-        echo "==> the image of the job ${job}"
+        flags=(--image="$image")
+        [[ -z "$version" ]] || flags+=(--update-secrets="${facts_path}=${secret}:${version}")
+        gcloud run jobs update "$job" "${where[@]}" "${flags[@]}" --quiet > /dev/null
+        echo "==> the image of the job ${job}${version:+, and version ${version} of the facts}"
     done
 }
 
@@ -258,7 +269,8 @@ case "$command" in
         # Before the migrations only the jobs that run before them get the new image: a job of the
         # clock or of after would run the new release against a database not migrated yet, were the
         # migrations to fail.
-        set_image "${check_jobs[@]}" "${migrate_jobs[@]}"
+        set_image "$version" "${check_jobs[@]}"
+        set_image "${migrate_jobs[@]}"
         run_jobs check "${check_jobs[@]}"
         run_jobs migrate "${migrate_jobs[@]}"
         if [[ -n "$described" ]]; then
@@ -272,10 +284,13 @@ case "$command" in
         ;;
 
     facts)
+        ((${#check_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part check, and new facts do not go without api's check of them (R05)"
         described="$(describe_service)"
         [[ -n "$described" ]] || fail "there is no service ${service} to give the facts to"
         image="$(serving_digest "$described")"
         version="$(add_facts)"
+        set_image "$version" "${check_jobs[@]}"
+        run_jobs check "${check_jobs[@]}"
         roll "$version"
         echo "deploy-api: the facts of version ${version}, on ${image}"
         ;;

@@ -83,7 +83,7 @@ output "api_jobs" {
 
 output "admission_facts_file" {
   description = "Where api's revision reads the deployment facts, the file of the secret's version mounted as a volume: the path in API_ADMISSION_FACTS_FILE."
-  value       = "${local.admission_dir}/${local.admission_file}"
+  value       = local.admission_path
 }
 
 # What modules and tutor sign in with and read, for the operator to hand them: the provider of the
