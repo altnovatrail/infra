@@ -15,6 +15,8 @@
 //      release-verify again, so that what reaches production is the file verified (R05) — unpacked,
 //      and deployment.json by spec's reading at the site's origin and by the build's
 //      deployment.schema.json, of the version of spec's deployment configuration at the submodule;
+//      then its api, which must be the configuration's api_origin, with api's service there: a
+//      build released before the service would call an api that is not there (R05);
 //   3. the build before, by the message of the live channel's release: none, and this is the first
 //      release; a message not of this script's, and the release is refused; otherwise that build's
 //      archive, through releaseFile too, and its assets/ into the folder, which keep a page loaded
@@ -34,7 +36,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import zlib from "node:zlib";
-import { buildCsp, buildFiles, deploymentHolds, deploymentOfTheList, readJson, readList, Refusal, releaseFile, ROOT, unpackBuild } from "../deploy-check/check.mjs";
+import { buildCsp, buildFiles, deploymentHolds, deploymentOfTheList, readDeployment, readJson, readList, Refusal, releaseFile, ROOT, unpackBuild } from "../deploy-check/check.mjs";
 
 export const HOSTING_API = "https://firebasehosting.googleapis.com/v1beta1";
 
@@ -110,6 +112,17 @@ function siteOf(outputsFile) {
   return { site: value("hosting_site"), url, origin };
 }
 
+// api's service, which the configuration makes once api_serving says so, and the address
+// /deployment.json names, which must be the service's deterministic one, api_origin (R05).
+function apiHolds(outputsFile, deploymentFile) {
+  const outputs = readJson(outputsFile, "the configuration's outputs");
+  if (typeof outputs?.api_service_url?.value !== "string") throw new Refusal("the configuration's outputs name no api_service_url: api has no service yet, and app goes only once it has (R05)");
+  const origin = outputs?.api_origin?.value;
+  if (typeof origin !== "string" || !origin) throw new Refusal("the configuration's outputs name no api_origin");
+  const named = readDeployment(deploymentFile)?.api;
+  if (named !== origin) throw new Refusal(`production/deployment.json names api ${JSON.stringify(named)}, not the service's address, ${origin}: the output api_origin`);
+}
+
 // The list's block of app, the list held to its schema, and its deployment.json, of the sha256
 // named and no larger than app reads: the same refusals as the check of a pull request.
 function theList(deployDir) {
@@ -174,6 +187,7 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-app-"));
   try {
     const { build, csp } = await theBuild(app, deploymentFile, origin, work, standIns);
+    apiHolds(outputsFile, deploymentFile);
     lines.push(`app ${app.release}: ${app.archive.name} is verified and holds a build to release`);
 
     // The folder of the version: the new build, the assets of the one released, deployment.json.

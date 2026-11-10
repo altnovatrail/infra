@@ -153,10 +153,9 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-> **A first deployment cannot be finished yet, on the platform or a copy.** Two things stand in its way, and epic E4 of [RUN.md](RUN.md) removes them with the platform's first deployment:
+> **A first deployment cannot be finished yet, on the platform or a copy.** One thing stands in its way, and epic E4 of [RUN.md](RUN.md) removes it with the platform's first deployment:
 >
 > - **`api` has no check of its configuration yet.** A release of `api` runs a job that checks the facts and the rung before the migrations (R05). `api`'s releases do not have that command yet, the default `api_jobs` has no job for it, and `just deploy-api` refuses a release without one.
-> - **The order is not settled.** Your `/deployment.json` names `api`'s address, which exists only once the service does. Yet the merge of a first list delivers `app` at once, with the image of `api`. E4 settles the order.
 >
 > This section and the next say what the list is made of and how the deployment goes once E4 is through. Do not merge a list into your `main` until then.
 
@@ -171,8 +170,10 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
   Take the files from the releases on GitHub (`gh release download <tag> -R altnovatrail/api`, and the same for `app`), and take each sha256 with `sha256sum`. `api`'s releases also carry a `SHA256SUMS`.
 - **`deploy/production/deployment.json`** — the file your copy of `app` reads at its start. Its format is `spec`'s `deployment/`, version 1 (`spec/deployment/README.md`), and it holds:
   - `"format": 1`;
-  - `"api"`, the origin of your `api`: `https://…run.app`, with no path. It exists once the service does;
-  - `"signIn"`, the output `app_sign_in` of your configuration. It is in the file `outputs.json` that a run of `Deploy` keeps as an artifact when it delivers something, or `tofu -chdir=tofu output -json app_sign_in` after you sign in as in [Without GitHub Actions](#10-without-github-actions).
+  - `"api"`, the origin of your `api`: the output `api_origin` of your configuration, `https://<api_service_name>-<project number>.<region>.run.app` — copy the output's value. It is the service's deterministic address, known before the service is, so you write it with your first list; the release of `app` refuses a file that names another;
+  - `"signIn"`, the output `app_sign_in` of your configuration.
+
+  Both outputs are in the file `outputs.json` that a run of `Deploy` keeps as an artifact when it delivers something, or come from `tofu -chdir=tofu output -json` after you sign in as in [Without GitHub Actions](#10-without-github-actions).
 
   `spec`'s schema at the submodule's tag and the schema in the build of `app` must both accept it.
 - **`deploy/production/facts.json`** — the deployment facts your copy declares for `api`'s admission to AI, by provider and fact, each to the age categories it holds for. For example, `{"openai": {"data_processing_agreement": ["adult"]}}`. The providers and facts it may name, and its form, are `spec`'s admission table (`spec/admission/admission-table.json` and `$defs/declared_facts` in `spec/admission/schemas/answer-vector.schema.json`). A copy declares only what is true of its own contracts with AI providers. The platform's facts are not yours.
@@ -190,13 +191,13 @@ Run `just deploy-check` before you open the pull request. It downloads the relea
 
 > Not run yet, on the platform or anywhere, and not possible before E4: see the start of section 8. This is the order the code follows today. E4 checks it against the first deployment.
 
-After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. `api` goes in steps, because its jobs and its service are made with their first image (R11):
+After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. `api` goes in steps, because its jobs and its service are made with their first image (R11), and `app` goes after `api`'s service, which its `/deployment.json` names (R05):
 
-1. With no `api_image` in your values, there are no jobs and no service. A run that delivers `api` builds and pushes its image alone, from the release, into your registry, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…`. To ask for that alone, run `Deploy` by hand with **image** chosen.
+1. With no `api_image` in your values, there are no jobs and no service. A run that delivers `api` builds and pushes its image alone, from the release, into your registry, and holds `app` back, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…`. To ask for that alone, run `Deploy` by hand with **image** chosen.
 2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made. Before this merge, add the values of the four connection strings ([Your list](#8-your-list)), and a first version of the facts, `gcloud secrets versions add api-admission-facts --data-file=deploy/production/facts.json`: the jobs mount them, the job of the check the facts. The deployment adds the version it checks and deploys anyway.
 3. Run `Deploy` by hand with **api** chosen. It adds a version of the facts, runs the check of the configuration on exactly that version, then the migrations.
 4. Set `api_serving = true`, and merge. The values of the four connection strings must be there by now ([Your list](#8-your-list)): the service reads the pooler's at its start, and without them its first revision does not become ready. The service is made, and with it the schedule of `sweep`, every day at 09:00 UTC: before it, the databases are not migrated yet. Run **api** again to roll it out. If you named an operator, they get a mail when a run of `sweep` fails.
-5. Run `Deploy` by hand with **app** chosen. It ships the build with your `/deployment.json` to `https://<project_id>.web.app`.
+5. The run of the merge that sets `api_serving = true` ships `app` too: the build with your `/deployment.json` to `https://<project_id>.web.app`. Until then a run holds `app` back and says so, and a release of `app` started by hand refuses while the configuration has no service; it refuses too a `/deployment.json` whose `api` is not `api_origin`.
 
 ## 10. Without GitHub Actions
 

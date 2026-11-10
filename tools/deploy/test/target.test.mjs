@@ -28,7 +28,7 @@ const list = (apiRelease = "v0.1.5", appRelease = "v0.1.0") => ({
   admission: { rung: "full" },
 });
 const facts = { openai: { data_processing_agreement: ["adult"] } };
-const tfvars = 'project_id = "novatrail-x"\napi_image  = "us-east4-docker.pkg.dev/novatrail-x/images/api@sha256:' + "5".repeat(64) + '"\n';
+const tfvars = 'project_id = "novatrail-x"\napi_image  = "us-east4-docker.pkg.dev/novatrail-x/images/api@sha256:' + "5".repeat(64) + '"\napi_serving = true\n';
 const setUp = { "tofu/ci.env": "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/1/locations/global/workloadIdentityPools/infra-github/providers/github\n", "tofu/production.auto.tfvars": tfvars, "tofu/backend.hcl": 'bucket = "novatrail-x-state"\n' };
 
 // An origin and its clone; commit() writes files, commits them and pushes main.
@@ -134,12 +134,45 @@ test("a last run that delivered at a commit this history does not hold counts as
   assert.match(d.lines.join("\n"), /which this history does not hold/);
 });
 
-test("until api_image is named, a changed api is its image alone, and the facts wait for the service", () => {
+test("until api_image is named, a changed api is its image alone, and the facts and app wait for the service", () => {
   const r = repository();
   const commit = r.commit({ ...setUp, "tofu/production.auto.tfvars": 'project_id = "novatrail-x"\n# api_image = "…"\n', "deploy/production.json": list(), "deploy/production/facts.json": facts });
   const d = decideAt(r, commit, null);
-  assert.deepEqual([d.deliver, d.image, d.api, d.facts, d.app], [true, true, false, false, true]);
+  assert.deepEqual([d.deliver, d.image, d.api, d.facts, d.app], [true, true, false, false, false]);
   assert.match(d.lines.join("\n"), /names no api_image yet, so api has no jobs: its image alone; name the digest it prints in api_image, then run api by hand/);
+  assert.match(d.lines.join("\n"), /does not set api_serving = true yet, so api has no service for app to call: app waits for the run that sets it/);
+});
+
+test("with the jobs and no service yet, api goes and app waits: its deployment.json names the service", async (t) => {
+  const image = 'api_image = "us-east4-docker.pkg.dev/novatrail-x/images/api@sha256:' + "5".repeat(64) + '"\n';
+  for (const [name, serving, app] of [
+    ["no api_serving", "", false],
+    ["api_serving = false", "api_serving = false\n", false],
+    ["api_serving = true # the service", "api_serving = true # the service\n", true],
+    ["api_serving = \"true\", which OpenTofu reads as true", 'api_serving = "true"\n', true],
+    ["api_serving = truely, no value of its", "api_serving = truely\n", false],
+  ]) {
+    await t.test(name, () => {
+      const r = repository();
+      const d = decideAt(r, r.commit({ ...setUp, "tofu/production.auto.tfvars": image + serving, "deploy/production.json": list(), "deploy/production/facts.json": facts }), null);
+      assert.deepEqual([d.deliver, d.api, d.facts, d.app], [true, true, true, app], d.lines.join("\n"));
+      assert.equal(/app waits/.test(d.lines.join("\n")), !app);
+    });
+  }
+});
+
+test("the run that brings api's service delivers app, which waited for it, though app has not changed since", () => {
+  const r = repository();
+  const image = 'api_image = "us-east4-docker.pkg.dev/novatrail-x/images/api@sha256:' + "5".repeat(64) + '"\n';
+  const held = r.commit({ ...setUp, "tofu/production.auto.tfvars": image, "deploy/production.json": list(), "deploy/production/facts.json": facts });
+  const first = decideAt(r, held, null);
+  assert.equal(first.app, false, first.lines.join("\n"));
+  const serving = r.commit({ "tofu/production.auto.tfvars": image + "api_serving = true\n" });
+  const d = decideAt(r, serving, held);
+  assert.deepEqual([d.api, d.facts, d.app], [false, false, true], d.lines.join("\n"));
+  assert.match(d.lines.join("\n"), /sets api_serving = true since the last run that delivered: app, which waited for the service/);
+  const next = decideAt(r, r.commit({ "tofu/main.tf": "# changed" }), serving);
+  assert.equal(next.app, false, "once delivered with the service, app goes again only when it changes");
 });
 
 test("the inputs of a run started by hand are its parts, and only true or false", () => {
