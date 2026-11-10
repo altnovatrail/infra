@@ -153,10 +153,9 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-> **A first deployment cannot be finished yet, on the platform or a copy.** Four things stand in its way, and epic E4 of [RUN.md](RUN.md) removes them with the platform's first deployment:
+> **A first deployment cannot be finished yet, on the platform or a copy.** Three things stand in its way, and epic E4 of [RUN.md](RUN.md) removes them with the platform's first deployment:
 >
 > - **`api` has no check of its configuration yet.** A release of `api` runs a job that checks the facts and the rung before the migrations (R05). `api`'s releases do not have that command yet, the default `api_jobs` has no job for it, and `just deploy-api` refuses a release without one.
-> - **The service gets no database settings.** `api` reads `API_DATABASE_URL`, `API_OPENFGA_DATABASE_URL` and `API_APP_ORIGIN` (its README), and the configuration does not give them to the service yet.
 > - **The jobs get no facts and no rung.** The job that checks the configuration needs the facts file and the rung, as the service does (R05). The configuration gives a job only `API_FIREBASE_PROJECT_ID` and its secrets.
 > - **The order is not settled.** Your `/deployment.json` names `api`'s address, which exists only once the service does. Yet the merge of a first list delivers `app` at once, with the image of `api`. E4 settles the order.
 >
@@ -178,7 +177,11 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
 
   `spec`'s schema at the submodule's tag and the schema in the build of `app` must both accept it.
 - **`deploy/production/facts.json`** — the deployment facts your copy declares for `api`'s admission to AI, by provider and fact, each to the age categories it holds for. For example, `{"openai": {"data_processing_agreement": ["adult"]}}`. The providers and facts it may name, and its form, are `spec`'s admission table (`spec/admission/admission-table.json` and `$defs/declared_facts` in `spec/admission/schemas/answer-vector.schema.json`). A copy declares only what is true of its own contracts with AI providers. The platform's facts are not yours.
-- **The databases.** `api` keeps its data in two Postgres databases, its own and OpenFGA's. The platform's are on Neon (R03 api). Their direct connection strings for the migrations are the values of the secrets `api-migrate-database-url` and `api-migrate-openfga-database-url`, which you add yourself with `gcloud secrets versions add`, before the first release of `api`.
+- **The databases.** `api` keeps its data in two Postgres databases, its own and OpenFGA's. The platform's are on Neon (R03 api). You add four connection strings yourself, as the values of secrets the configuration makes, with `gcloud secrets versions add`:
+  - the direct ones, for the migrations, before the first release of `api`: `api-migrate-database-url` and `api-migrate-openfga-database-url`;
+  - the pooler's, for the service, before you set `api_serving = true`: `api-database-url` and `api-openfga-database-url`. The service reads them at its start and does not start without them.
+
+  Each with `sslmode=verify-full` (`api`'s README).
 
 Run `just deploy-check` before you open the pull request. It downloads the releases from GitHub and checks their signatures with Sigstore, so it needs the network and a fetched `origin/main`. The pull request's check `Deploy` runs it again.
 
@@ -191,7 +194,7 @@ After a merge, the workflow delivers only the parts of the list that changed: `a
 1. With no `api_image` in your values, there are no jobs and no service. A run that delivers `api` builds and pushes its image alone, from the release, into your registry, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…`. To ask for that alone, run `Deploy` by hand with **image** chosen.
 2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made.
 3. Run `Deploy` by hand with **api** chosen. It runs the check of the configuration and the migrations, and adds a version of the facts.
-4. Set `api_serving = true`, and merge. The service is made. Run **api** again to roll it out.
+4. Add the values of `api-database-url` and `api-openfga-database-url`, the pooler's connection strings ([Your list](#8-your-list)): the service reads them at its start, and without them its first revision does not become ready. Then set `api_serving = true`, and merge. The service is made. Run **api** again to roll it out.
 5. Run `Deploy` by hand with **app** chosen. It ships the build with your `/deployment.json` to `https://<project_id>.web.app`.
 
 ## 10. Without GitHub Actions

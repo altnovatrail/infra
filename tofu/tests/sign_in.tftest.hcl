@@ -86,7 +86,7 @@ run "api_holds_its_role_of_sign_in_and_its_project" {
   }
 
   assert {
-    condition     = contains([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : "${e.name}=${e.value}"], "API_FIREBASE_PROJECT_ID=novatrail-test-0")
+    condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_FIREBASE_PROJECT_ID"]) == "novatrail-test-0"
     error_message = "api's service is told the platform's project as the Firebase project whose tokens it accepts."
   }
 

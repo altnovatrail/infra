@@ -54,7 +54,7 @@ run "a_copy_keeps_everything_regional_in_its_region" {
   }
 
   assert {
-    condition = alltrue([for s in concat([google_secret_manager_secret.admission_facts], values(google_secret_manager_secret.api_job)) :
+    condition = alltrue([for s in concat([google_secret_manager_secret.admission_facts], values(google_secret_manager_secret.api_job), values(google_secret_manager_secret.api_service)) :
       s.replication[0].user_managed[0].replicas[0].location == "europe-west3"
     ])
     error_message = "Every secret is replicated to the copy's region alone."
@@ -77,6 +77,11 @@ run "a_copy_signs_in_and_publishes_under_its_own_names" {
   assert {
     condition     = google_firebase_hosting_site.app.site_id == "acme-learning-1" && toset(google_identity_platform_config.this.authorized_domains) == toset(["acme-learning-1.firebaseapp.com", "acme-learning-1.web.app"])
     error_message = "The copy's site is named after its project, and its sign-in admits its own two domains alone."
+  }
+
+  assert {
+    condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_APP_ORIGIN"]) == "https://acme-learning-1.web.app"
+    error_message = "The copy's api answers CORS for the copy's own site."
   }
 
   assert {
@@ -117,6 +122,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_observability_project_settings.traces),
       jsonencode(google_secret_manager_secret.admission_facts),
       jsonencode(google_secret_manager_secret.api_job),
+      jsonencode(google_secret_manager_secret.api_service),
       jsonencode(google_cloud_run_v2_service.api),
       jsonencode(google_cloud_run_v2_job.api),
       jsonencode(google_cloud_scheduler_job.api),
@@ -138,6 +144,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_artifact_registry_repository_iam_member.deployer),
       jsonencode(google_secret_manager_secret_iam_member.api_reads_facts),
       jsonencode(google_secret_manager_secret_iam_member.api_reads_job_secrets),
+      jsonencode(google_secret_manager_secret_iam_member.api_reads_service_secrets),
       jsonencode(google_secret_manager_secret_iam_member.deployer_adds_facts),
       jsonencode(google_cloud_run_v2_service_iam_member.deployer),
       jsonencode(google_cloud_run_v2_service_iam_member.public),

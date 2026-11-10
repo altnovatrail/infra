@@ -35,6 +35,14 @@ resource "google_secret_manager_secret_iam_member" "api_reads_facts" {
   member    = "serviceAccount:${google_service_account.api.email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "api_reads_service_secrets" {
+  for_each = google_secret_manager_secret.api_service
+
+  secret_id = each.value.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "api_reads_job_secrets" {
   for_each = google_secret_manager_secret.api_job
 
