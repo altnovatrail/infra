@@ -211,9 +211,9 @@
 | Задание | Окружение и учётная запись | Что делает |
 |---|---|---|
 | `target` | нет, без входа | `main` на коммите? проект поднят? какие части списка изменились против последнего прогона, который выложил; без `api_image` — только образ `api` |
-| `config` | `production-config`, `infra-config` | `just ci-tf-apply`, выходы модуля — артефактом |
-| `api` | `production`, `api-deploy` | `just deploy-api`, `deploy-api-facts` или, руками, `deploy-api-image` |
-| `app` | `production-hosting`, `hosting-publish` | `just deploy-app`, после `api`, если оно шло и прошло |
+| `config` | `production-config`, `infra-config` | `just ci-tf-apply`; выходы модуля — артефактом; все три окружения есть и запускаются только из `main` — `just ci-deploy-environments` |
+| `api` | вывод `deploy_environment`, по умолчанию `production`; `api-deploy` | `just deploy-api`, `deploy-api-facts` или, руками, `deploy-api-image` |
+| `app` | вывод `hosting_environment`, по умолчанию `production-hosting`; `hosting-publish` | `just deploy-app`, после `api`, если оно шло и прошло |
 
 Каждое задание после `target` на повторной попытке спрашивает, стоит ли `main` на коммите. Инструменты ставит `.github/actions/tools` по точным версиям и суммам: OpenTofu, `just` и Node — по `ARG` Dockerfile, Google Cloud CLI, `jq` и `buildx` — по `tools/ci/versions.env`, а движок Docker раннера сверяется с записанной версией.
 
@@ -369,6 +369,23 @@ Self-hosting — копия платформы, которую оператор 
 - **регион** — у копии свой: R109 spec и R04 — о платформе.
 
 `bootstrap.sh` и переменные корневого модуля уже берут значения копии из её `production.auto.tfvars` и `backend.hcl`. Руководство оператора, свой проект Firebase и локальный запуск всей платформы отложены: раздел 2.6, эпик E3.
+
+**Что копия задаёт сама, а что общее** (T29). Перечень — по коду модуля, `bootstrap.sh`, проверок и выкладки на 2026-11-10. Тесты на значениях копии — `tofu/tests/copy.tftest.hcl`, тест копии в `tofu/tests/bootstrap.test.mjs`, `tools/deploy/test/api.test.mjs` и `app.test.mjs`. Они держат и то, что ни имя `novatrail`, ни регион `us-east4`, ни числа `altnovatrail` до копии не доходят.
+
+| Что | Откуда у копии | Своё или общее |
+|---|---|---|
+| проект, регион, бюджет и валюта | `production.auto.tfvars` | своё |
+| бакет состояния и префикс | `backend.hcl` | своё |
+| платёжный аккаунт, адрес оператора | `TF_VAR_billing_account`, `TF_VAR_operator_email` | своё |
+| пул CI, репозиторий и его числа | `workload_identity_pool_id`, `github_oidc_subject_prefix` | своё |
+| окружения GitHub выкладки и публикации | `deploy_environment`, `hosting_environment`, а workflow берёт их из выводов модуля; `production-config` — константа | своё (поправка 2026-11-10 к R18) |
+| сайт Hosting и домены входа | ID проекта: `<проект>.web.app`, `<проект>.firebaseapp.com` | своё |
+| eval | `eval_github_subject_prefixes`, по умолчанию пуст: ни секретов, ни пула | только у платформы |
+| список, `/deployment.json`, факты | каталог `deploy/` копии | своё (Т-20; R96 spec) |
+| файлы релизов `api` и `app` | релизы `altnovatrail`, `release-verify` | общее (R105, R106 spec) |
+| формат `/deployment.json` | `spec/deployment/` подмодуля | общее (R85 spec) |
+| имена учётных записей, своих ролей, секретов и заданий | константы модуля и `bootstrap.sh` | общее: они внутри проекта копии |
+| вход CI | Workload Identity Federation GitHub; без GitHub Actions — те же рецепты руками (T30) | общее |
 
 ### 3.6. Инструмент: OpenTofu
 

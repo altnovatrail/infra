@@ -403,6 +403,11 @@ ci-deploy-current commit:
 ci-deploy-identity:
     node tools/deploy/target.mjs identity
 
+# The GitHub environments the configuration lends its identities to, each there and run from main
+# alone, by GitHub's API (R18).
+ci-deploy-environments +names:
+    node tools/deploy/target.mjs environments {{ names }}
+
 # The configuration applied, by the lock file and the backend of the deployment, with the billing
 # account and the operator's address kept out of what it prints: the budget's name holds the first,
 # and a refresh prints it (canvas-api).
@@ -431,6 +436,8 @@ ci-tf-outputs out:
     hosting="$(jq -er '.hosting_service_account.value' "$out")"
     echo "deploy_service_account=${deploy}"
     echo "hosting_service_account=${hosting}"
+    echo "deploy_environment=$(jq -er '.deploy_environment.value' "$out")"
+    echo "hosting_environment=$(jq -er '.hosting_environment.value' "$out")"
 
 # tools/deploy/target.mjs against repositories made here and a stand-in for GitHub's API, and the
 # workflow's own shape: no network.

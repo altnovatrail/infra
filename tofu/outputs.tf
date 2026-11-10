@@ -95,3 +95,15 @@ output "eval_access" {
     secrets                    = { for code, secret in google_secret_manager_secret.eval : code => secret.id }
   }
 }
+
+# The GitHub environments whose jobs may borrow api's deployment and the publisher: the workflow runs
+# its jobs in them, and checks first that each is there and run from main alone (R18).
+output "deploy_environment" {
+  description = "The GitHub environment of api's deployment."
+  value       = var.deploy_environment
+}
+
+output "hosting_environment" {
+  description = "The GitHub environment of app's publisher."
+  value       = var.hosting_environment
+}

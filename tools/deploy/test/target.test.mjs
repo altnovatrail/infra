@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { decide, identity, lastDelivered, partsOfInputs, Refusal, tipOfMain } from "../target.mjs";
+import { decide, environmentsHoldToMain, identity, lastDelivered, partsOfInputs, Refusal, tipOfMain } from "../target.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..", "..");
@@ -162,12 +162,14 @@ let server;
 let api;
 let answer = () => ({ status: 200, body: { workflow_runs: [] } });
 let jobsOf = () => ({ status: 200, body: { jobs: [] } });
+let environmentOf = null;
 const asked = [];
 before(async () => {
   server = http.createServer((req, res) => {
     asked.push({ url: req.url, authorization: req.headers.authorization });
     const jobs = /\/actions\/runs\/(\d+)\/jobs/.exec(req.url);
-    const { status, body } = jobs ? jobsOf(Number(jobs[1])) : answer();
+    const environment = /\/environments\/([^/?]+)(\/deployment-branch-policies)?/.exec(req.url);
+    const { status, body } = environment && environmentOf ? environmentOf(decodeURIComponent(environment[1]), Boolean(environment[2])) : jobs ? jobsOf(Number(jobs[1])) : answer();
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(body));
   });
@@ -175,6 +177,35 @@ before(async () => {
   api = `http://127.0.0.1:${server.address().port}`;
 });
 after(() => server.close());
+
+test("the environments the configuration lends its identities to are there and run from main alone", async () => {
+  const environments = {
+    "production-config": { policy: { protected_branches: false, custom_branch_policies: true }, rules: [{ name: "main", type: "branch" }] },
+    "acme-api": { policy: { protected_branches: false, custom_branch_policies: true }, rules: [{ name: "main", type: "branch" }] },
+    open: { policy: null, rules: [] },
+    protected: { policy: { protected_branches: true, custom_branch_policies: false }, rules: [] },
+    wide: { policy: { protected_branches: false, custom_branch_policies: true }, rules: [{ name: "main", type: "branch" }, { name: "release/*", type: "branch" }] },
+    tagged: { policy: { protected_branches: false, custom_branch_policies: true }, rules: [{ name: "main", type: "tag" }] },
+  };
+  answer = () => ({ status: 500, body: {} });
+  environmentOf = (name, rules) => {
+    const e = environments[name];
+    if (!e) return { status: 404, body: { message: "Not Found" } };
+    return rules ? { status: 200, body: { branch_policies: e.rules } } : { status: 200, body: { name, deployment_branch_policy: e.policy } };
+  };
+  await environmentsHoldToMain({ repository: "acme/platform", token: "synthetic", names: ["production-config", "acme-api"], api });
+  for (const [name, message] of [
+    ["acme-site", /there is no environment acme-site: a job in it would make it, with no rule of branches/],
+    ["open", /the environment open is not run from chosen branches alone/],
+    ["protected", /the environment protected is not run from chosen branches alone/],
+    ["wide", /the environment wide is run from branch:main, branch:release\/\*, and not from main alone/],
+    ["tagged", /the environment tagged is run from tag:main, and not from main alone/],
+  ]) {
+    await assert.rejects(environmentsHoldToMain({ repository: "acme/platform", token: "synthetic", names: ["production-config", name], api }), message, name);
+  }
+  await assert.rejects(environmentsHoldToMain({ repository: "", token: "synthetic", names: ["x"], api }), /GITHUB_REPOSITORY and GITHUB_TOKEN/);
+  environmentOf = null;
+});
 
 test("the last run that delivered is the newest green run pushed to main whose Configuration went through", async () => {
   // Run 3 is green and delivered nothing: main had moved on, or the project was not set up.
@@ -258,7 +289,11 @@ test("the workflow: every job after target asks again on a retry, signs in only 
     else if (inJobs && name) jobs[name].push(line);
   }
   assert.deepEqual(Object.keys(jobs), ["target", "config", "api", "app"]);
-  const environments = { config: "production-config", api: "production", app: "production-hosting" };
+  // The configuration's own environment is fixed, as bootstrap.sh fixes it; the other two are the
+  // configuration's outputs, which config checks before any job runs in them.
+  const environments = { config: "production-config", api: "\\$\\{\\{ needs\\.config\\.outputs\\.deploy_environment \\}\\}", app: "\\$\\{\\{ needs\\.config\\.outputs\\.hosting_environment \\}\\}" };
+  assert.match(jobs.config.join("\n"), /run: just ci-deploy-environments production-config "\$DEPLOY_ENVIRONMENT" "\$HOSTING_ENVIRONMENT"/, "config checks the environments");
+  assert.match(jobs.config.join("\n"), /actions: read/, "config reads the environments");
   for (const [job, environment] of Object.entries(environments)) {
     const body = jobs[job].join("\n");
     assert.match(body, new RegExp(`^ {4}environment: ${environment}$`, "m"), job);

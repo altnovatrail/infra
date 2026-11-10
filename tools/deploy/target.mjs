@@ -4,6 +4,7 @@
 //   node tools/deploy/target.mjs target <commit> [--by-hand=<parts>]
 //   node tools/deploy/target.mjs current <commit>
 //   node tools/deploy/target.mjs identity
+//   node tools/deploy/target.mjs environments <name>...
 //
 // target prints, one `key=value` a line for $GITHUB_OUTPUT, whether the run delivers and which parts
 // of the list it delivers: `deliver`, `commit`, `image`, `api`, `facts`, `app`, each part true or
@@ -28,6 +29,10 @@
 //
 // identity prints, for $GITHUB_OUTPUT, the provider of the federated pool and the configuration's
 // identity that tofu/ci.env names, as bootstrap.sh printed them (R13), once each holds to its form.
+//
+// environments fails unless each GitHub environment it names is there and is run from main alone:
+// the configuration lends its identities to the jobs of these environments, and GitHub makes an
+// environment a job names that it does not have, with no rule of branches (R18).
 //
 // It reads the repository it runs in, its origin and, for the last run that delivered, GitHub's
 // API with GITHUB_TOKEN; GITHUB_REPOSITORY names the repository, GITHUB_API_URL the API.
@@ -82,15 +87,32 @@ function jsonAt(dir, commit, file) {
   }
 }
 
-async function github(url, token) {
+async function github(url, token, what = "the last run that delivered", { missing } = {}) {
   let response;
   try {
     response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" } });
   } catch (error) {
-    throw new Refusal(`GitHub cannot be reached for the last run that delivered: ${error.message}`);
+    throw new Refusal(`GitHub cannot be reached for ${what}: ${error.message}`);
   }
-  if (!response.ok) throw new Refusal(`GitHub answered ${response.status} for the last run that delivered: ${(await response.text()).slice(0, 300)}`);
+  if (response.status === 404 && missing) throw new Refusal(missing);
+  if (!response.ok) throw new Refusal(`GitHub answered ${response.status} for ${what}: ${(await response.text()).slice(0, 300)}`);
   return response.json();
+}
+
+// The GitHub environments the configuration lends its identities to — its own, api's deployment's
+// and app's publisher's, as its outputs name them — each there and run from main alone. A job that
+// names an environment GitHub does not have makes it, with no rule of branches, and then a workflow
+// of any branch could borrow the identity lent to it (R12, R13, R18).
+export async function environmentsHoldToMain({ repository, token, names, api = "https://api.github.com" }) {
+  if (!repository || !token) throw new Refusal("GITHUB_REPOSITORY and GITHUB_TOKEN name the repository and read its environments");
+  for (const name of names) {
+    const at = `${api}/repos/${repository}/environments/${encodeURIComponent(name)}`;
+    const environment = await github(at, token, `the environment ${name}`, { missing: `there is no environment ${name}: a job in it would make it, with no rule of branches, and lend its identity to any branch; make it with the rule main first (docs/architecture.md, section 3.2)` });
+    const policy = environment.deployment_branch_policy;
+    if (!policy || policy.protected_branches || !policy.custom_branch_policies) throw new Refusal(`the environment ${name} is not run from chosen branches alone: its rule is main, and main alone`);
+    const rules = ((await github(`${at}/deployment-branch-policies?per_page=100`, token, `the branches of the environment ${name}`)).branch_policies ?? []).map((rule) => `${rule.type ?? "branch"}:${rule.name}`);
+    if (rules.length !== 1 || rules[0] !== "branch:main") throw new Refusal(`the environment ${name} is run from ${rules.join(", ") || "no branch"}, and not from main alone`);
+  }
 }
 
 // The commit of the last run of the workflow that delivered: pushed to main, green, and its job
@@ -191,10 +213,15 @@ export function identity(file) {
   return { provider, config_service_account: account };
 }
 
-const USAGE = "usage: target target <commit> [--by-hand=<parts>] | target current <commit> | target identity";
+const USAGE = "usage: target target <commit> [--by-hand=<parts>] | target current <commit> | target identity | target environments <name>...";
 
 async function main(argv) {
   const [command, commit, flag] = argv;
+  if (command === "environments" && argv.length > 1) {
+    await environmentsHoldToMain({ repository: process.env.GITHUB_REPOSITORY, token: process.env.GITHUB_TOKEN, names: argv.slice(1), api: process.env.GITHUB_API_URL || undefined });
+    console.error(`target: ${argv.slice(1).join(", ")} — each there, and run from main alone`);
+    return;
+  }
   if (command === "identity" && argv.length === 1) {
     for (const [key, value] of Object.entries(identity("tofu/ci.env"))) console.log(`${key}=${value}`);
     return;
