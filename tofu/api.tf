@@ -22,8 +22,24 @@ locals {
   admission_dir  = "/etc/api/admission"
   admission_file = "facts.json"
 
-  # Every secret a job reads as a file, by its id, from every job of the list.
-  api_job_secret_ids = toset(flatten([for job in values(var.api_jobs) : values(job.secrets)]))
+  # The service's secrets, by api's variable: the pooler's connection strings of its two databases,
+  # which serve opens at its start (README api).
+  api_service_secrets = {
+    API_DATABASE_URL         = "api-database-url"
+    API_OPENFGA_DATABASE_URL = "api-openfga-database-url"
+  }
+  api_service_secret_ids = toset(values(local.api_service_secrets))
+
+  # Every secret a job reads as a file, by its id, from every job of the list, but the service's:
+  # a job that names one of those reads the service's secret, not a second of the same id.
+  api_job_secret_ids = setsubtract(toset(flatten([for job in values(var.api_jobs) : values(job.secrets)])), local.api_service_secret_ids)
+
+  # Every secret of api a volume may name, by its id.
+  api_secrets = merge(google_secret_manager_secret.api_job, google_secret_manager_secret.api_service)
+
+  # The origin app is served at, the one api answers CORS for: the default site, named after the
+  # project (R06).
+  app_origin = "https://${google_firebase_hosting_site.app.site_id}.web.app"
 
   # The jobs that run by the clock, once the jobs exist.
   api_scheduled_jobs = local.api_created ? { for name, job in var.api_jobs : name => job if job.schedule != null } : {}
@@ -108,6 +124,32 @@ resource "google_cloud_run_v2_service" "api" {
         value = "${floor(local.api_memory_mib * 9 / 10)}MiB"
       }
 
+      # app is on its own origin, the site's, and api on run.app: api answers CORS for that one
+      # origin, "when api has an origin of its own" (README api).
+      env {
+        name  = "API_APP_ORIGIN"
+        value = local.app_origin
+      }
+
+      # The pooler's connection strings, each in its variable from the latest version of its secret,
+      # resolved when an instance starts: api takes a secret from its variable or from a file, alike
+      # (R26 api). Not volumes: the facts' volume stays the service's only one, the one whose version
+      # the deployment changes and the configuration leaves alone by its place.
+      dynamic "env" {
+        for_each = local.api_service_secrets
+
+        content {
+          name = env.key
+
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.api_service[env.value].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
       volume_mounts {
         name       = "admission-facts"
         mount_path = local.admission_dir
@@ -133,6 +175,7 @@ resource "google_cloud_run_v2_service" "api" {
   depends_on = [
     google_project_service.enabled,
     google_secret_manager_secret_iam_member.api_reads_facts,
+    google_secret_manager_secret_iam_member.api_reads_service_secrets,
   ]
 
   # The deployment owns the image and the facts' version; this configuration owns everything
@@ -227,7 +270,7 @@ resource "google_cloud_run_v2_job" "api" {
           name = volumes.value
 
           secret {
-            secret = google_secret_manager_secret.api_job[volumes.value].secret_id
+            secret = local.api_secrets[volumes.value].secret_id
 
             items {
               path    = "value"
@@ -242,6 +285,7 @@ resource "google_cloud_run_v2_job" "api" {
   depends_on = [
     google_project_service.enabled,
     google_secret_manager_secret_iam_member.api_reads_job_secrets,
+    google_secret_manager_secret_iam_member.api_reads_service_secrets,
   ]
 
   lifecycle {

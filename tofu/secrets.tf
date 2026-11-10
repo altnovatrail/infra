@@ -29,6 +29,33 @@ resource "google_secret_manager_secret" "admission_facts" {
   depends_on = [google_project_service.enabled]
 }
 
+# The secrets api's service reads: the pooler's connection strings of its two databases,
+# api-database-url and api-openfga-database-url (README api). They are made with the configuration,
+# before any service: their values are put by whoever holds them, before the service is made. A job
+# that names one reads the same secret. Each is replicated to the region alone, and the
+# configuration never deletes one the serving revision mounts.
+resource "google_secret_manager_secret" "api_service" {
+  for_each = local.api_service_secret_ids
+
+  secret_id = each.value
+
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+
+  labels = {
+    purpose = "api-service-secret"
+  }
+
+  deletion_protection = true
+
+  depends_on = [google_project_service.enabled]
+}
+
 # The secrets api's jobs read as files, one for every id the list of jobs names: the direct
 # connection strings of api's two databases for migrate, to begin with (R11). Their values are put
 # by whoever holds them; each is replicated to the region alone. A secret the list stops naming is

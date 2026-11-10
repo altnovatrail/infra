@@ -52,6 +52,16 @@ run "with_no_image_there_is_no_service_and_no_job" {
     condition     = length(google_cloud_scheduler_job.api) == 0 && length(google_service_account.scheduler) == 0
     error_message = "With no jobs, there is no schedule."
   }
+
+  assert {
+    condition     = toset(keys(google_secret_manager_secret.api_service)) == toset(["api-database-url", "api-openfga-database-url"]) && alltrue([for s in google_secret_manager_secret.api_service : s.deletion_protection == true && [for r in s.replication[0].user_managed[0].replicas : r.location] == ["us-east4"]])
+    error_message = "The service's secrets, the pooler's connection strings, are there before any service, so that their values can be put first; replicated to the region alone, and never deleted by the configuration."
+  }
+
+  assert {
+    condition     = toset([for m in google_secret_manager_secret_iam_member.api_reads_service_secrets : "${m.secret_id} ${m.role} ${m.member}"]) == toset([for id in ["api-database-url", "api-openfga-database-url"] : "${google_secret_manager_secret.api_service[id].id} roles/secretmanager.secretAccessor serviceAccount:${google_service_account.api.email}"])
+    error_message = "api reads the service's two secrets, each by a grant on that secret alone."
+  }
 }
 
 # The first image makes the jobs and not yet the service: the first deployment runs the check and
@@ -145,6 +155,26 @@ run "the_service_is_made_with_the_first_image" {
   }
 
   assert {
+    condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_APP_ORIGIN"]) == "https://novatrail-test-0.web.app"
+    error_message = "api answers CORS for app's origin, the project's default site."
+  }
+
+  assert {
+    condition = {
+      for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.name => "${e.value_source[0].secret_key_ref[0].secret}:${e.value_source[0].secret_key_ref[0].version}" if length(e.value_source) > 0
+      } == {
+      API_DATABASE_URL         = "api-database-url:latest"
+      API_OPENFGA_DATABASE_URL = "api-openfga-database-url:latest"
+    }
+    error_message = "serve reads each pooler's connection string in its variable, from the latest version of its own secret."
+  }
+
+  assert {
+    condition     = length(google_cloud_run_v2_service.api[0].template[0].volumes) == 1
+    error_message = "The facts' volume is the service's only one: the deployment changes its version, and the configuration leaves it alone by its place."
+  }
+
+  assert {
     condition     = google_cloud_run_v2_service_iam_member.public[0].member == "allUsers" && google_cloud_run_v2_service_iam_member.public[0].role == "roles/run.invoker"
     error_message = "Anyone may call api: its own checks decide."
   }
@@ -198,6 +228,35 @@ run "migrate_reads_its_secrets_as_files" {
   assert {
     condition     = length(google_cloud_scheduler_job.api) == 0
     error_message = "migrate has no schedule: it runs with each deployment."
+  }
+}
+
+# A job that names a secret of the service reads that secret: the configuration makes no second
+# one of the same id, and makes the job's own as before.
+run "a_job_naming_a_service_secret_reads_the_services_own" {
+  command = plan
+
+  variables {
+    api_image = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_jobs = {
+      daily = {
+        args = ["daily"]
+        secrets = {
+          API_DATABASE_URL = "api-database-url"
+          API_DAILY_TOKEN  = "api-daily-token"
+        }
+      }
+    }
+  }
+
+  assert {
+    condition     = toset(keys(google_secret_manager_secret.api_job)) == toset(["api-daily-token"]) && toset(keys(google_secret_manager_secret.api_service)) == toset(["api-database-url", "api-openfga-database-url"])
+    error_message = "The job's own secret is made, and the service's is not made a second time."
+  }
+
+  assert {
+    condition     = toset([for v in google_cloud_run_v2_job.api["daily"].template[0].template[0].volumes : v.secret[0].secret]) == toset(["api-database-url", "api-daily-token"])
+    error_message = "The job mounts the service's secret and its own."
   }
 }
 
