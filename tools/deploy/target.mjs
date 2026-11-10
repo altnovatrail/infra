@@ -16,7 +16,9 @@
 // the push before this one either, which a run waiting in the queue and replaced by a newer one, or a
 // run that failed, would leave undelivered. With no such run, every part the list has; with no list,
 // none, and the run applies the configuration alone. Until tofu/production.auto.tfvars names
-// api_image, api has no jobs to run a release with (R11), and a changed api is its image alone.
+// api_image, api has no jobs to run a release with (R11), and a changed api is its image alone; until
+// it sets api_serving = true, api has no service, and a changed app waits for the run that sets it,
+// which delivers app (R05).
 //
 // A run started by hand delivers the parts it names, among image, api, facts and app, and none when
 // it names none: --by-hand=<parts>, apart by commas, or, in the workflow, GITHUB_EVENT_NAME
@@ -138,15 +140,24 @@ export function partsOfInputs(env) {
   }).join(",");
 }
 
-// Whether tofu/production.auto.tfvars at the commit names api_image: until it does, api has no jobs.
-function hasImage(dir, commit) {
+// Whether a line of tofu/production.auto.tfvars at the commit sets the variable name to a value
+// that holds: line by line, with no regular expression over the whole text, which would backtrack
+// (S8786).
+function setsVariable(dir, commit, name, holds) {
   if (!has(dir, commit, TFVARS)) return false;
-  // Line by line, with no regular expression over the whole text, which would backtrack (S8786).
   return git(dir, ["show", `${commit}:${TFVARS}`]).stdout.split("\n").some((line) => {
     const at = line.indexOf("=");
-    return at > 0 && line.slice(0, at).trim() === "api_image" && /^"[^"]+"/.test(line.slice(at + 1).trim());
+    return at > 0 && line.slice(0, at).trim() === name && holds(line.slice(at + 1).trim());
   });
 }
+
+// Whether tofu/production.auto.tfvars at the commit names api_image: until it does, api has no jobs.
+const hasImage = (dir, commit) => setsVariable(dir, commit, "api_image", (value) => /^"[^"]+"/.test(value));
+
+// Whether the configuration of the commit makes api's service: app goes only once it is there, since
+// its /deployment.json names the service's address (R05).
+// The value true, or the string "true", which OpenTofu reads as the same bool.
+const hasServing = (dir, commit) => setsVariable(dir, commit, "api_serving", (value) => /^("true"|true)(\s|#|$)/.test(value));
 
 function partsByHand(text) {
   const named = text.split(",").map((part) => part.trim()).filter(Boolean);
@@ -183,11 +194,19 @@ export function decide({ dir, commit, tip, base, byHand = null }) {
   };
   if (!known) lines.push("no run has delivered the list yet: every part of it");
   else lines.push(`against ${known.slice(0, 12)}, the last run that delivered: ${Object.entries(changed).filter(([, is]) => is).map(([part]) => part).join(", ") || "no part"} changed`);
+  // app goes after api's service, whose address its /deployment.json names: a run before it would
+  // ship a build that calls an api not there. The run that brings the service delivers it, changed
+  // or not since the last run that delivered, which held it back (R05).
+  const serving = hasServing(dir, commit);
+  const servingNew = serving && !(known && hasServing(dir, known));
+  const app = serving && (changed.app || servingNew);
+  if (changed.app && !serving) lines.push(`${TFVARS} does not set api_serving = true yet, so api has no service for app to call: app waits for the run that sets it (R05)`);
+  if (app && !changed.app) lines.push(`${TFVARS} sets api_serving = true since the last run that delivered: app, which waited for the service`);
   if ((changed.api || changed.facts) && !hasImage(dir, commit)) {
     lines.push(`${TFVARS} names no api_image yet, so api has no jobs: its image alone; name the digest it prints in api_image, then run api by hand (R11)`);
-    return { deliver: true, commit, image: changed.api, api: false, facts: false, app: changed.app, lines };
+    return { deliver: true, commit, image: changed.api, api: false, facts: false, app, lines };
   }
-  return { deliver: true, commit, image: false, ...changed, lines };
+  return { deliver: true, commit, image: false, ...changed, app, lines };
 }
 
 // tofu/ci.env: the two lines bootstrap.sh prints, neither of them a secret, and nothing else.

@@ -127,7 +127,7 @@
 
 **Каталог `deploy/`:**
 - `production.json` — список выкатки;
-- `production/deployment.json` — значения `/deployment.json` сборки `app`, формат 1 (R09 app);
+- `production/deployment.json` — значения `/deployment.json` сборки `app`, формат 1 (R09 app); `api` в нём — детерминированный адрес сервиса, вывод модуля `api_origin`, `https://<сервис>-<номер проекта>.<регион>.run.app`: он известен до сервиса (вторая поправка 2026-11-10 к R05);
 - `production/facts.json` — файл фактов развёртывания для функции допуска, в форме `facts` таблицы допуска ([текст таблицы допуска](../spec/admission/README.md), раздел 5);
 - `schema/production.schema.json` — схема JSON списка, JSON Schema 2020-12 (R14).
 
@@ -187,7 +187,7 @@
 
 Только факты: новая версия секрета фактов, её проверка — шаг 4 на образе, который уже выкачен, — и новая ревизия на этом образе, по его digest, — шаг 6; шагов 2, 3, 5 и 7 нет (поправка 2026-11-10 к R05). Пути «только ступень» нет: ступень у развёртывания всегда `full` (поправка 2026-11-09 к R05). Сборки, миграций и `release-verify` нет: файлы релиза не менялись, и снятие факта не ждёт Sigstore.
 
-Новый релиз `app`:
+Новый релиз `app` — только когда есть сервис `api`: пока `production.auto.tfvars` коммита не ставит `api_serving = true`, прогон `app` не выкатывает, а прогон, который его поставил, выкатывает `app`, даже если тот не менялся (вторая поправка 2026-11-10 к R05):
 1. `release-verify` архива и sha256 — как в шаге 2;
 2. архив раскладывается на хостинг, `/deployment.json` пишется из `deploy/production/deployment.json`, заголовок CSP собирается по `csp.json` архива, и всё выходит одним выпуском хостинга (R85 spec; R09 app). На Firebase Hosting — раздел 3.3 (R06);
 3. домен `app` — в разрешённых доменах проекта Firebase (Т-19): их ставит модуль, конфигурацией облака той же выкладки (R16).
@@ -200,7 +200,7 @@
 Какие задания когда запускать, говорит поле `deploy` записи `api_jobs` модуля (вторая поправка 2026-11-09 к R11). Задания проверки конфигурации и после выкладки встанут туда, когда их назовёт релиз `api`.
 
 **Выпуск `app` в коде** (R17; T20) — `tools/deploy/app.mjs`, рецепты `just deploy-app` и `deploy-app-check`, на выходах модуля после `apply`, `hosting_site` и `hosting_url`, через REST API Hosting:
-- `release` — шаги раздела 3.3: `deployment.json` того sha256, что в списке; архив новой сборки и архив выпущенной — снова `release-verify` и sha256; одна версия с конфигурацией, выпуск с сообщением, которое называет сборку, и проверка ответов;
+- `release` — шаги раздела 3.3: `deployment.json` того sha256, что в списке; архив новой сборки и архив выпущенной — снова `release-verify` и sha256; сервис `api` в выводах модуля и `api` файла, равный `api_origin`, — иначе отказ до Hosting (поправка 2026-11-10 к R17); одна версия с конфигурацией, выпуск с сообщением, которое называет сборку, и проверка ответов;
 - `check` — только проверка ответов сайта, по сборке из списка.
 
 Входит выпуск токеном доступа `hosting-publish` из `gcloud`, а прав, кроме `hostingPublisher`, ему не нужно (третья поправка 2026-11-09 к R12). Проверка pull request смотрит у сборки ту же раскладку и тот же `csp.json`, что выпуск (поправка 2026-11-09 к R14).
@@ -587,3 +587,4 @@ Self-hosting — копия платформы, которую оператор 
 - **Задание `sweep` и оповещение на его провал** (разделы 3.2, 3.4; T34), прочитано 2026-11-10:
   - `api` [v0.1.14](https://github.com/altnovatrail/api/blob/v0.1.14/README.md), `README.md`: «`api sweep` is the daily job, one pass a run»; «`-for` is how long the pass may run, `9m` by default»; «It reads what `serve` opens, and `API_REQUEST_TIMEOUT`»; «exits 1 unless the pass was clean, which the next pass picks up»; «A deployment runs it on a schedule as a Cloud Run job»; `API_REQUEST_TIMEOUT` — «a job gets the value its service has»;
   - Google Cloud, [Google Cloud metrics: P to Z](https://cloud.google.com/monitoring/api/metrics_gcp_p_z), «Last updated 2026-11-06 UTC»: `job/completed_execution_count` — «Number of completed job executions and their result. Sampled every 60 seconds. After sampling, data is not visible for up to 120 seconds», ресурс `cloud_run_job`, метка «result: Execution result». Значений метки страница не называет, и [обзор мониторинга Cloud Run](https://docs.cloud.google.com/run/docs/monitoring) — тоже; `succeeded` и `failed` — по сторонним руководствам, например [Dash0, Monitor Cloud Run Jobs](https://www.dash0.com/docs/dash0/infrastructure/google-cloud/cloud-run-jobs). Сверяет первая выкладка, T24.
+- **Детерминированный адрес сервиса Cloud Run** (раздел 3.2; вторая поправка 2026-11-10 к R05), прочитано 2026-11-10 — Google Cloud, документация Cloud Run об адресах сервиса, [triggering/https-request](https://docs.cloud.google.com/run/docs/triggering/https-request), даты на странице нет: «https://[TAG---]SERVICE_NAME-PROJECT_NUMBER.REGION.run.app»; «The deterministic URL lets you predict the service URL before the service is created»; «The deterministic URL is only available for DNS segments of 63 characters or less»; второй адрес, «https://[TAG---]SERVICE_IDENTIFIER.run.app», — со случайным хэшем, и оба работают, а «The deterministic URL is given priority when displayed».

@@ -46,11 +46,11 @@ const cspTable = {
 };
 const deployment = {
   format: 1,
-  api: "https://api-example.a.run.app",
+  api: "https://api-123456789012.us-east4.run.app",
   signIn: { service: "firebase", apiKey: "synthetic-key", authDomain: "novatrail-test-0.firebaseapp.com", projectId: "novatrail-test-0", appId: "1:2:web:3" },
 };
 const wantedCsp =
-  "default-src 'none'; script-src 'self' https://apis.google.com; connect-src 'self' https://api-example.a.run.app https://identitytoolkit.googleapis.com; frame-src https://novatrail-test-0.firebaseapp.com; frame-ancestors 'none'";
+  "default-src 'none'; script-src 'self' https://apis.google.com; connect-src 'self' https://api-123456789012.us-east4.run.app https://identitytoolkit.googleapis.com; frame-src https://novatrail-test-0.firebaseapp.com; frame-ancestors 'none'";
 
 // The stand-in for Hosting's API: the live channel's release, the versions made, every call in
 // order, the files uploaded by their hash. `known` are the hashes Hosting holds already and does
@@ -118,6 +118,11 @@ after(() => server.close());
 
 // A folder of releases of app, a deploy/ with the list naming `tag`, and the configuration's
 // outputs. `builds` are the tags to make, each with the assets it holds.
+// The configuration's outputs for the site and its address, with api's service there and its
+// address the one deployment.json names, unless `api` says otherwise.
+const outputsOf = (site, url, api = {}) =>
+  JSON.stringify({ hosting_site: { value: site }, hosting_url: { value: url }, api_service_url: { value: "https://api-a1b2c3d4e5-uk.a.run.app" }, api_origin: { value: deployment.api }, ...api });
+
 function world({ tag = "v0.3.0", builds = { "v0.3.0": ["index-new.js"], "v0.2.0": ["index-old.js"] }, change, edit } = {}) {
   hosting.reset();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-app-test-"));
@@ -154,7 +159,7 @@ function world({ tag = "v0.3.0", builds = { "v0.3.0": ["index-new.js"], "v0.2.0"
   fs.writeFileSync(path.join(deploy, "production.json"), JSON.stringify(list));
 
   const outputsFile = path.join(dir, "outputs.json");
-  fs.writeFileSync(outputsFile, JSON.stringify({ hosting_site: { value: "novatrail-test-0" }, hosting_url: { value: "https://novatrail-test-0.web.app" } }));
+  fs.writeFileSync(outputsFile, outputsOf("novatrail-test-0", "https://novatrail-test-0.web.app"));
 
   const verify = path.join(dir, "verify");
   fs.writeFileSync(verify, 'case "$4" in *"$1"*) echo "release-verify: the bundle does not hold $4" >&2; exit 1;; esac\n');
@@ -349,10 +354,28 @@ test("refusals before anything is made on Hosting", async (t) => {
     await assert.rejects(w.release(), /the build reads the deployment configuration 2, and spec at the submodule's tag is of 1/);
     assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
   });
+  await t.test("no service of api yet: app waits for it", async () => {
+    const w = world();
+    fs.writeFileSync(w.outputsFile, outputsOf("novatrail-test-0", "https://novatrail-test-0.web.app", { api_service_url: { value: null } }));
+    await assert.rejects(w.release(), /api has no service yet, and app goes only once it has/);
+    assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
+  });
+  await t.test("a deployment.json whose api is not the service's address", async () => {
+    const w = world();
+    fs.writeFileSync(w.outputsFile, outputsOf("novatrail-test-0", "https://novatrail-test-0.web.app", { api_origin: { value: "https://api-999999999999.us-east4.run.app" } }));
+    await assert.rejects(w.release(), /names api "https:\/\/api-123456789012\.us-east4\.run\.app", not the service's address, https:\/\/api-999999999999\.us-east4\.run\.app/);
+    assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
+  });
+  await t.test("outputs that name no api_origin", async () => {
+    const w = world();
+    fs.writeFileSync(w.outputsFile, outputsOf("novatrail-test-0", "https://novatrail-test-0.web.app", { api_origin: undefined }));
+    await assert.rejects(w.release(), /name no api_origin/);
+    assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
+  });
   for (const url of ["not a url", "foo://novatrail-test-0", "http://novatrail-test-0.web.app"]) {
     await t.test(`outputs whose hosting_url is ${url}`, async () => {
       const w = world();
-      fs.writeFileSync(w.outputsFile, JSON.stringify({ hosting_site: { value: "novatrail-test-0" }, hosting_url: { value: url } }));
+      fs.writeFileSync(w.outputsFile, outputsOf("novatrail-test-0", url));
       await assert.rejects(w.release(), /name hosting_url .*, which is no https URL/);
       assert.equal(hosting.calls.length, 0, "nothing is asked of Hosting");
     });
@@ -419,7 +442,7 @@ test("the command line says how it is used, and refuses with no token before any
 test("a copy's release goes to the copy's site, every call of it", async () => {
   const w = world();
   hosting.site = "acme-learning-1";
-  fs.writeFileSync(w.outputsFile, JSON.stringify({ hosting_site: { value: "acme-learning-1" }, hosting_url: { value: "https://acme-learning-1.web.app" } }));
+  fs.writeFileSync(w.outputsFile, outputsOf("acme-learning-1", "https://acme-learning-1.web.app"));
   await w.release();
   assert.match(hosting.released.versionName, /^sites\/acme-learning-1\/versions\/v\d+$/);
   assert.ok(hosting.calls.length > 5, "the release went through");

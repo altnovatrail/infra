@@ -37,8 +37,17 @@ output "deploy_service_account" {
 }
 
 output "api_service_url" {
-  description = "api's address on run.app, the one app calls; null until the service exists."
+  description = "api's address as the provider reads it from the service, null until the service exists: whether the service is there. The address /deployment.json names is api_origin."
   value       = one(google_cloud_run_v2_service.api[*].uri)
+}
+
+# The deterministic address of the service, which Cloud Run gives a service for its name, its
+# project's number and its region, and which is known before the service is: /deployment.json names
+# it with the first list (R05). api_service_name stays short enough for its jobs' names, so the DNS
+# segment of name and number stays under the 63 characters such an address may have.
+output "api_origin" {
+  description = "api's origin as /deployment.json names it: https://<service>-<project number>.<region>.run.app, known before the service exists."
+  value       = "https://${var.api_service_name}-${data.google_project.this.number}.${var.region}.run.app"
 }
 
 output "hosting_site" {

@@ -85,6 +85,11 @@ run "a_copy_signs_in_and_publishes_under_its_own_names" {
   }
 
   assert {
+    condition     = output.api_origin == "https://api-987654321098.europe-west3.run.app"
+    error_message = "The copy's api is at its own deterministic address, in its own region."
+  }
+
+  assert {
     condition     = output.project_id == "acme-learning-1" && output.region == "europe-west3" && output.hosting_site == "acme-learning-1" && output.app_sign_in.projectId == "acme-learning-1"
     error_message = "The outputs a deployment reads name the copy's project, region and site. The addresses the provider computes from them are not checked here: mock providers make them up."
   }
@@ -151,7 +156,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_cloud_run_v2_job_iam_member.deployer),
       jsonencode(google_cloud_run_v2_job_iam_member.scheduler),
       jsonencode(google_service_account_iam_member.deployer_runs_as_api),
-      jsonencode([output.project_id, output.region, output.hosting_site, output.app_sign_in, output.api_jobs, output.api_service_name, output.admission_facts_secret, output.admission_facts_file, output.deploy_environment, output.hosting_environment, output.eval_access]),
+      jsonencode([output.project_id, output.region, output.hosting_site, output.app_sign_in, output.api_jobs, output.api_service_name, output.admission_facts_secret, output.admission_facts_file, output.deploy_environment, output.hosting_environment, output.eval_access, output.api_origin]),
       ] : alltrue([for platform in ["novatrail", "us-east4", "344507087", "altnovatrail", "1425816333", "infra-github"] : !strcontains(text, platform)])
     ])
     error_message = "A resource of the copy carries the platform's name, region or numbers."

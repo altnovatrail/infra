@@ -49,6 +49,11 @@ run "with_no_image_there_is_no_service_and_no_job" {
   }
 
   assert {
+    condition     = output.api_origin == "https://api-123456789012.us-east4.run.app"
+    error_message = "api's deterministic address, which /deployment.json names, is known before the service: the service's name, the project's number and the region."
+  }
+
+  assert {
     condition     = length(google_cloud_scheduler_job.api) == 0 && length(google_service_account.scheduler) == 0
     error_message = "With no jobs, there is no schedule."
   }
