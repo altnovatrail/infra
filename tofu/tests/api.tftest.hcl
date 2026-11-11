@@ -79,12 +79,12 @@ run "the_first_image_makes_the_jobs_and_not_the_service" {
   }
 
   assert {
-    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["check", "migrate", "sweep"]) && length(google_cloud_run_v2_service.api) == 0
+    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["after", "check", "migrate", "sweep"]) && length(google_cloud_run_v2_service.api) == 0
     error_message = "With api_image and no api_serving, the jobs are made and the service is not."
   }
 
   assert {
-    condition     = length(google_cloud_run_v2_service_iam_member.public) == 0 && length(google_cloud_run_v2_service_iam_member.deployer) == 0 && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["check", "migrate", "sweep"])
+    condition     = length(google_cloud_run_v2_service_iam_member.public) == 0 && length(google_cloud_run_v2_service_iam_member.deployer) == 0 && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["after", "check", "migrate", "sweep"])
     error_message = "With no service, nobody may call it, and the deployment's role is on the jobs alone."
   }
 }
@@ -195,8 +195,8 @@ run "migrate_reads_its_secrets_as_files" {
   }
 
   assert {
-    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["check", "migrate", "sweep"]) && google_cloud_run_v2_job.api["migrate"].name == "api-migrate"
-    error_message = "The jobs are api-check, api-migrate and api-sweep, the three api's binary has."
+    condition     = toset(keys(google_cloud_run_v2_job.api)) == toset(["after", "check", "migrate", "sweep"]) && google_cloud_run_v2_job.api["migrate"].name == "api-migrate"
+    error_message = "The jobs are api-after, api-check, api-migrate and api-sweep, the four api's binary has."
   }
 
   assert {
@@ -303,6 +303,43 @@ run "sweep_runs_every_day_once_the_service_exists" {
       length([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e if e.name == "API_REQUEST_TIMEOUT"]) == 0
     )
     error_message = "Neither sweep nor its service sets API_REQUEST_TIMEOUT, so both take api's default, 30s: a job gets the value its service has, as api asks. A change to one is a change to both."
+  }
+}
+
+# after, by default: api's pass once the new revision takes all traffic, run by the deployment in
+# the part after, with the pooler's string of api alone, as a file from the service's own secret, a
+# timeout past its nine minutes, and no clock.
+run "after_runs_once_the_revision_takes_all_traffic" {
+  command = plan
+
+  variables {
+    api_image   = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_serving = true
+  }
+
+  assert {
+    condition     = google_cloud_run_v2_job.api["after"].name == "api-after" && google_cloud_run_v2_job.api["after"].template[0].template[0].containers[0].args == tolist(["after"]) && google_cloud_run_v2_job.api["after"].template[0].template[0].timeout == "900s" && output.api_jobs["after"].deploy == "after"
+    error_message = "api-after runs `api after`, in the part after, with 900s for a pass of nine minutes at most and its start."
+  }
+
+  assert {
+    condition = {
+      for e in google_cloud_run_v2_job.api["after"].template[0].template[0].containers[0].env : e.name => e.value
+      } == {
+      API_DATABASE_URL_FILE   = "/secrets/api-database-url/value"
+      API_FIREBASE_PROJECT_ID = "novatrail-test-0"
+    }
+    error_message = "after reads api's pooler's string alone, as a file: neither openfga, nor the facts, nor the rung."
+  }
+
+  assert {
+    condition     = [for v in google_cloud_run_v2_job.api["after"].template[0].template[0].volumes : v.secret[0].secret] == ["api-database-url"] && !contains(keys(google_secret_manager_secret.api_job), "api-database-url")
+    error_message = "after mounts the service's own secret, and no second secret of the same id is made."
+  }
+
+  assert {
+    condition     = !contains(keys(google_cloud_scheduler_job.api), "after")
+    error_message = "after runs in the deployment, never by the clock."
   }
 }
 
@@ -438,7 +475,7 @@ run "the_deployment_holds_what_its_steps_need_and_no_more" {
 
   # What the role holds is bootstrap.sh's, and its test holds it to the steps' rights.
   assert {
-    condition     = google_cloud_run_v2_service_iam_member.deployer[0].role == "projects/novatrail-test-0/roles/apiDeployer" && toset([for m in values(google_cloud_run_v2_job_iam_member.deployer) : m.role]) == toset(["projects/novatrail-test-0/roles/apiDeployer"]) && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["check", "migrate", "sweep"])
+    condition     = google_cloud_run_v2_service_iam_member.deployer[0].role == "projects/novatrail-test-0/roles/apiDeployer" && toset([for m in values(google_cloud_run_v2_job_iam_member.deployer) : m.role]) == toset(["projects/novatrail-test-0/roles/apiDeployer"]) && toset(keys(google_cloud_run_v2_job_iam_member.deployer)) == toset(["after", "check", "migrate", "sweep"])
     error_message = "The deployment's role, apiDeployer, which bootstrap.sh makes, is granted on the service and on each job, not on the project."
   }
 

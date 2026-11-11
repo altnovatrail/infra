@@ -181,14 +181,17 @@ variable "api_jobs" {
   }))
   nullable = false
 
-  # The jobs api's binary has so far (api README, v0.1.16). check checks the deployment's facts and
+  # The jobs api's binary has (api README, v0.1.20). check checks the deployment's facts and
   # rung for admission to AI, before the migrations, and reads no database: the configuration gives
   # it the facts and the rung itself (R05; R45 api). migrate applies the migrations of both
   # databases with each deployment. sweep is the daily pass that finishes the deletions a request
   # left and deletes what is past its term: by the clock, at 09:00 UTC, night in every time zone of
   # the US, where the platform's learners are (R109 spec). A pass runs 9 minutes at most, sweep's
-  # -for, and reads what serve opens: the pooler's strings, the service's own secrets. The job after
-  # the rollout joins the list when api's release names it.
+  # -for, and reads what serve opens: the pooler's strings, the service's own secrets. after is the
+  # pass the deployment runs once the new revision takes all traffic: it closes "unchecked" what is
+  # open on packages the image no longer gives (the 2026-11-08 amendment to R106 spec; R51 api). It
+  # reads api's pooler's string alone, the service's own secret, and the packages at the image's
+  # API_PACKAGES_DIR, and its pass runs 9 minutes at most, as sweep's does.
   default = {
     check = {
       args   = ["check"]
@@ -200,6 +203,14 @@ variable "api_jobs" {
       secrets = {
         API_MIGRATE_DATABASE_URL         = "api-migrate-database-url"
         API_MIGRATE_OPENFGA_DATABASE_URL = "api-migrate-openfga-database-url"
+      }
+    }
+    after = {
+      args    = ["after"]
+      deploy  = "after"
+      timeout = "900s"
+      secrets = {
+        API_DATABASE_URL = "api-database-url"
       }
     }
     sweep = {
