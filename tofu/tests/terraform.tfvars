@@ -46,6 +46,14 @@ api_jobs = {
       API_MIGRATE_OPENFGA_DATABASE_URL = "api-migrate-openfga-database-url"
     }
   }
+  after = {
+    args    = ["after"]
+    deploy  = "after"
+    timeout = "900s"
+    secrets = {
+      API_DATABASE_URL = "api-database-url"
+    }
+  }
   sweep = {
     args     = ["sweep"]
     schedule = "0 9 * * *"

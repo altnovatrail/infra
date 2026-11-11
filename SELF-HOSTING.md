@@ -153,7 +153,7 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-> **A first deployment has not run yet, on the platform or a copy.** Nothing in the code stands in its way since `api` v0.1.16, whose `api check` the default `api_jobs` runs before the migrations. `app` has no release yet, and the job `api` runs after a rollout comes with a later release of `api`. This section and the next say what the list is made of and how the deployment goes; epic E4 of [RUN.md](RUN.md) checks both against the platform's first deployment.
+> **A first deployment has not run yet, on the platform or a copy.** Nothing in the code stands in its way: the default `api_jobs` runs `api check` before the migrations and `api after` once the new revision takes all traffic, both of `api` v0.1.20. `app` has no release yet. This section and the next say what the list is made of and how the deployment goes; epic E4 of [RUN.md](RUN.md) checks both against the platform's first deployment.
 
 The deployment ships what `deploy/` names. A pull request that changes it is checked before the merge, and the merge deploys what changed (R05).
 
@@ -175,7 +175,7 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
 - **`deploy/production/facts.json`** — the deployment facts your copy declares for `api`'s admission to AI, by provider and fact, each to the age categories it holds for. For example, `{"openai": {"data_processing_agreement": ["adult"]}}`. The providers and facts it may name, and its form, are `spec`'s admission table (`spec/admission/admission-table.json` and `$defs/declared_facts` in `spec/admission/schemas/answer-vector.schema.json`). A copy declares only what is true of its own contracts with AI providers. The platform's facts are not yours.
 - **The databases.** `api` keeps its data in two Postgres databases, its own and OpenFGA's. The platform's are on Neon (R03 api). You add four connection strings yourself, as the values of secrets the configuration makes, with `gcloud secrets versions add`:
   - the direct ones, for the migrations: `api-migrate-database-url` and `api-migrate-openfga-database-url`;
-  - the pooler's, for the service and for `sweep`: `api-database-url` and `api-openfga-database-url`. The service reads them at its start and does not start without them.
+  - the pooler's, for the service, for `sweep` and, `api-database-url` alone, for `after`: `api-database-url` and `api-openfga-database-url`. The service reads them at its start and does not start without them.
 
   Add all four before you set `api_image`: the jobs that come with it mount them.
 
