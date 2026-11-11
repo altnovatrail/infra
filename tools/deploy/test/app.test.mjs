@@ -136,6 +136,8 @@ function world({ tag = "v0.3.0", builds = { "v0.3.0": ["index-new.js"], "v0.2.0"
     for (const asset of assets) fs.writeFileSync(path.join(build, "assets", asset), `// ${asset} of ${release}`);
     fs.writeFileSync(path.join(build, "deployment.schema.json"), JSON.stringify(deploymentSchema));
     fs.writeFileSync(path.join(build, "csp.json"), JSON.stringify(cspTable));
+    fs.writeFileSync(path.join(build, "NOTICE"), `Notices of the code app ${release} bundles.\n`);
+    fs.writeFileSync(path.join(build, "LICENSE"), "Apache License, Version 2.0\n");
     if (release === tag) change?.(build);
     const name = `app_${release}.tar.gz`;
     const folder = path.join(releases, "app", release);
@@ -177,6 +179,8 @@ function world({ tag = "v0.3.0", builds = { "v0.3.0": ["index-new.js"], "v0.2.0"
       answer = fs.existsSync(file)
         ? { status: 200, body: fs.readFileSync(file), headers: { "x-content-type-options": "nosniff", "cache-control": "public, max-age=31536000, immutable" } }
         : { status: 404, body: "not found", headers: {} };
+    } else if (where === "/NOTICE" || where === "/LICENSE") {
+      answer = { status: 200, body: fs.readFileSync(path.join(own, where)), headers: page };
     } else if (where === "/deployment.json") {
       answer = { status: 200, body: deploymentText, headers: { ...page, "content-type": "application/json" } };
     } else {
@@ -214,13 +218,13 @@ test("a first release: the build and deployment.json in one version, configured,
       "GET /v1beta1/sites/novatrail-test-0/channels/live",
       "POST /v1beta1/sites/novatrail-test-0/versions",
       "POST /v1beta1/sites/novatrail-test-0/versions/v*:populateFiles",
-      ...Array(5).fill("POST /upload/sites/novatrail-test-0/versions/v*/<hash>"),
+      ...Array(7).fill("POST /upload/sites/novatrail-test-0/versions/v*/<hash>"),
       "PATCH /v1beta1/sites/novatrail-test-0/versions/v*?update_mask=status",
       `POST /v1beta1/sites/novatrail-test-0/releases?versionName=${encodeURIComponent("sites/novatrail-test-0/versions/")}v*`,
     ],
   );
   const files = releasedFiles();
-  assert.deepEqual(Object.keys(files).sort(), ["/assets/index-new.js", "/csp.json", "/deployment.json", "/deployment.schema.json", "/index.html"]);
+  assert.deepEqual(Object.keys(files).sort(), ["/LICENSE", "/NOTICE", "/assets/index-new.js", "/csp.json", "/deployment.json", "/deployment.schema.json", "/index.html"]);
   assert.equal(files["/index.html"], "<!doctype html><title>app v0.3.0</title>");
   assert.deepEqual(JSON.parse(files["/deployment.json"]), deployment);
   assert.equal(hosting.released.message, releaseMessage({ release: "v0.3.0", archive: w.archives["v0.3.0"].archive }));
@@ -251,7 +255,7 @@ test("the next release keeps the assets of the build released, verified again, a
   hosting.live = { release: { name: "sites/novatrail-test-0/releases/r0", message: releaseMessage(w.archives["v0.2.0"]) } };
   const lines = await w.release();
   const files = releasedFiles();
-  assert.deepEqual(Object.keys(files).sort(), ["/assets/index-new.js", "/assets/index-old.js", "/csp.json", "/deployment.json", "/deployment.schema.json", "/index.html"]);
+  assert.deepEqual(Object.keys(files).sort(), ["/LICENSE", "/NOTICE", "/assets/index-new.js", "/assets/index-old.js", "/csp.json", "/deployment.json", "/deployment.schema.json", "/index.html"]);
   assert.equal(files["/assets/index-old.js"], "// index-old.js of v0.2.0");
   assert.equal(files["/index.html"], "<!doctype html><title>app v0.3.0</title>");
   assert.match(lines.join("\n"), /app v0\.2\.0 came before: its 1 files of assets\/ are kept/);
@@ -292,7 +296,7 @@ test("only the files Hosting asks for are uploaded", async () => {
   const known = zlib.gzipSync(fs.readFileSync(path.join(w.archives["v0.3.0"].build, "index.html")), { level: 9 });
   hosting.known.add(hash(known));
   await w.release();
-  assert.equal(hosting.calls.filter((c) => c.startsWith("POST /upload/")).length, 4);
+  assert.equal(hosting.calls.filter((c) => c.startsWith("POST /upload/")).length, 6);
   assert.equal(hosting.versions[hosting.released.versionName].status, "FINALIZED");
 });
 
@@ -300,7 +304,7 @@ test("more than a thousand files go in batches of a thousand", async () => {
   const many = Array.from({ length: 1001 }, (_, i) => `chunk-${i}.js`);
   await world({ builds: { "v0.3.0": many } }).release();
   assert.equal(hosting.calls.filter((c) => c.includes(":populateFiles")).length, 2);
-  assert.equal(Object.keys(hosting.versions[hosting.released.versionName].files).length, 1005);
+  assert.equal(Object.keys(hosting.versions[hosting.released.versionName].files).length, 1007);
 });
 
 test("refusals before anything is made on Hosting", async (t) => {
@@ -328,6 +332,16 @@ test("refusals before anything is made on Hosting", async (t) => {
   await t.test("a build with a deployment.json of its own", async () => {
     const w = world({ change: (b) => fs.writeFileSync(path.join(b, "deployment.json"), "{}") });
     await assert.rejects(w.release(), /holds a deployment\.json of its own/);
+  });
+  await t.test("a build with no LICENSE", async () => {
+    const w = world({ change: (b) => fs.rmSync(path.join(b, "LICENSE")) });
+    await assert.rejects(w.release(), /holds no LICENSE at its root/);
+    assert.ok(!hosting.calls.some((c) => c.includes("/versions")), hosting.calls.join("\n"));
+  });
+  await t.test("a build with no NOTICE", async () => {
+    const w = world({ change: (b) => fs.rmSync(path.join(b, "NOTICE")) });
+    await assert.rejects(w.release(), /holds no NOTICE at its root/);
+    assert.ok(!hosting.calls.some((c) => c.includes("/versions")), hosting.calls.join("\n"));
   });
   await t.test("a build whose csp.json is not a table of directives", async () => {
     const w = world({ change: (b) => fs.writeFileSync(path.join(b, "csp.json"), JSON.stringify("default-src 'none'")) });
@@ -410,6 +424,9 @@ test("the check after the release says every answer that is wrong", async (t) =>
     ["deployment.json moved elsewhere", { "/deployment.json": () => ({ status: 301, body: "", headers: { location: "/index.html" } }) }, /\/deployment\.json answered 301, not 200/],
     ["another page at /", { "/": (a) => (a.headers["content-type"] === "text/html" ? { ...a, body: "<!doctype html><title>old</title>" } : a) }, /^ {2}\/ answered other bytes than index\.html$/m],
     ["Cross-Origin-Opener-Policy: same-origin", { "/": (a) => ({ ...a, headers: { ...a.headers, "cross-origin-opener-policy": "same-origin" } }) }, /sent Cross-Origin-Opener-Policy: same-origin, which breaks the window of sign-in/],
+    ["the page in place of NOTICE", { "/NOTICE": (a) => ({ ...a, body: "<!doctype html>" }) }, /\/NOTICE answered other bytes than the build's NOTICE/],
+    ["a NOTICE that may be cached", { "/NOTICE": (a) => ({ ...a, headers: { ...a.headers, "cache-control": "public, max-age=31536000, immutable" } }) }, /\/NOTICE sent cache-control: public, max-age=31536000, immutable, not \/no-cache\//],
+    ["no LICENSE on the site", { "/LICENSE": () => ({ status: 404, body: "not found", headers: {} }) }, /\/LICENSE answered 404, not 200/],
     ["no nosniff on a file of /assets/", { "/assets/index-new.js": (a) => ({ ...a, headers: { "cache-control": "immutable" } }) }, /\/assets\/index-new\.js sent x-content-type-options: nothing, not nosniff/],
   ];
   for (const [name, breaks, message] of cases) {

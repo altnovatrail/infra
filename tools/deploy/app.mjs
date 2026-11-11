@@ -246,7 +246,8 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
 
 // What the site answers, against the build (R06): index.html's bytes, with its headers, at / and
 // at a path of the SPA; a file of assets/ with its own; a 404 for a file of /assets/ that is not
-// there; deployment.json as app reads it. Every answer is checked, and every one that is wrong is
+// there; deployment.json as app reads it; the build's NOTICE and LICENSE at /NOTICE and /LICENSE
+// (the 2026-11-11 amendment to R85 spec). Every answer is checked, and every one that is wrong is
 // said.
 async function answers({ url, build, deploymentFile, csp, fetchSite = fetch }) {
   const random = crypto.randomBytes(6).toString("hex");
@@ -281,9 +282,12 @@ async function answers({ url, build, deploymentFile, csp, fetchSite = fetch }) {
   holds(`/${asset}`, await ask(`/${asset}`), { status: 200, body: fs.readFileSync(path.join(build, asset)), of: asset, headers: { "x-content-type-options": "nosniff", "cache-control": /immutable/ } });
   holds(`/assets/gone-${random}.js`, await ask(`/assets/gone-${random}.js`), { status: 404 });
   holds("/deployment.json", await ask("/deployment.json"), { status: 200, body: deployment, of: "production/deployment.json", headers: { "content-type": /^application\/json/, "cache-control": /no-cache/ } });
+  // A path outside /assets/**, with no extension: its type is sniffed unless nosniff holds it.
+  const notices = { "x-content-type-options": "nosniff", "cache-control": /no-cache/ };
+  for (const notice of ["NOTICE", "LICENSE"]) holds(`/${notice}`, await ask(`/${notice}`), { status: 200, body: fs.readFileSync(path.join(build, notice)), of: `the build's ${notice}`, headers: notices });
 
   if (wrong.length) throw new Refusal(`${url} does not answer as the release has it:\n  ${wrong.join("\n  ")}`);
-  return [`${url} answers as the release has it: the page at / and at a path of the SPA, ${asset}, a 404 under /assets/, deployment.json`];
+  return [`${url} answers as the release has it: the page at / and at a path of the SPA, ${asset}, a 404 under /assets/, deployment.json, NOTICE and LICENSE`];
 }
 
 export async function check({ outputsFile, deployDir = path.join(ROOT, "deploy"), standIns = {}, fetchSite } = {}) {
