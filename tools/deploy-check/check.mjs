@@ -186,9 +186,10 @@ export function deploymentOfTheList(app, deploymentFile) {
 }
 
 // What a build of app holds at the root of its archive, and what a release of it is made of: its
-// page, its assets, the schema of /deployment.json and the table of the CSP header; never a
-// deployment.json of its own, which is the deployment's (architecture 3.7 app; R17).
-const BUILD_FILES = ["index.html", "deployment.schema.json", "csp.json"];
+// page, its assets, the schema of /deployment.json, the table of the CSP header and the notices of
+// the licenses of what it bundles, NOTICE and LICENSE (the 2026-11-11 amendment to R85 spec); never
+// a deployment.json of its own, which is the deployment's (architecture 3.7 app; R17).
+const BUILD_FILES = ["index.html", "deployment.schema.json", "csp.json", "NOTICE", "LICENSE"];
 
 // The archive of a build unpacked into dir, once its listing shows nothing but files and folders
 // under it: no link, no device, no path that is absolute or climbs out with "..". The release is

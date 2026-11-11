@@ -81,6 +81,8 @@ function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, 
   fs.writeFileSync(path.join(build, "assets", "index-1a2b3c.js"), "console.log(1)");
   if (schema) fs.writeFileSync(path.join(build, "deployment.schema.json"), JSON.stringify(schema));
   if (csp !== null) fs.writeFileSync(path.join(build, "csp.json"), JSON.stringify(csp));
+  fs.writeFileSync(path.join(build, "NOTICE"), "Notices of the code this build bundles.\n");
+  fs.writeFileSync(path.join(build, "LICENSE"), "Apache License, Version 2.0\n");
   change?.(build);
   const archivePath = path.join(dir, "app_v0.3.0.tar.gz");
   assert.equal(spawnSync("/usr/bin/tar", ["-czf", archivePath, "-C", build, "."]).status, 0);
@@ -217,6 +219,8 @@ test("refusals, each on its own", async (t) => {
     ["a build with no schema", { schema: null }, undefined, /holds no deployment\.schema\.json at its root/],
     ["a build's schema of another dialect", { schema: { ...deploymentSchema, $schema: "http://json-schema.org/draft-07/schema#" } }, undefined, /is not of JSON Schema 2020-12/],
     ["a build with no csp.json", { csp: null }, undefined, /holds no csp\.json at its root/],
+    ["a build with no NOTICE", { build: (b) => fs.rmSync(path.join(b, "NOTICE")) }, undefined, /holds no NOTICE at its root/],
+    ["a build with no LICENSE", { build: (b) => fs.rmSync(path.join(b, "LICENSE")) }, undefined, /holds no LICENSE at its root/],
     ["a build with no asset", { build: (b) => fs.rmSync(path.join(b, "assets", "index-1a2b3c.js")) }, undefined, /holds no file under assets\//],
     ["a build with a deployment.json of its own", { build: (b) => fs.writeFileSync(path.join(b, "deployment.json"), "{}") }, undefined, /holds a deployment\.json of its own/],
     ["a build with a link", { build: (b) => fs.symlinkSync("/etc/passwd", path.join(b, "assets", "passwd")) }, undefined, /holds \.\/assets\/passwd, which is neither a file nor a folder/],
