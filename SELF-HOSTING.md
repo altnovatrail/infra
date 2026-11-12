@@ -179,16 +179,19 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
 
   Add all four before you set `api_image`: the jobs that come with it mount them.
 
-  Each must ask for `sslmode=verify-full`: `api` refuses any other, and its jobs stop with "must ask for sslmode=verify-full" (`api`'s README). Neon's Connect window gives `sslmode=require`; change it. In Cloud Shell, or wherever `gcloud` is signed in as an owner of your project, this asks for each string without echoing it, mends its `sslmode` and adds it:
+  Each must ask for `sslmode=verify-full`, as `api`'s README says: on the platform, a string without it stopped the job `api-migrate` with "API_MIGRATE_DATABASE_URL must ask for sslmode=verify-full". Neon's Connect window gives `sslmode=require`; change it. In Cloud Shell, or wherever `gcloud` is signed in as an owner of your project, this asks for each string without echoing it, mends its `sslmode`, and adds it, or asks again for a string it cannot take. The first two are the direct strings; on Neon, the pooler's host has `-pooler` in its name and the direct one has not.
 
   ```bash
   for s in api-migrate-database-url api-migrate-openfga-database-url api-database-url api-openfga-database-url; do
-    read -rsp "$s: " v; echo
-    v="${v/sslmode=require/sslmode=verify-full}"
-    [[ "$v" == *sslmode=verify-full* ]] || { echo "$s has no sslmode=verify-full"; continue; }
+    while :; do
+      read -rsp "$s: " v; echo
+      v="${v/sslmode=require/sslmode=verify-full}"
+      [[ "$v" == *sslmode=verify-full* ]] && break
+      echo "$s: no sslmode=verify-full, give it again"
+    done
     printf '%s' "$v" | gcloud secrets versions add "$s" --project=<project_id> --data-file=-
-    unset v
   done
+  unset v
   ```
 
   A string goes from Neon to the secret and nowhere else: not into a file of the repository, not into a chat.
@@ -207,14 +210,21 @@ After a merge, the workflow delivers only the parts of the list that changed: `a
 6. Let your learners in. `api` takes nobody from a country you have not allowed, and an account is made only by an invite code. Both are commands of `api`'s binary that you run yourself, not jobs of the deployment: "a job's output is kept in its log, the code with it" (`api`'s README). In Cloud Shell, with the binary of your list's release checked against its sha256 in `deploy/production.json` and the pooler's string read from its secret:
 
    ```bash
-   cd ~ && curl -fsSLo api https://github.com/altnovatrail/api/releases/download/<tag>/api_<tag>_linux_amd64
-   echo "<sha256 of the binary>  api" | sha256sum --check && chmod +x api
-   export API_DATABASE_URL="$(gcloud secrets versions access latest --secret=api-database-url --project=<project_id>)"
-   ./api countries allow US     # once for each country, here the platform's own
-   ./api countries list
-   ./api invite                 # once for each learner: its last line is the code
-   unset API_DATABASE_URL; rm -f api
+   (
+     set -euo pipefail
+     cd ~ && rm -f api
+     curl -fsSLo api https://github.com/altnovatrail/api/releases/download/<tag>/api_<tag>_linux_amd64
+     echo "<sha256 of the binary>  api" | sha256sum --check
+     chmod +x api
+     export API_DATABASE_URL="$(gcloud secrets versions access latest --secret=api-database-url --project=<project_id>)"
+     ./api countries allow US     # once for each country, here the platform's own
+     ./api countries list
+     ./api invite                 # once for each learner: its last line is the code
+   )
+   rm -f ~/api
    ```
+
+   The block runs in a subshell that stops at the first failure: a binary that fails its sha256 never runs, and the string leaves with the subshell.
 
    Each code makes one account, and you hand it to the learner yourself. A learner who signs in with Google and gives the code has an account.
 
