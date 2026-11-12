@@ -50,11 +50,19 @@ const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 // The programs the checks run, by absolute path, as spec's tools run theirs (spec/tools/shared.mjs):
-// no directory on PATH decides which program runs. just is the toolchain stage's, in /usr/local/bin;
-// git the devcontainers base image's, or else the system's; tar the system's.
-const JUST = first(["/usr/local/bin/just"]);
+// no directory on PATH decides which program runs. just is the one that runs the recipe, whose path
+// the justfile exports as INFRA_JUST: the toolchain stage's /usr/local/bin/just, or, on a runner of
+// the workflow Deploy, the one tools/ci/install.sh put in a folder no fixed path names (T24). Run
+// outside a recipe, it is the toolchain stage's. git is the devcontainers base image's, or else the
+// system's; tar the system's.
+const JUST = justProgram(process.env.INFRA_JUST);
 const GIT = first(["/usr/local/bin/git", "/usr/bin/git", "/bin/git"]);
 const TAR = first(["/usr/bin/tar", "/bin/tar"]);
+
+// The just that runs release-verify: the absolute path a recipe names, or the toolchain stage's.
+export function justProgram(named) {
+  return named && path.isAbsolute(named) ? named : first(["/usr/local/bin/just"]);
+}
 
 // The first of the paths that exists, or the first of them, which then fails by its own name.
 function first(paths) {
