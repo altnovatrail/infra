@@ -11,7 +11,8 @@
 //      deployment configuration at the tag of the submodule — its schema and its rules — and by the
 //      deployment.schema.json of the archive of that build, whose version is spec's (R85 spec); the
 //      archive holding what a release of the build is made of, and its csp.json making the header
-//      of that deployment.json (R17);
+//      of that deployment.json (R17); its api, the address of api's service, the output api_origin,
+//      by the project tofu/ci.env names and the values of tofu/production.auto.tfvars (R05);
 //   5. production/facts.json, by the facts a deployment declares in spec's admission schemas, with
 //      every provider and fact of the dictionary of spec's admission table, at the tag of the
 //      submodule: an early sign, since api checks the file again with its own table (R25 api);
@@ -30,6 +31,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readingOf } from "./reading.mjs";
+import { PROVIDER } from "./setup.mjs";
 
 const require = createRequire(import.meta.url);
 const Ajv2020 = require("ajv/dist/2020").default;
@@ -155,11 +157,16 @@ function git(cwd, args) {
   return spawnSync(GIT, ["-C", cwd, ...args], { encoding: "utf8" });
 }
 
+// The top of the git repository deployDir is in; `unread` says what is lost when it is in none.
+function repositoryOf(deployDir, unread) {
+  const top = git(deployDir, ["rev-parse", "--show-toplevel"]);
+  if (top.status !== 0) throw new Refusal(`${deployDir} is not in a git repository, and ${unread}`);
+  return top.stdout.trim();
+}
+
 // The list at the base, or null when the base has none.
 function baseList(base, deployDir) {
-  const top = git(deployDir, ["rev-parse", "--show-toplevel"]);
-  if (top.status !== 0) throw new Refusal(`${deployDir} is not in a git repository, and the base ${base} cannot be read`);
-  const root = top.stdout.trim();
+  const root = repositoryOf(deployDir, `the base ${base} cannot be read`);
   if (git(root, ["rev-parse", "--verify", "--quiet", `${base}^{commit}`]).status !== 0) {
     throw new Refusal(`the base ${base} is not a commit here: fetch it before the check`);
   }
@@ -261,6 +268,53 @@ export function buildDeployment(build) {
 
 export function readDeployment(deploymentFile) {
   return readJson(deploymentFile, "production/deployment.json");
+}
+
+// The lines of a file of tofu/, or null when it is not there.
+function linesOf(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n") : null;
+}
+
+// The string a line `<name> = "<value>"` of a file of values gives the variable, or null: line by
+// line, with no regular expression over the whole text, which would backtrack (S8786).
+export function valueOf(lines, name) {
+  for (const line of lines ?? []) {
+    const at = line.indexOf("=");
+    if (at > 0 && line.slice(0, at).trim() === name) return /^"([^"]*)"/.exec(line.slice(at + 1).trim())?.[1] ?? null;
+  }
+  return null;
+}
+
+// The string default of the variable name in a file of the configuration, or null: the line
+// `default = "<value>"` of its block, which tofu fmt leaves at the top level of the block.
+export function defaultOf(lines, name) {
+  const start = (lines ?? []).indexOf(`variable "${name}" {`);
+  if (start < 0) return null;
+  for (const line of lines.slice(start + 1)) {
+    if (line === "}") return null;
+    const at = line.indexOf("=");
+    if (at > 0 && line.slice(0, at).trim() === "default") return /^"([^"]*)"/.exec(line.slice(at + 1).trim())?.[1] ?? null;
+  }
+  return null;
+}
+
+// api's address as the configuration makes it, the output api_origin of tofu/outputs.tf:
+// https://<api_service_name>-<the project's number>.<region>.run.app (R05). The number is in the
+// provider of the federated pool tofu/ci.env names (R13); the region and the service's name are the
+// values of tofu/production.auto.tfvars, and the name, when they leave it out, its default in
+// tofu/variables.tf. Null with no tofu/ci.env in the repository: no project to compare with.
+export function serviceOrigin(root) {
+  const env = linesOf(path.join(root, "tofu", "ci.env"));
+  if (!env) return null;
+  const named = "GCP_WORKLOAD_IDENTITY_PROVIDER=";
+  const number = PROVIDER.exec(env.find((line) => line.startsWith(named))?.slice(named.length).trim() ?? "")?.[1];
+  if (!number) throw new Refusal("tofu/ci.env names no provider of a federated pool in GCP_WORKLOAD_IDENTITY_PROVIDER, and the number of the project of api's service is not known");
+  const values = linesOf(path.join(root, "tofu", "production.auto.tfvars"));
+  const region = valueOf(values, "region");
+  if (!region) throw new Refusal("tofu/production.auto.tfvars names no region, and the region of api's service is not known");
+  const name = valueOf(values, "api_service_name") ?? defaultOf(linesOf(path.join(root, "tofu", "variables.tf")), "api_service_name");
+  if (!name) throw new Refusal("neither tofu/production.auto.tfvars nor the default in tofu/variables.tf names api_service_name, and the name of api's service is not known");
+  return `https://${name}-${number}.${region}.run.app`;
 }
 
 // deployment, the parsed /deployment.json, read as spec's deployment configuration reads it, with
@@ -428,6 +482,15 @@ export async function run(deployDir, base, standIns = {}) {
       deployment = readDeployment(deploymentFile);
       deploymentReadBySpec(spec, deployment, HOSTED_ORIGIN);
       return `production/deployment.json is accepted by spec's reading of the deployment configuration ${spec.version}`;
+    });
+    // The release of app compares the same once the configuration is applied, by its outputs (R17);
+    // here, before the merge, by the files the outputs come from.
+    await step("production/deployment.json names api at its service's address", () => {
+      if (!deployment) return "api in production/deployment.json is not compared with its service's address: the file was not read";
+      const origin = serviceOrigin(repositoryOf(deployDir, "the address of api's service cannot be read"));
+      if (!origin) return "api in production/deployment.json is not compared with its service's address: the repository has no tofu/ci.env, and so no project";
+      if (deployment.api !== origin) throw new Refusal(`production/deployment.json names api ${JSON.stringify(deployment.api)}, not its service's address, ${origin}: the output api_origin, by the project of tofu/ci.env and the values of tofu/production.auto.tfvars (R05)`);
+      return `production/deployment.json names api at its service's address, ${origin}`;
     });
     await step("the build reads spec's version of the deployment configuration", () => {
       if (!build) return `the build's version of the deployment configuration is not read: ${app.archive.name} was refused`;

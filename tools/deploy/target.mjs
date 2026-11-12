@@ -44,6 +44,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
+import { PROVIDER } from "../deploy-check/setup.mjs";
 
 export class Refusal extends Error {}
 
@@ -225,7 +226,7 @@ export function identity(file) {
   }
   const provider = values.GCP_WORKLOAD_IDENTITY_PROVIDER;
   const account = values.GCP_CONFIG_SERVICE_ACCOUNT;
-  if (!/^projects\/[0-9]+\/locations\/global\/workloadIdentityPools\/[a-z0-9-]+\/providers\/[a-z0-9-]+$/.test(provider ?? "")) throw new Refusal(`${file} names no provider of a federated pool in GCP_WORKLOAD_IDENTITY_PROVIDER`);
+  if (!PROVIDER.test(provider ?? "")) throw new Refusal(`${file} names no provider of a federated pool in GCP_WORKLOAD_IDENTITY_PROVIDER`);
   if (!/^infra-config@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$/.test(account ?? "")) throw new Refusal(`${file} names no infra-config identity of a project in GCP_CONFIG_SERVICE_ACCOUNT`);
   const extra = Object.keys(values).filter((key) => !["GCP_WORKLOAD_IDENTITY_PROVIDER", "GCP_CONFIG_SERVICE_ACCOUNT"].includes(key));
   if (extra.length) throw new Refusal(`${file} holds ${extra.join(", ")}, which it does not name`);
