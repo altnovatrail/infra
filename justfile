@@ -262,7 +262,10 @@ _tf-grants:
 
 # Every variable of the configuration is set in tofu/tests/terraform.tfvars: tofu test reads the
 # deployment's tofu/production.auto.tfvars too, and a variable this file leaves out would take the
-# deployment's value into every test (T30).
+# deployment's value into every test (T30). One with a default is set to null there, which gives it
+# its default: a copy of the default instead would let a mistake in the default itself pass every
+# test (Д19). Null gives the default only where the variable is `nullable = false`, or where the
+# default is null itself; a nullable one with another default would take the null.
 _tf-test-values:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -272,6 +275,14 @@ _tf-test-values:
     if [ -n "$missing" ]; then
         echo "tf-check: tofu/tests/terraform.tfvars does not set these variables, so a deployment's values would reach the tests:" >&2
         echo "$missing" >&2
+        exit 1
+    fi
+    defaulted=$(awk '/^variable "/ { name = $2; gsub(/"/, "", name); given = 0; none = 0; kept = 0 } /^  default[[:space:]]*=/ && name != "" { given = 1; none = /^  default[[:space:]]*=[[:space:]]*null[[:space:]]*$/ } /^  nullable[[:space:]]*=[[:space:]]*false[[:space:]]*$/ && name != "" { kept = 1 } /^}/ { if (name != "" && given && (none || kept)) print name; name = "" }' {{ quote(tofu_dir) }}/*.tf | sort -u)
+    null_in_tests=$(sed -n 's/^\([a-z0-9_]*\)[[:space:]]*=[[:space:]]*null[[:space:]]*$/\1/p' {{ quote(tofu_dir) }}/tests/terraform.tfvars | sort -u)
+    copies=$(comm -23 <(printf '%s\n' "$defaulted") <(printf '%s\n' "$null_in_tests"))
+    if [ -n "$copies" ]; then
+        echo "tf-check: tofu/tests/terraform.tfvars sets these variables with a default to something but null, so the tests would not read their default (Д19):" >&2
+        echo "$copies" >&2
         exit 1
     fi
 
@@ -334,8 +345,10 @@ deploy-check base="origin/main": _tools
 
 # What CI runs: deploy-check, when the pull request changes against base what the list is checked
 # or deployed by — deploy/, the checks, the deployment of tools/deploy/, their packages, this file,
-# or the tag of spec, whose admission table and release-verify the checks read — and otherwise
-# nothing, so that a pull request of documents downloads no release.
+# the tag of spec, whose admission table and release-verify the checks read, or tofu/variables.tf,
+# whose default names api's service — and otherwise nothing, so that a pull request of documents
+# downloads no release. Not tofu/ci.env or the values: a fork's first pull request changes them
+# alone, while its list is still the platform's, with the platform's address of api (R14).
 ci-deploy-check base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -344,7 +357,7 @@ ci-deploy-check base="origin/main":
         echo "ci-deploy-check: the base ${base} is not a commit here: fetch it before the check" >&2
         exit 1
     fi
-    changed=$(git diff --name-only "${base}...HEAD" -- deploy tools/deploy-check tools/deploy tools/package.json tools/package-lock.json justfile spec)
+    changed=$(git diff --name-only "${base}...HEAD" -- deploy tools/deploy-check tools/deploy tools/package.json tools/package-lock.json justfile spec tofu/variables.tf)
     if [ -z "$changed" ]; then
         echo "ci-deploy-check: nothing the list is checked by changes against ${base}, and the list is not checked"
         exit 0

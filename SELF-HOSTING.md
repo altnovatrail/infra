@@ -2,7 +2,7 @@
 
 This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). Those are in Russian, and this guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine).
 
-> **Status, 2026-11-10.** Everything up to [Your list](#8-your-list) has run on the platform's own project (`novatrail`) and is held by tests on a copy's values, except the steps it marks as not checked. A first deployment cannot be finished yet, on the platform or a copy: the start of [Your list](#8-your-list) says why, and epic E4 of [RUN.md](RUN.md) removes what stands in its way. Sections 8 and 9 are written from the code and will be checked against the platform's first deployment. Section 12, a local run, has not run either: `app` has no code yet.
+> **Status, 2026-11-12.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. Section 12, a local run, is checked against the author's first run from source, on 2026-11-12.
 
 ## 1. What a copy is
 
@@ -44,7 +44,7 @@ If your billing account is a free trial, upgrade it to a paid account before the
 
 ## 3. Your values
 
-Your fork carries the platform's own `tofu/production.auto.tfvars`, `tofu/backend.hcl` and `tofu/ci.env`. **Replace all three** with yours in your first commit, and drop the platform's `eval_github_subject_prefixes`. Until then, a push to your `main` runs `Deploy` against the platform's project, and it fails to sign in: the platform's pool admits only the platform's repository.
+Your fork carries the platform's own `tofu/production.auto.tfvars`, `tofu/backend.hcl` and `tofu/ci.env`. **Replace all three** with yours in your first commit. Keep none of the platform's values: not its `api_image`, an image in the platform's own registry, nor `api_serving`, nor `eval_github_subject_prefixes`. Until then, a push to your `main` runs `Deploy` against the platform's project, and it fails to sign in: the platform's pool admits only the platform's repository.
 
 Write `tofu/production.auto.tfvars`. It is committed: nothing in it is a secret.
 
@@ -60,7 +60,7 @@ github_oidc_subject_prefix = "repo:acme@555/platform@777"
 ```
 
 - **`project_id`** — your new project's ID: 6 to 30 lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen. It is permanent, and it names your app's address `https://<project_id>.web.app` and its sign-in domain `<project_id>.firebaseapp.com`.
-- **`region`** — where everything regional lives: the services and jobs, the images, the secrets' replicas, the logs and the traces. The platform's region is `us-east4`, chosen for its learners (R04). Yours is yours.
+- **`region`** — where everything regional lives: the services and jobs, the schedule of `sweep`, the images, the secrets' replicas, the logs and the traces. The platform's region is `us-east4`, chosen for its learners (R04). Yours is yours.
 - **`budget_amount`, `budget_currency`** — a monthly spend alert, in whole units of your billing account's own currency. It is an alert, not a cap. `bootstrap.sh` refuses a currency other than the account's.
 - **`workload_identity_pool_id`** — the federated pool your GitHub Actions sign in through: 4 to 32 lowercase letters, digits and hyphens, and not `github-eval`.
 - **`github_oidc_subject_prefix`** — how GitHub begins the subject of your fork's tokens. Print it with:
@@ -138,6 +138,8 @@ Commit `tofu/production.auto.tfvars`, `tofu/backend.hcl` and `tofu/ci.env`. Open
 
 The merge starts the workflow `Deploy` (`.github/workflows/deploy.yml`), and its job `Configuration` applies the configuration as `infra-config`. On the platform, the first apply made 48 resources with no refusal of rights. Run the workflow again by hand with no part chosen: its apply should say "No changes".
 
+Your fork also carries the platform's list, `deploy/production.json` and the files of `deploy/production/`, and no run of yours has delivered it yet. So the same run builds the image of the `api` release that list names and pushes it into your registry, as in step 1 of [Deploying](#9-deploying), and holds `app` back. It is a release every copy may run, and nothing of it goes beyond your registry until you set `api_image`. Leave the list where it is: a pull request may change the list but not remove it, and [Your list](#8-your-list) puts your own values into it. Not run yet: on the platform, the first apply came before there was a list.
+
 From then on, every merge that changes what the workflow watches applies the configuration again.
 
 ## 7. Sign-in with Google
@@ -166,7 +168,7 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
   Take the files from the releases on GitHub (`gh release download <tag> -R altnovatrail/api`, and the same for `app`), and take each sha256 with `sha256sum`. `api`'s releases also carry a `SHA256SUMS`.
 - **`deploy/production/deployment.json`** — the file your copy of `app` reads at its start. Its format is `spec`'s `deployment/`, version 1 (`spec/deployment/README.md`), and it holds:
   - `"format": 1`;
-  - `"api"`, the origin of your `api`: the output `api_origin` of your configuration, `https://<api_service_name>-<project number>.<region>.run.app` — copy the output's value. It is the service's deterministic address, known before the service is, so you write it with your first list; the release of `app` refuses a file that names another;
+  - `"api"`, the origin of your `api`: the output `api_origin` of your configuration, `https://<api_service_name>-<project number>.<region>.run.app` — copy the output's value. It is the service's deterministic address, known before the service is, so you write it with your first list. The pull request's check builds the same address from `tofu/ci.env`, `tofu/production.auto.tfvars` and the default in `tofu/variables.tf`, and refuses a file that names another, as the release of `app` does after the merge. Until your list names your own address, the check refuses every pull request that runs it — one that changes `deploy/`, `tools/deploy-check/`, `tools/deploy/`, their packages, `justfile`, the tag of `spec` or `tofu/variables.tf` — so write the file in the first pull request that does;
   - `"signIn"`, the output `app_sign_in` of your configuration.
 
   Both outputs are in the file `outputs.json` that a run of `Deploy` keeps as an artifact when it delivers something, or come from `tofu -chdir=tofu output -json` after you sign in as in [Without GitHub Actions](#10-without-github-actions).
@@ -202,10 +204,10 @@ Run `just deploy-check` before you open the pull request. It downloads the relea
 
 After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. `api` goes in steps, because its jobs and its service are made with their first image (R11), and `app` goes after `api`'s service, which its `/deployment.json` names (R05):
 
-1. With no `api_image` in your values, there are no jobs and no service. The run of the merge that brings your list builds and pushes `api`'s image alone, from the release, into your registry, holds `app` back, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…` in its job `api`. To ask for that alone, run `Deploy` by hand with **image** chosen.
-2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made. Before this merge, add the values of the four connection strings ([Your list](#8-your-list)), and a first version of the facts, `gcloud secrets versions add api-admission-facts --data-file=deploy/production/facts.json`: the jobs mount them, the job of the check the facts. The deployment adds the version it checks and deploys anyway.
+1. With no `api_image` in your values, there are no jobs and no service. When a run's list names a release of `api` that the last run that delivered did not, the run builds `api`'s image alone from that release, pushes it into your registry, holds `app` back, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…` in its job `api`. If your list keeps the release of the platform's list, your first merge built it already ([First apply](#6-first-apply)). To ask for that alone, or to print the reference of an image your registry holds already, run `Deploy` by hand with **image** chosen.
+2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made. Before this merge, add the values of the four connection strings ([Your list](#8-your-list)), and a first version of the facts, `gcloud secrets versions add api-admission-facts --project=<project_id> --data-file=deploy/production/facts.json`: the jobs mount them, the job of the check the facts. The deployment adds the version it checks and deploys anyway.
 3. Run `Deploy` by hand with **api** chosen. It adds a version of the facts, runs the check of the configuration on exactly that version, then the migrations. A job that fails stops the run there; its own log is in Cloud Run → Jobs → the job → its execution → Logs, and the run's log says only which job it was.
-4. Set `api_serving = true`, and merge. The values of the four connection strings must be there by now ([Your list](#8-your-list)): the service reads the pooler's at its start, and without them its first revision does not become ready. The service is made, and with it the schedule of `sweep`, every day at 09:00 UTC: before it, the databases are not migrated yet. Run **api** again to roll it out. If you named an operator, they get a mail when a run of `sweep` fails.
+4. Set `api_serving = true`, and merge. The values of the four connection strings must be there by now ([Your list](#8-your-list)): the service reads the pooler's at its start, and without them its first revision does not become ready. The service is made, and with it the schedule of `sweep`, every day at 09:00 UTC: before it, the databases are not migrated yet. Run **api** again to roll it out: a revision, all traffic to it, then the job `after`. If `after` fails, the new revision serves already, and that run ships no `app`. If you named an operator, they get a mail when a run of `sweep` fails.
 5. The run of the merge that sets `api_serving = true` ships `app` too: the build with your `/deployment.json` to `https://<project_id>.web.app`. Until then a run holds `app` back and says so, and a release of `app` started by hand refuses while the configuration has no service; it refuses too a `/deployment.json` whose `api` is not `api_origin`.
 6. Let your learners in. `api` takes nobody from a country you have not allowed, and an account is made only by an invite code. Both are commands of `api`'s binary that you run yourself, not jobs of the deployment: "a job's output is kept in its log, the code with it" (`api`'s README). In Cloud Shell, with the binary of your list's release checked against its sha256 in `deploy/production.json` and the pooler's string read from its secret:
 
@@ -271,56 +273,63 @@ The workflow's checks of `main` and of the environments do not apply either, so 
 
 ## 12. Running the whole platform on one machine
 
-> **Status, 2026-11-11.** Not run yet: `app` has no code. This section says how the pieces fit, by what `api`, `app` and `spec`'s format hold today (R22 and its 2026-11-11 amendment). `spec` has answered both questions this section once left open, В19 and В20: `api` is reached through `app`'s own origin, and the Firebase project is `api`'s dev project. One thing is left to `app`'s first code: which address of `api` its proxy reaches.
+> **Status, 2026-11-12.** Checked against the author's first run of `app` with `api` from source, on 2026-11-12 (`app`'s T30, `api`'s T42), and against the code of `app` at `main` 55ab358 and of `api` v0.1.27. That run went the whole way in a browser: sign-in through Google, lessons, handwriting read by two models, hints and the engine's choices. The steps are in the two READMEs; this section points to them and says how the pieces fit (R22 and its amendments).
 
 A local run is the platform from source: `api` and `app`, each in its own devcontainer and run by its own recipes, with the browser on your machine. It is how the author's first app runs (R76 spec). It needs no copy on Google Cloud, no list and nothing from this repository: `infra` deploys releases, and a local run has none. What `infra` gives here is this section.
 
-It is not offline. Sign-in goes to a Firebase project and `api`'s databases are on Neon. `api` puts it so: "the first app runs locally: `app` and `api` on one machine, preflight is local, and the token check, the database and the AI provider go over the network, as in a deployment" (`api`'s `docs/architecture.md`, «Протокол между `app` и `api`», in Russian). `api` has no setting for an AI provider yet.
+It is not offline. Sign-in goes to a Firebase project and `api`'s databases are on Neon. `api` puts it so: "the first app runs locally: `app` and `api` on one machine, preflight is local, and the token check, the database and the AI provider go over the network, as in a deployment" (`api`'s `docs/architecture.md`, «Протокол между `app` и `api`», in Russian). A reading of handwriting goes to Anthropic with the key whose file `dev.env` names, outside the repository. Whoever runs `api` brings that key, and each reading is a paid call on its account.
 
 ### `api`
 
-Follow "Run on the dev projects" in [`api`'s README](https://github.com/altnovatrail/api#run-on-the-dev-projects), in `api`'s devcontainer. In short:
+Follow "Run on the dev projects" in [`api`'s README](https://github.com/altnovatrail/api#run-on-the-dev-projects), in `api`'s devcontainer: it names every line of the configuration, and its paragraph "With app" the steps of a run with `app`. They come to this:
 
-1. Write the configuration: the file `/home/vscode/.novatrail-dev/dev.env`, in a Docker volume of the container, outside the repository. It holds the databases' strings, the Firebase project, the path of the service account's key and `API_PACKAGES_DIR` (R39 api). For `app` on its own origin, add one more line: `API_APP_ORIGIN=http://127.0.0.1:<app's port>`, the origin your browser opens `app` at. `api` then answers CORS for that origin alone, and off a deployment it accepts `http` there.
-2. `just packages` lays the modules' packages into `/home/vscode/.novatrail-dev/packages`, the folder `API_PACKAGES_DIR` names. The release of modules that `api` pins holds no package of the current format yet, so the catalog is empty until `modules` moves to it (`api`'s README, Status).
-3. `just dev migrate`, then `just dev countries allow US` and `just dev invite`. The country lets the owner's profile be created; the invite code, printed once, lets one owner create an account.
-4. `just dev serve`. The server listens on `PORT`, 8080 by default, on every interface of its container. To take another port, set `PORT` in the shell: `dev.env` takes `API_*` names alone.
+1. The configuration is the file `/home/vscode/.novatrail-dev/dev.env`, in a Docker volume of the container, outside the repository. It holds the databases' strings, the Firebase project and the service account's key, the folder of the modules' packages, admission to AI and the key of Anthropic, the folder for the scans of parents' forms, and the project's Web API key, which `just dev-check` alone reads.
+2. `just packages` lays the packages of the release of `modules` that `api` pins, v0.2.5 of format 0.4, into the folder `API_PACKAGES_DIR` names, and only into an empty one. The catalog then holds olympiad mathematics, the first app's module, and two small modules.
+3. `just dev migrate`, then `just dev countries allow US` and `just dev invite`. The country lets the owner's profile be created. The invite code, printed once, lets one owner create an account, and a deleted account needs a new one.
+4. `just dev serve` listens on port 8080 of every interface of its container. `hostname -i` in the same container gives its address on the Docker network `novatrail-api`, which `app`'s proxy needs.
 
-`just dev-check` runs the whole way once by itself, with a test user, and is a quick check that the configuration holds. It also needs `API_DEV_WEB_API_KEY`, the project's Web API key, in `dev.env`.
+`API_APP_ORIGIN` is `http://127.0.0.1:5173` in `api`'s README and in the author's run, while `app`'s `docs/architecture.md` leaves it unset. Either works. Behind `app`'s proxy every request comes from `app`'s own origin: unset, `api` answers no CORS, and set, it adds CORS's headers for that one origin and refuses no request (`internal/server/cors.go` of `api`).
+
+`just dev-check` runs the whole way once by itself, with a test user, and is a quick check that the configuration holds.
 
 ### `app`
 
-`app` has no code yet. When it has, its README will name the recipe that serves it, and the file its dev server serves as `/deployment.json`: its plan is a git-ignored `deployment.local.json` (`app`'s `docs/architecture.md`, «Конфигурация развёртывания», in Russian). The file has `spec`'s format, version 1 (`spec/deployment/README.md`):
+Follow "Run locally with api" in [`app`'s README](https://github.com/altnovatrail/app#run-locally-with-api), in `app`'s devcontainer:
 
-```json
-{
-  "format": 1,
-  "api": "http://127.0.0.1:5173",
-  "signIn": {
-    "service": "firebase",
-    "apiKey": "<the Web App's API key>",
-    "authDomain": "<project_id>.firebaseapp.com",
-    "projectId": "<project_id>",
-    "appId": "<the Web App's ID>"
-  }
-}
-```
+1. Copy `deployment.example.json` to `deployment.local.json`, which git ignores, and fill in `signIn` from the dev project's Web App. The development server and `vite preview` serve it as `/deployment.json`. Its format is `spec`'s, version 1 (`spec/deployment/README.md`):
 
-- `api` is the origin of `app` itself, as your browser opens it: put `app`'s port in place of 5173. `app`'s server leads `api`'s paths to `api` by a proxy, its dev server and `vite preview` alike (R09 app; architecture 3.7 app). The lower layer of the page's CSP lets no origin over `http` but its own, so a browser would refuse `api` on a port of its own, though the file is accepted.
-- `projectId` is the project in `API_FIREBASE_PROJECT_ID`: `api` accepts ID tokens of that one project.
+   ```json
+   {
+     "format": 1,
+     "api": "http://127.0.0.1:5173",
+     "signIn": {
+       "service": "firebase",
+       "apiKey": "<the Web App's API key>",
+       "authDomain": "<project_id>.firebaseapp.com",
+       "projectId": "<project_id>",
+       "appId": "<the Web App's ID>"
+     }
+   }
+   ```
+
+2. `NOVATRAIL_API=http://<api's address>:8080 just dev`, with the address `hostname -i` gave in `api`'s container. Then open `http://127.0.0.1:5173`.
+
+What holds the file to that shape:
+
+- `api` is the origin of `app` itself. Both servers of `app`, the development server and `vite preview`, listen on `127.0.0.1:5173` with `strictPort`, so a second one on a taken port stops rather than moving to another, and lead `api`'s paths to `NOVATRAIL_API` by a proxy; with no `NOVATRAIL_API`, there is no proxy. `app` serves the file only when its `api` is the origin of the server that serves it. The lower layer of the page's CSP lets no origin over `http` but its own, so a browser would refuse `api` on a port of its own, though the format accepts it (`app`'s `docs/architecture.md`, «Локальный запуск», in Russian).
 - `api` may be `http` only because `app` itself is open on a loopback host: the rule `deployment.loopback`. A loopback host is `127.0.0.1`, `localhost` or `[::1]`, and nothing else.
-- `api` is an origin with no path and no default port: `http://127.0.0.1:80` is refused by the rule `deployment.api-origin`.
-- Open `app` at `http://127.0.0.1:<port>`, not at `localhost`. The Firebase project of a local run has `127.0.0.1` among its authorized domains (architecture 3.12 spec), and Firebase matches an IP address only exactly (`app`'s `docs/architecture.md`, «Конфигурация развёртывания»).
+- `projectId` is the project in `API_FIREBASE_PROJECT_ID`: `api` accepts ID tokens of that one project.
+- Open `app` at `http://127.0.0.1:5173`, not at `localhost`. The Firebase project of a local run has `127.0.0.1` among its authorized domains (architecture 3.12 spec), and Firebase matches an IP address only exactly (`app`'s `docs/architecture.md`, «Конфигурация развёртывания»).
 
 ### The two containers
 
-The two devcontainers are on separate Docker networks, `novatrail-api` and `novatrail-app`, so neither reaches the other by its name. Your browser reaches a server in a container through a port that VS Code forwards to your machine ([Developing inside a Container](https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port), updated 2026-11-04, read 2026-11-10):
+Each devcontainer comes up on a Docker network of its own, `novatrail-api` and `novatrail-app`, and `app`'s container joins `api`'s network too, by the `runArgs` of its `devcontainer.json`. `api`'s container publishes no port. The browser talks to `app`'s origin alone, and the request to `api` goes on from `app`'s proxy, inside `app`'s container, to the address of `api`'s container on `novatrail-api`. The address may change when that container is made again, so take it again with `hostname -i`. A name for it on its network, `http://api:8080`, comes with a task of `spec` that has not run yet (row Д195 of `spec`'s RUN.md).
 
-- Open each repository in its own VS Code window. Once a server runs, look for its port in the Ports view of its window. If it is not there, run **Forward a Port** from the Command Palette. Neither `devcontainer.json` names a port to forward.
-- "A notification will tell you the localhost port you should use to access the port in the container". It may be another port: "it was mapped to port 4123 on localhost". Use the port your machine has for `app`, in `/deployment.json` and in `API_APP_ORIGIN`.
-- A server bound to `127.0.0.1` in its container still answers: "Forwarded ports, on the other hand, actually look like localhost to the application".
+Your browser reaches `app` through a port that VS Code forwards to your machine ([Developing inside a Container](https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port), updated 2026-11-04, read 2026-11-10):
 
-The browser talks to `app`'s origin alone, and the request to `api` goes on from `app`'s proxy, inside `app`'s container. Which address of `api` that proxy reaches from there is not settled: the first task of `app`'s code checks it (row Д177 of `spec`'s RUN.md), and this section changes with what it finds.
+- Open each repository in its own VS Code window. VS Code forwards 5173 by itself when `just dev` runs in the terminal of `app`'s window. Otherwise, run **Forward a Port** in `app`'s window, or use its Ports view. Neither `devcontainer.json` names a port to forward.
+- The port on your machine must be 5173 too: `http://127.0.0.1:5173` is the origin in `deployment.local.json` and the one Firebase lets sign in. "A notification will tell you the localhost port you should use to access the port in the container", and it may be another: "it was mapped to port 4123 on localhost". Then free 5173 on your machine and forward the port again.
+- `app`'s server listens on `127.0.0.1` in its container and still answers: "Forwarded ports, on the other hand, actually look like localhost to the application".
 
 ### A Firebase project
 
@@ -328,7 +337,7 @@ A local run needs one. The format requires `signIn` with the service `firebase`,
 
 It is `api`'s dev project, on the free Spark plan with sign-in through Google (R03, R39 api): one project for `api` and `app` (architecture 3.12 spec, the row «сервис входа»). For `app`, the author adds to it once, in the Firebase console:
 
-- a Web App, in Project settings → Your apps, whose app ID goes in `signIn`. Its API key is the project's Web API key, which `api`'s `dev.env` already holds as `API_DEV_WEB_API_KEY`;
+- a Web App, in Project settings → Your apps, whose app ID goes in `signIn`. Its API key is the project's Web API key, which `api`'s `dev.env` already holds as `API_DEV_WEB_API_KEY`. The author's first sign-in failed on a wrong `apiKey` in `deployment.local.json`, before any request reached `api`;
 - `127.0.0.1` in Authentication → Settings → Authorized domains.
 
 Your copy's project is not for this. The module keeps its authorized domains to `<project_id>.firebaseapp.com` and `<project_id>.web.app`, with no loopback host (R16).

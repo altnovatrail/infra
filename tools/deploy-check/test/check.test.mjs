@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildReadsSpecVersion, justProgram, Refusal, run } from "../check.mjs";
+import { buildReadsSpecVersion, defaultOf, justProgram, Refusal, ROOT, run, valueOf } from "../check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const main = path.join(here, "..", "main.mjs");
@@ -37,10 +37,20 @@ const deploymentSchema = {
   unevaluatedProperties: false,
 };
 
-// /deployment.json, synthetic, of spec's deployment configuration 1.
+// The files of tofu/ api's service's address is read from, synthetic: the provider bootstrap.sh
+// prints, with the project's number, the values with the region, and the default of the service's
+// name. A world's `tofu` replaces any of them, or leaves it out with null.
+const tofuFiles = {
+  "ci.env": "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/123456789012/locations/global/workloadIdentityPools/infra-github/providers/github\nGCP_CONFIG_SERVICE_ACCOUNT=infra-config@novatrail-test-0.iam.gserviceaccount.com\n",
+  "production.auto.tfvars": 'project_id = "novatrail-test-0"\nregion     = "us-east4"\n',
+  "variables.tf": 'variable "region" {\n  type = string\n}\n\nvariable "api_service_name" {\n  description = "api\'s service."\n  type        = string\n  default     = "api"\n  nullable    = false\n}\n',
+};
+
+// /deployment.json, synthetic, of spec's deployment configuration 1, its api at the address of the
+// service of those files.
 const deployment = {
   format: 1,
-  api: "https://api-example.a.run.app",
+  api: "https://api-123456789012.us-east4.run.app",
   signIn: { service: "firebase", apiKey: "synthetic-key", authDomain: "novatrail-test-0.firebaseapp.com", projectId: "novatrail-test-0", appId: "1:2:web:3" },
 };
 
@@ -57,13 +67,17 @@ const cspTable = { "default-src": "'none'", "script-src": "'self'", "connect-src
 // A git repository with deploy/ and a folder of releases for each, the list on main at baseTag
 // (or none), and the working tree's list at tag. `build` changes the build's folder before it is
 // packed.
-function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, csp = cspTable, build: change, edit } = {}) {
+function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, csp = cspTable, build: change, edit, tofu = {} } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-check-test-"));
   made.push(dir);
   const releases = path.join(dir, "releases");
   const repo = path.join(dir, "repo");
   const deploy = path.join(repo, "deploy");
   fs.mkdirSync(path.join(deploy, "production"), { recursive: true });
+  fs.mkdirSync(path.join(repo, "tofu"));
+  for (const [name, text] of Object.entries({ ...tofuFiles, ...tofu })) {
+    if (text !== null) fs.writeFileSync(path.join(repo, "tofu", name), text);
+  }
 
   const put = (repository, release, name, bytes) => {
     const folder = path.join(releases, repository, release);
@@ -154,6 +168,7 @@ test("a list that holds passes every check", async () => {
     "production/deployment.json is of the sha256 named",
     "app v0.3.0: app_v0.3.0.tar.gz holds a build to release",
     "production/deployment.json is accepted by spec's reading of the deployment configuration 1",
+    "production/deployment.json names api at its service's address, https://api-123456789012.us-east4.run.app",
     "app v0.3.0 reads the deployment configuration 1, spec's at the submodule's tag",
     "production/deployment.json holds to its build's deployment.schema.json",
     "the build's csp.json makes the CSP header of production/deployment.json",
@@ -177,6 +192,56 @@ test("a base with no list, or no base named, holds the tag to nothing", async ()
   const none = await world().check({ base: null });
   assert.ok(none.ok, none.output);
   assert.match(none.stdout, /no base named/);
+});
+
+test("api's service's address takes the name the values give over the default", async () => {
+  const r = await world({
+    tofu: { "production.auto.tfvars": 'region = "us-east4"\napi_service_name = "learn"\n' },
+    edit: withDeployment({ ...deployment, api: "https://learn-123456789012.us-east4.run.app" }),
+  }).check();
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /names api at its service's address, https:\/\/learn-123456789012\.us-east4\.run\.app/);
+});
+
+test("a region inside the value of another variable is not the service's", async () => {
+  const r = await world({ tofu: { "production.auto.tfvars": 'labels = {\n  region = "us-west1"\n}\nregion = "us-east4"\n' } }).check();
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /names api at its service's address, https:\/\/api-123456789012\.us-east4\.run\.app/);
+});
+
+test("out of a git repository, api is not compared, and the check that needs no base goes on", async () => {
+  const w = world();
+  fs.rmSync(path.join(path.dirname(w.deploy), ".git"), { recursive: true });
+  const r = await w.check({ base: null });
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /api in production\/deployment\.json is not compared with its service's address: .* is not in a git repository/);
+});
+
+test("with no tofu/ci.env, api is not compared with an address no project gives", async () => {
+  const r = await world({ tofu: { "ci.env": null } }).check();
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /api in production\/deployment\.json is not compared with its service's address: the repository has no tofu\/ci\.env/);
+});
+
+test("the service's name and region are read from the lines that set them, and nothing else", () => {
+  const values = ['# region = "nowhere"', 'project_id = "novatrail-test-0"', 'region     = "us-east4" # the platform\'s', "api_serving = true"];
+  assert.equal(valueOf(values, "region"), "us-east4");
+  assert.equal(valueOf(values, "api_service_name"), null);
+  assert.equal(valueOf(values, "api_serving"), null);
+  assert.equal(valueOf(null, "region"), null);
+  assert.equal(valueOf(['  region = "us-west1"'], "region"), null, "an indented line is a key inside another value");
+  const variables = ['variable "api_service_name" {', "  type = string", "}", "", 'variable "other" {', '  default = "api-of-another"', "}"];
+  assert.equal(defaultOf(variables, "api_service_name"), null, "a default of another block is not its own");
+  assert.equal(defaultOf(variables, "nowhere"), null);
+  const nested = ['variable "api_service_name" {', "  type = object({", '    default = "of-the-type"', "  })", '  default = "api"', "}"];
+  assert.equal(defaultOf(nested, "api_service_name"), "api", "a default inside another argument is not the block's");
+});
+
+// The configuration's own variables.tf, as the check reads it: a change of its layout that hides
+// the default from the check fails here, not in a pull request.
+test("the default of api_service_name in tofu/variables.tf is read, and is a name of a service", () => {
+  const lines = fs.readFileSync(path.join(ROOT, "tofu", "variables.tf"), "utf8").split("\n");
+  assert.match(defaultOf(lines, "api_service_name") ?? "", /^[a-z][a-z0-9-]{0,18}[a-z0-9]$/);
 });
 
 test("no list, where the base has none either, is nothing to check", async () => {
@@ -214,6 +279,14 @@ test("refusals, each on its own", async (t) => {
     ["a deployment.json its build's schema takes and spec's refuses", { edit: withDeployment({ ...deployment, signIn: { ...deployment.signIn, measurementId: "G-SYNTHETIC" } }) }, undefined, /production\/deployment\.json is refused by spec's deployment configuration 1, at signIn\.measurementId, by the schema/],
     ["an api not written as its origin", { edit: withDeployment({ ...deployment, api: "https://api-example.a.run.app:443" }) }, undefined, /refused by spec's deployment configuration 1, at api, by the rule deployment\.api-origin/],
     ["an api in clear text, with app on no loopback host", { edit: withDeployment({ ...deployment, api: "http://localhost:8080" }) }, undefined, /refused by spec's deployment configuration 1, at api, by the rule deployment\.loopback/],
+    ["an api of another project", { edit: withDeployment({ ...deployment, api: "https://api-999999999999.us-east4.run.app" }) }, undefined, /names api "https:\/\/api-999999999999\.us-east4\.run\.app", not its service's address, https:\/\/api-123456789012\.us-east4\.run\.app: the output api_origin/],
+    ["an api of another region", { edit: withDeployment({ ...deployment, api: "https://api-123456789012.us-central1.run.app" }) }, undefined, /names api "https:\/\/api-123456789012\.us-central1\.run\.app", not its service's address/],
+    ["an api of the default name, where the values name the service another", { tofu: { "production.auto.tfvars": 'region = "us-east4"\napi_service_name = "learn" # the service\n' } }, undefined, /not its service's address, https:\/\/learn-123456789012\.us-east4\.run\.app/],
+    ["a ci.env with no provider", { tofu: { "ci.env": "GCP_CONFIG_SERVICE_ACCOUNT=infra-config@novatrail-test-0.iam.gserviceaccount.com\n" } }, undefined, /tofu\/ci\.env names no provider of a federated pool/],
+    ["a ci.env with a provider of no project's number", { tofu: { "ci.env": "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/novatrail/locations/global/workloadIdentityPools/infra-github/providers/github\n" } }, undefined, /tofu\/ci\.env names no provider of a federated pool/],
+    ["a ci.env that names its provider twice", { tofu: { "ci.env": `${tofuFiles["ci.env"]}GCP_WORKLOAD_IDENTITY_PROVIDER=projects/999999999999/locations/global/workloadIdentityPools/infra-github/providers/github\n` } }, undefined, /tofu\/ci\.env holds "GCP_WORKLOAD_IDENTITY_PROVIDER=projects\/999999999999\/[^"]*", not one line of KEY=value of its own/],
+    ["values with no region", { tofu: { "production.auto.tfvars": 'project_id = "novatrail-test-0"\n' } }, undefined, /tofu\/production\.auto\.tfvars names no region/],
+    ["no name of the service, in the values or as a default", { tofu: { "variables.tf": 'variable "api_service_name" {\n  type = string\n}\n' } }, undefined, /nor the default in tofu\/variables\.tf names api_service_name/],
     ["a build of another version of the deployment configuration", { schema: { ...deploymentSchema, $id: "https://altnovatrail.github.io/spec/deployment/2/deployment.schema.json" } }, undefined, /the build reads the deployment configuration 2, and spec at the submodule's tag is of 1: infra moves to a tag of spec of version 2 first/],
     ["a build's schema that names no version", { schema: { ...deploymentSchema, $id: undefined } }, undefined, /the build's deployment\.schema\.json names no version of spec's deployment configuration: its \$id is null/],
     ["a build with no schema", { schema: null }, undefined, /holds no deployment\.schema\.json at its root/],

@@ -679,12 +679,19 @@ run "the_deployment_reads_the_jobs_parts_from_the_outputs" {
   }
 }
 
-run "migrate_is_the_deployments_by_default" {
+# The default list is what the tests read: tests/terraform.tfvars gives api_jobs as null, and the
+# module takes its default. An assertion on var.api_jobs would see that null, so this one reads
+# what the module made of it.
+run "the_default_jobs_take_their_parts_in_the_deployment" {
   command = plan
 
+  variables {
+    api_image = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  }
+
   assert {
-    condition     = var.api_jobs["migrate"].deploy == "migrate"
-    error_message = "The default list's migrate is the deployment's migrations."
+    condition     = toset(keys(output.api_jobs)) == toset(["check", "migrate", "after", "sweep"]) && alltrue([for name in ["check", "migrate", "after"] : output.api_jobs[name].job == "api-${name}" && output.api_jobs[name].deploy == name]) && output.api_jobs["sweep"].job == "api-sweep" && output.api_jobs["sweep"].deploy == null
+    error_message = "The default list's check, migrate and after are the deployment's, and sweep goes by the clock."
   }
 }
 
