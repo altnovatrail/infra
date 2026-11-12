@@ -181,7 +181,7 @@ variable "api_jobs" {
   }))
   nullable = false
 
-  # The jobs api's binary has (api README, v0.1.20). check checks the deployment's facts and
+  # The jobs api's binary has (api README, v0.1.22). check checks the deployment's facts and
   # rung for admission to AI, before the migrations, and reads no database: the configuration gives
   # it the facts and the rung itself (R05; R45 api). migrate applies the migrations of both
   # databases with each deployment. sweep is the daily pass that finishes the deletions a request

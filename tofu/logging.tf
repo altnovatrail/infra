@@ -16,7 +16,7 @@
 locals {
   # What no sink of the project keeps, by the name of each exclusion (R07). Cloud Run's request logs
   # hold the client's address in httpRequest; the log's exact name is checked against an entry of
-  # the project once it has one (T24).
+  # the project once it has one (T42).
   exclusions = {
     "cloud-run-request-logs" = {
       filter      = "LOG_ID(\"run.googleapis.com/requests\")"

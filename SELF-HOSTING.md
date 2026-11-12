@@ -153,7 +153,7 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-> **A first deployment has not run yet, on the platform or a copy.** Nothing in the code stands in its way: the default `api_jobs` runs `api check` before the migrations and `api after` once the new revision takes all traffic, both of `api` v0.1.20. `app` has no release yet. This section and the next say what the list is made of and how the deployment goes; epic E4 of [RUN.md](RUN.md) checks both against the platform's first deployment.
+The platform's first deployment went this way on 2026-11-12, with `api` v0.1.22 and `app` v0.1.0 (R25 in [docs/decisions.md](docs/decisions.md)). This section says what the list is made of, and the next how the deployment goes.
 
 The deployment ships what `deploy/` names. A pull request that changes it is checked before the merge, and the merge deploys what changed (R05).
 
@@ -179,21 +179,44 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
 
   Add all four before you set `api_image`: the jobs that come with it mount them.
 
-  Each with `sslmode=verify-full` (`api`'s README).
+  Each must ask for `sslmode=verify-full`: `api` refuses any other, and its jobs stop with "must ask for sslmode=verify-full" (`api`'s README). Neon's Connect window gives `sslmode=require`; change it. In Cloud Shell, or wherever `gcloud` is signed in as an owner of your project, this asks for each string without echoing it, mends its `sslmode` and adds it:
+
+  ```bash
+  for s in api-migrate-database-url api-migrate-openfga-database-url api-database-url api-openfga-database-url; do
+    read -rsp "$s: " v; echo
+    v="${v/sslmode=require/sslmode=verify-full}"
+    [[ "$v" == *sslmode=verify-full* ]] || { echo "$s has no sslmode=verify-full"; continue; }
+    printf '%s' "$v" | gcloud secrets versions add "$s" --project=<project_id> --data-file=-
+    unset v
+  done
+  ```
+
+  A string goes from Neon to the secret and nowhere else: not into a file of the repository, not into a chat.
 
 Run `just deploy-check` before you open the pull request. It downloads the releases from GitHub and checks their signatures with Sigstore, so it needs the network and a fetched `origin/main`. The pull request's check `Deploy` runs it again.
 
 ## 9. Deploying
 
-> Not run yet, on the platform or anywhere, and not possible before E4: see the start of section 8. This is the order the code follows today. E4 checks it against the first deployment.
-
 After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. `api` goes in steps, because its jobs and its service are made with their first image (R11), and `app` goes after `api`'s service, which its `/deployment.json` names (R05):
 
-1. With no `api_image` in your values, there are no jobs and no service. A run that delivers `api` builds and pushes its image alone, from the release, into your registry, and holds `app` back, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…`. To ask for that alone, run `Deploy` by hand with **image** chosen.
+1. With no `api_image` in your values, there are no jobs and no service. The run of the merge that brings your list builds and pushes `api`'s image alone, from the release, into your registry, holds `app` back, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…` in its job `api`. To ask for that alone, run `Deploy` by hand with **image** chosen.
 2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made. Before this merge, add the values of the four connection strings ([Your list](#8-your-list)), and a first version of the facts, `gcloud secrets versions add api-admission-facts --data-file=deploy/production/facts.json`: the jobs mount them, the job of the check the facts. The deployment adds the version it checks and deploys anyway.
-3. Run `Deploy` by hand with **api** chosen. It adds a version of the facts, runs the check of the configuration on exactly that version, then the migrations.
+3. Run `Deploy` by hand with **api** chosen. It adds a version of the facts, runs the check of the configuration on exactly that version, then the migrations. A job that fails stops the run there; its own log is in Cloud Run → Jobs → the job → its execution → Logs, and the run's log says only which job it was.
 4. Set `api_serving = true`, and merge. The values of the four connection strings must be there by now ([Your list](#8-your-list)): the service reads the pooler's at its start, and without them its first revision does not become ready. The service is made, and with it the schedule of `sweep`, every day at 09:00 UTC: before it, the databases are not migrated yet. Run **api** again to roll it out. If you named an operator, they get a mail when a run of `sweep` fails.
 5. The run of the merge that sets `api_serving = true` ships `app` too: the build with your `/deployment.json` to `https://<project_id>.web.app`. Until then a run holds `app` back and says so, and a release of `app` started by hand refuses while the configuration has no service; it refuses too a `/deployment.json` whose `api` is not `api_origin`.
+6. Let your learners in. `api` takes nobody from a country you have not allowed, and an account is made only by an invite code. Both are commands of `api`'s binary that you run yourself, not jobs of the deployment: "a job's output is kept in its log, the code with it" (`api`'s README). In Cloud Shell, with the binary of your list's release checked against its sha256 in `deploy/production.json` and the pooler's string read from its secret:
+
+   ```bash
+   cd ~ && curl -fsSLo api https://github.com/altnovatrail/api/releases/download/<tag>/api_<tag>_linux_amd64
+   echo "<sha256 of the binary>  api" | sha256sum --check && chmod +x api
+   export API_DATABASE_URL="$(gcloud secrets versions access latest --secret=api-database-url --project=<project_id>)"
+   ./api countries allow US     # once for each country, here the platform's own
+   ./api countries list
+   ./api invite                 # once for each learner: its last line is the code
+   unset API_DATABASE_URL; rm -f api
+   ```
+
+   Each code makes one account, and you hand it to the learner yourself. A learner who signs in with Google and gives the code has an account.
 
 ## 10. Without GitHub Actions
 
