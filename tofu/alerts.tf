@@ -116,9 +116,9 @@ resource "google_monitoring_alert_policy" "api" {
 # terms of retention standing, with nobody told; this mails the operator at the first. It reads
 # Cloud Run's own count of a job's completed executions by their result: every result but
 # "succeeded". Google's list of metrics names the label and not its values; third-party guides give
-# "succeeded" and "failed", and the first deployment checks them (T24). Matching what is not a
-# success, a value spelled otherwise mails too many rather than none. One metric, charged as the
-# two above.
+# "succeeded" and "failed", and the checks after the first deployment read them (T42). Matching
+# what is not a success, a value spelled otherwise mails too many rather than none. One metric,
+# charged as the two above.
 locals {
   # The names of the jobs by the clock, as Cloud Run knows them.
   api_clock_job_names = [for name in keys(local.api_scheduled_jobs) : google_cloud_run_v2_job.api[name].name]

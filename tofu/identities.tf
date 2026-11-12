@@ -85,7 +85,7 @@ resource "google_secret_manager_secret_iam_member" "deployer_adds_facts" {
 # ready-made developer role carries far more, deleting the service among it; a deployment needs
 # the eleven permissions of bootstrap.sh's role apiDeployer. It is granted on the service and on
 # each job; canvas-api's deployment ran on such grants, run.operations.get among them, and the
-# first deployment shows it here too (T24).
+# first deployment ran on them too (T24).
 resource "google_cloud_run_v2_service_iam_member" "deployer" {
   count = local.api_serving ? 1 : 0
 
