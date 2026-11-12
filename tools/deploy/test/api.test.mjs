@@ -52,7 +52,8 @@ const jobs = {
 };
 
 // The layout of the repository, the release's files, the configuration's outputs, and the stand-ins'
-// state: the service serving `serving` (or none), the registry's tags.
+// state: the service serving `serving` (or none), the registry's packages and tags: with no service, the
+// registry holds no package of api yet, as before the first deployment.
 // `project` and `region` are the copy's when a test is about a copy: its registry follows them.
 function world({ release = "v0.2.0", serving = "v0.1.0", outputs: change, state: edit, project = "novatrail-test-0", region = "us-east4" } = {}) {
   const ownRepository = `${region}-docker.pkg.dev/${project}/images`;
@@ -102,6 +103,7 @@ function world({ release = "v0.2.0", serving = "v0.1.0", outputs: change, state:
   const state = {
     jobs: Object.fromEntries(Object.values(jobs).map((j) => [j.job, { image: `${ownImage}@sha256:${"f".repeat(64)}` }])),
     tags: serving ? [{ image: ownImage, tag: serving, digest: servingDigest }] : [],
+    packages: serving ? [ownImage] : [],
     service: serving
       ? {
           name: "api",
@@ -350,6 +352,21 @@ test("image builds around the binary alone, pushes and prints the digest", () =>
   const build = w.calls().find((c) => c[0] === "docker" && c[1] === "build");
   assert.ok(build.includes("--target") && build[build.indexOf("--target") + 1] === "release");
   assert.deepEqual(steps(w.calls()), ["docker build", "docker push"]);
+});
+
+test("a registry with no package of api yet is no tags: the first image builds, and a failure of another kind stops before any build", () => {
+  const first = world({ serving: null });
+  const r = first.run("image");
+  assert.equal(r.status, 0, r.output);
+  assert.deepEqual(steps(first.calls()), ["docker build", "docker push"]);
+  assert.deepEqual(first.read().packages, [image], "the push makes the package");
+
+  const denied = world({ serving: null, state: (s) => (s.tagsError = "PERMISSION_DENIED: Permission 'artifactregistry.tags.list' denied") });
+  const d = denied.run("image");
+  assert.notEqual(d.status, 0, d.output);
+  assert.match(d.stderr, /PERMISSION_DENIED/);
+  assert.match(d.stderr, /the registry's tags of .* cannot be read/);
+  assert.deepEqual(steps(denied.calls()), []);
 });
 
 test("a file that fetch refuses stops before any build", () => {
