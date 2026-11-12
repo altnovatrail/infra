@@ -94,6 +94,9 @@ function world({ release = "v0.2.0", serving = "v0.1.0", outputs: change, state:
     admission_facts_secret: "api-admission-facts",
     admission_facts_file: "/etc/api/admission/facts.json",
     api_jobs: jobs,
+    // As `tofu output -json` prints them: the address of the service once it is there, and no such
+    // output before.
+    ...(serving ? { api_service_url: `https://api-123456789012.${region}.run.app` } : {}),
   };
   change?.(values);
   const outputs = path.join(dir, "outputs.json");
@@ -288,6 +291,16 @@ test("with no service yet, the jobs alone: every image, check, migrate, and no r
   assert.deepEqual(steps(w.calls()).filter((s) => s.startsWith("execute") || s === "revision" || s === "traffic"), ["execute api-check", "execute api-migrate"]);
   const s = w.read();
   for (const job of Object.values(s.jobs)) assert.match(job.image, new RegExp(`@sha256:${s.tags[0].digest}$`), "every job runs the new image");
+  assert.ok(!w.calls().some((c) => c.slice(1, 4).join(" ") === "run services describe"), "with no api_service_url, Cloud Run is not asked for the service");
+});
+
+test("a service the outputs name and gcloud cannot read stops the deployment before anything runs", () => {
+  const w = world({ state: (s) => (s.describeError = "PERMISSION_DENIED: Permission 'run.services.get' denied on resource 'namespaces/p/services/api'") });
+  const r = w.run("release");
+  assert.notEqual(r.status, 0, r.output);
+  assert.match(r.stderr, /PERMISSION_DENIED/);
+  assert.match(r.stderr, /the service api cannot be read/);
+  assert.deepEqual(steps(w.calls()), []);
 });
 
 test("a check or a migration that fails stops the deployment before any revision", () => {

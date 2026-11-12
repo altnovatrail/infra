@@ -94,19 +94,15 @@ lower() {
     return 1
 }
 
-# The service, as JSON, or nothing when the configuration has not made it yet. Any other failure to
-# read it stops the deployment: read as no service, it would skip the revision without a word.
-# gcloud says a service is not there by the code NOT_FOUND or in words, "Cannot find service".
+# The service, as JSON, or nothing when the configuration has not made it yet. Whether it has, the
+# outputs say by api_service_url, as they do for the release of app: Cloud Run cannot say it to the
+# deployment's account, whose right to read the service is on the service alone, and for a service
+# not there it answers PERMISSION_DENIED "(or resource may not exist)", as the first deployment
+# found (T24). A service the outputs name and gcloud cannot read stops the deployment: read as no
+# service, it would skip the revision without a word.
 describe_service() {
-    local errors status=0 described
-    errors="$work/describe-errors"
-    described="$(gcloud run services describe "$service" "${where[@]}" --format=json 2> "$errors")" || status=$?
-    if ((status == 0)); then
-        printf '%s\n' "$described"
-    elif ! grep -qE 'NOT_FOUND|Cannot find service' "$errors"; then
-        cat "$errors" >&2
-        fail "the service ${service} cannot be read"
-    fi
+    jq -e '.api_service_url.value | type == "string"' "$outputs" > /dev/null || return 0
+    gcloud run services describe "$service" "${where[@]}" --format=json || fail "the service ${service} cannot be read"
 }
 
 # The digest of the image the revision that takes the traffic runs. Traffic split between revisions
