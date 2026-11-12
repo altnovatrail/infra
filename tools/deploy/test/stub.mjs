@@ -56,7 +56,7 @@ function gcloud() {
       return;
     case command === "run revisions describe": {
       const revision = service?.revisions[subject] ?? fail(`NOT_FOUND: revision ${subject}`);
-      out(JSON.stringify({ status: { imageDigest: revision.image } }));
+      out(JSON.stringify({ status: { imageDigest: revision.image, conditions: [{ type: "Ready", status: revision.ready === false ? "False" : "True" }] } }));
       return;
     }
     case positional.slice(0, 4).join(" ") === "artifacts docker tags list": {
@@ -100,9 +100,11 @@ function gcloud() {
       if (!service || service.name !== subject) fail(`NOT_FOUND: service ${subject}`);
       const [file, secretVersion] = flag("update-secrets").split("=");
       const name = `${subject}-${String(Object.keys(service.revisions).length + 1).padStart(5, "0")}`;
-      service.revisions[name] = { image: flag("image"), factsFile: file, facts: secretVersion };
+      service.revisions[name] = { image: flag("image"), factsFile: file, facts: secretVersion, ...(state.notReady ? { ready: false } : {}) };
       service.latestCreated = name;
-      if (!state.notReady) service.latestReady = name;
+      // As Cloud Run does: a revision with no traffic leaves latestReadyRevisionName on the one that
+      // serves, ready or not (T24).
+      if (!state.notReady && !args.includes("--no-traffic")) service.latestReady = name;
       // With --no-traffic, the traffic stays where it was; without it, the new revision would take
       // it all at once.
       if (!args.includes("--no-traffic")) service.traffic = [{ revisionName: name, percent: 100 }];

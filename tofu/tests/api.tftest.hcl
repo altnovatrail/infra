@@ -155,6 +155,14 @@ run "the_service_is_made_with_the_first_image" {
   }
 
   assert {
+    condition = (
+      google_cloud_run_v2_service.api[0].template[0].containers[0].name == "api" &&
+      alltrue([for job in google_cloud_run_v2_job.api : job.template[0].template[0].containers[0].name == "api"])
+    )
+    error_message = "The container of the service and of every job is named api: gcloud's --update-secrets sets the facts' version in the volume of a named container only, and in an unnamed one makes a volume of its own (T24)."
+  }
+
+  assert {
     condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "GOMEMLIMIT"]) == "921MiB"
     error_message = "1Gi of memory tells the runtime 921MiB."
   }

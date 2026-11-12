@@ -24,6 +24,13 @@ locals {
   admission_file = "facts.json"
   admission_path = "${local.admission_dir}/${local.admission_file}"
 
+  # The name of the one container of the service and of every job. gcloud 592.0.0 keys a container
+  # with no name as "" and reads its name as None, so --update-secrets takes the container's own
+  # facts volume for one another container mounts, and makes a volume of its own instead of setting
+  # the version in this one, which the next apply undoes (T24). Named, the deployment sets the
+  # version in the module's volume, where ignore_changes leaves it.
+  container_name = "api"
+
   # The lowest admission rung: full, the only one a deployment takes (R05; R25 api). The service and
   # the jobs of the check are told the same.
   admission_rung = "full"
@@ -84,6 +91,7 @@ resource "google_cloud_run_v2_service" "api" {
     max_instance_request_concurrency = var.api_concurrency
 
     containers {
+      name  = local.container_name
       image = var.api_image
 
       resources {
@@ -235,6 +243,7 @@ resource "google_cloud_run_v2_job" "api" {
       max_retries = 0
 
       containers {
+        name  = local.container_name
         image = var.api_image
         args  = each.value.args
 
