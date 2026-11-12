@@ -3,8 +3,8 @@
 // they did in one JSON file and writes every call to a log, one JSON array a line. A command it does
 // not know fails loudly, so that a script that drifts from what the test holds shows it.
 //
-// STUB_STATE  the JSON file: the service with its revisions and traffic, the registry's tags, the
-//             jobs, their executions, the facts' versions, what docker built and pushed
+// STUB_STATE  the JSON file: the service with its revisions and traffic, the registry's packages
+//             and tags, the jobs, their executions, the facts' versions, what docker built and pushed
 // STUB_LOG    the log of calls
 
 import crypto from "node:crypto";
@@ -15,6 +15,8 @@ const [program, ...args] = process.argv.slice(2);
 const statePath = process.env.STUB_STATE;
 const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
 state.tags ??= [];
+// The images the registry holds a package of: one is there once anything was pushed to it.
+state.packages ??= [...new Set(state.tags.map((t) => t.image))];
 state.jobs ??= {};
 state.executions ??= [];
 state.facts ??= [];
@@ -56,6 +58,9 @@ function gcloud() {
     }
     case positional.slice(0, 4).join(" ") === "artifacts docker tags list": {
       const image = positional[4];
+      if (state.tagsError) fail(state.tagsError);
+      // As Artifact Registry answers for an image with no package yet, before its first push (T24).
+      if (!state.packages.includes(image)) fail("NOT_FOUND: Requested entity was not found.");
       out(
         JSON.stringify(
           state.tags
@@ -138,6 +143,7 @@ function docker() {
       // A tag pushed again moves to the new image, as in Artifact Registry.
       state.tags = state.tags.filter((t) => !(t.image === image && t.tag === tag));
       state.tags.push({ image, tag, digest });
+      if (!state.packages.includes(image)) state.packages.push(image);
       out(`The push refers to repository [${image}]`);
       out(`${tag}: digest: sha256:${digest} size: 528`);
       return;

@@ -126,10 +126,19 @@ serving_digest() {
     printf '%s\n' "$digest"
 }
 
-# The registry's tags of api's image, as lines of tag and digest.
+# The registry's tags of api's image, as lines of tag and digest. Before the first push the registry
+# has no package of the image, and gcloud says NOT_FOUND: that is no tags, as the first deployment
+# found (T24). Any other failure stops the deployment, as for the service.
 registry_tags() {
-    gcloud artifacts docker tags list "$image_name" --format=json |
-        jq -r '.[] | [(.tag | split("/") | last), (.version | split("/") | last)] | @tsv'
+    local errors status=0 listed
+    errors="$work/tags-errors"
+    listed="$(gcloud artifacts docker tags list "$image_name" --format=json 2> "$errors")" || status=$?
+    if ((status != 0)); then
+        grep -q 'NOT_FOUND' "$errors" && return 0
+        cat "$errors" >&2
+        return 1
+    fi
+    jq -r '.[] | [(.tag | split("/") | last), (.version | split("/") | last)] | @tsv' <<< "$listed"
 }
 
 # The release the image of that digest is tagged with in the registry: one exact tag, as the
