@@ -1,0 +1,17 @@
+# infra's allowlist for the shared check Secrets (.github): gitleaks' own rules, and one exception.
+# The check reads this file from the base a pull request merges into, so the exception enters main
+# by a pull request of its own before any file it frees.
+[extend]
+useDefault = true
+
+# The Web API key of the Firebase Web App in /deployment.json, the configuration's output
+# app_sign_in: every browser that opens app receives it, and Firebase restricts it to its own APIs.
+# "API keys restricted to Firebase services do not need to be treated as secrets" (Firebase, Learn
+# about using and managing API keys for Firebase, read 2026-11-12). Only a key of that form, and
+# only in that file: any other secret there, or the key anywhere else, is still a finding (the
+# 2026-11-12 amendment to R17).
+[[allowlists]]
+description = "The Firebase Web API key in deploy/production/deployment.json"
+condition = "AND"
+paths = ['''^deploy/production/deployment\.json$''']
+regexes = ['''^AIza[\w-]{35}$''']
