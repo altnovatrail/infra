@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "api": "https://api-306463944576.us-east4.run.app",
+  "signIn": {
+    "service": "firebase",
+    "apiKey": "AIzaSyCYn9HFnIukakJ1Hys4qdh3QwP191Z8iv8",
+    "authDomain": "novatrail.firebaseapp.com",
+    "projectId": "novatrail",
+    "appId": "1:306463944576:web:02c9c45748c097b0d65b65"
+  }
+}
