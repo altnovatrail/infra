@@ -262,7 +262,9 @@ _tf-grants:
 
 # Every variable of the configuration is set in tofu/tests/terraform.tfvars: tofu test reads the
 # deployment's tofu/production.auto.tfvars too, and a variable this file leaves out would take the
-# deployment's value into every test (T30).
+# deployment's value into every test (T30). One with a default is set to null there, which gives it
+# its default: a copy of the default instead would let a mistake in the default itself pass every
+# test (Д19).
 _tf-test-values:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -272,6 +274,14 @@ _tf-test-values:
     if [ -n "$missing" ]; then
         echo "tf-check: tofu/tests/terraform.tfvars does not set these variables, so a deployment's values would reach the tests:" >&2
         echo "$missing" >&2
+        exit 1
+    fi
+    defaulted=$(awk '/^variable "/ { name = $2; gsub(/"/, "", name) } /^  default[[:space:]]*=/ && name != "" { print name } /^}/ { name = "" }' {{ quote(tofu_dir) }}/*.tf | sort -u)
+    null_in_tests=$(sed -n 's/^\([a-z0-9_]*\)[[:space:]]*=[[:space:]]*null[[:space:]]*$/\1/p' {{ quote(tofu_dir) }}/tests/terraform.tfvars | sort -u)
+    copies=$(comm -23 <(printf '%s\n' "$defaulted") <(printf '%s\n' "$null_in_tests"))
+    if [ -n "$copies" ]; then
+        echo "tf-check: tofu/tests/terraform.tfvars sets these variables with a default to something but null, so the tests would not read their default (Д19):" >&2
+        echo "$copies" >&2
         exit 1
     fi
 
