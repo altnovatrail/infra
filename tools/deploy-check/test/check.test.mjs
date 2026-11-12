@@ -203,6 +203,20 @@ test("api's service's address takes the name the values give over the default", 
   assert.match(r.stdout, /names api at its service's address, https:\/\/learn-123456789012\.us-east4\.run\.app/);
 });
 
+test("a region inside the value of another variable is not the service's", async () => {
+  const r = await world({ tofu: { "production.auto.tfvars": 'labels = {\n  region = "us-west1"\n}\nregion = "us-east4"\n' } }).check();
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /names api at its service's address, https:\/\/api-123456789012\.us-east4\.run\.app/);
+});
+
+test("out of a git repository, api is not compared, and the check that needs no base goes on", async () => {
+  const w = world();
+  fs.rmSync(path.join(path.dirname(w.deploy), ".git"), { recursive: true });
+  const r = await w.check({ base: null });
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /api in production\/deployment\.json is not compared with its service's address: .* is not in a git repository/);
+});
+
 test("with no tofu/ci.env, api is not compared with an address no project gives", async () => {
   const r = await world({ tofu: { "ci.env": null } }).check();
   assert.ok(r.ok, r.output);
@@ -215,9 +229,12 @@ test("the service's name and region are read from the lines that set them, and n
   assert.equal(valueOf(values, "api_service_name"), null);
   assert.equal(valueOf(values, "api_serving"), null);
   assert.equal(valueOf(null, "region"), null);
+  assert.equal(valueOf(['  region = "us-west1"'], "region"), null, "an indented line is a key inside another value");
   const variables = ['variable "api_service_name" {', "  type = string", "}", "", 'variable "other" {', '  default = "api-of-another"', "}"];
   assert.equal(defaultOf(variables, "api_service_name"), null, "a default of another block is not its own");
   assert.equal(defaultOf(variables, "nowhere"), null);
+  const nested = ['variable "api_service_name" {', "  type = object({", '    default = "of-the-type"', "  })", '  default = "api"', "}"];
+  assert.equal(defaultOf(nested, "api_service_name"), "api", "a default inside another argument is not the block's");
 });
 
 // The configuration's own variables.tf, as the check reads it: a change of its layout that hides
@@ -267,6 +284,7 @@ test("refusals, each on its own", async (t) => {
     ["an api of the default name, where the values name the service another", { tofu: { "production.auto.tfvars": 'region = "us-east4"\napi_service_name = "learn" # the service\n' } }, undefined, /not its service's address, https:\/\/learn-123456789012\.us-east4\.run\.app/],
     ["a ci.env with no provider", { tofu: { "ci.env": "GCP_CONFIG_SERVICE_ACCOUNT=infra-config@novatrail-test-0.iam.gserviceaccount.com\n" } }, undefined, /tofu\/ci\.env names no provider of a federated pool/],
     ["a ci.env with a provider of no project's number", { tofu: { "ci.env": "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/novatrail/locations/global/workloadIdentityPools/infra-github/providers/github\n" } }, undefined, /tofu\/ci\.env names no provider of a federated pool/],
+    ["a ci.env that names its provider twice", { tofu: { "ci.env": `${tofuFiles["ci.env"]}GCP_WORKLOAD_IDENTITY_PROVIDER=projects/999999999999/locations/global/workloadIdentityPools/infra-github/providers/github\n` } }, undefined, /tofu\/ci\.env holds "GCP_WORKLOAD_IDENTITY_PROVIDER=projects\/999999999999\/[^"]*", not one line of KEY=value of its own/],
     ["values with no region", { tofu: { "production.auto.tfvars": 'project_id = "novatrail-test-0"\n' } }, undefined, /tofu\/production\.auto\.tfvars names no region/],
     ["no name of the service, in the values or as a default", { tofu: { "variables.tf": 'variable "api_service_name" {\n  type = string\n}\n' } }, undefined, /nor the default in tofu\/variables\.tf names api_service_name/],
     ["a build of another version of the deployment configuration", { schema: { ...deploymentSchema, $id: "https://altnovatrail.github.io/spec/deployment/2/deployment.schema.json" } }, undefined, /the build reads the deployment configuration 2, and spec at the submodule's tag is of 1: infra moves to a tag of spec of version 2 first/],

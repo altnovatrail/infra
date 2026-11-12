@@ -44,7 +44,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
-import { PROVIDER } from "../deploy-check/setup.mjs";
+import { envValues, PROVIDER, tfvarsValue } from "../deploy-check/setup.mjs";
 
 export class Refusal extends Error {}
 
@@ -141,15 +141,12 @@ export function partsOfInputs(env) {
   }).join(",");
 }
 
-// Whether a line of tofu/production.auto.tfvars at the commit sets the variable name to a value
-// that holds: line by line, with no regular expression over the whole text, which would backtrack
-// (S8786).
+// Whether tofu/production.auto.tfvars at the commit sets the variable name to a value that holds,
+// by the line that sets it (setup.mjs).
 function setsVariable(dir, commit, name, holds) {
   if (!has(dir, commit, TFVARS)) return false;
-  return git(dir, ["show", `${commit}:${TFVARS}`]).stdout.split("\n").some((line) => {
-    const at = line.indexOf("=");
-    return at > 0 && line.slice(0, at).trim() === name && holds(line.slice(at + 1).trim());
-  });
+  const value = tfvarsValue(git(dir, ["show", `${commit}:${TFVARS}`]).stdout.split("\n"), name);
+  return value !== null && holds(value);
 }
 
 // Whether tofu/production.auto.tfvars at the commit names api_image: until it does, api has no jobs.
@@ -218,12 +215,8 @@ export function identity(file) {
   } catch {
     throw new Refusal(`${file} is not there: the project is not set up yet (T23)`);
   }
-  const values = {};
-  for (const line of text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"))) {
-    const found = /^([A-Z_]+)=(.*)$/.exec(line);
-    if (!found || Object.hasOwn(values, found[1])) throw new Refusal(`${file} holds ${JSON.stringify(line)}, not one line of KEY=value of its own`);
-    values[found[1]] = found[2];
-  }
+  const { values, wrong } = envValues(text);
+  if (wrong !== null) throw new Refusal(`${file} holds ${JSON.stringify(wrong)}, not one line of KEY=value of its own`);
   const provider = values.GCP_WORKLOAD_IDENTITY_PROVIDER;
   const account = values.GCP_CONFIG_SERVICE_ACCOUNT;
   if (!PROVIDER.test(provider ?? "")) throw new Refusal(`${file} names no provider of a federated pool in GCP_WORKLOAD_IDENTITY_PROVIDER`);

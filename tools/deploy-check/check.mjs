@@ -31,7 +31,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readingOf } from "./reading.mjs";
-import { PROVIDER } from "./setup.mjs";
+import { envValues, PROVIDER, tfvarsValue } from "./setup.mjs";
 
 const require = createRequire(import.meta.url);
 const Ajv2020 = require("ajv/dist/2020").default;
@@ -157,16 +157,16 @@ function git(cwd, args) {
   return spawnSync(GIT, ["-C", cwd, ...args], { encoding: "utf8" });
 }
 
-// The top of the git repository deployDir is in; `unread` says what is lost when it is in none.
-function repositoryOf(deployDir, unread) {
+// The top of the git repository deployDir is in, or null when it is in none.
+function topOf(deployDir) {
   const top = git(deployDir, ["rev-parse", "--show-toplevel"]);
-  if (top.status !== 0) throw new Refusal(`${deployDir} is not in a git repository, and ${unread}`);
-  return top.stdout.trim();
+  return top.status === 0 ? top.stdout.trim() : null;
 }
 
 // The list at the base, or null when the base has none.
 function baseList(base, deployDir) {
-  const root = repositoryOf(deployDir, `the base ${base} cannot be read`);
+  const root = topOf(deployDir);
+  if (!root) throw new Refusal(`${deployDir} is not in a git repository, and the base ${base} cannot be read`);
   if (git(root, ["rev-parse", "--verify", "--quiet", `${base}^{commit}`]).status !== 0) {
     throw new Refusal(`the base ${base} is not a commit here: fetch it before the check`);
   }
@@ -270,30 +270,27 @@ export function readDeployment(deploymentFile) {
   return readJson(deploymentFile, "production/deployment.json");
 }
 
-// The lines of a file of tofu/, or null when it is not there.
-function linesOf(file) {
-  return fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n") : null;
+// The text of a file of tofu/, or null when it is not there.
+function textOf(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
 }
 
-// The string a line `<name> = "<value>"` of a file of values gives the variable, or null: line by
-// line, with no regular expression over the whole text, which would backtrack (S8786).
+// The string the line `<name> = "<value>"` of a file of values gives the variable, or null
+// (tfvarsValue of setup.mjs, which the deployment reads the file by too).
 export function valueOf(lines, name) {
-  for (const line of lines ?? []) {
-    const at = line.indexOf("=");
-    if (at > 0 && line.slice(0, at).trim() === name) return /^"([^"]*)"/.exec(line.slice(at + 1).trim())?.[1] ?? null;
-  }
-  return null;
+  return /^"([^"]*)"/.exec(tfvarsValue(lines, name) ?? "")?.[1] ?? null;
 }
 
 // The string default of the variable name in a file of the configuration, or null: the line
-// `default = "<value>"` of its block, which tofu fmt leaves at the top level of the block.
+// `default = "<value>"` of its block, two spaces in, where tofu fmt writes the block's own
+// arguments; a line further in is inside the value of another.
 export function defaultOf(lines, name) {
   const start = (lines ?? []).indexOf(`variable "${name}" {`);
   if (start < 0) return null;
   for (const line of lines.slice(start + 1)) {
     if (line === "}") return null;
     const at = line.indexOf("=");
-    if (at > 0 && line.slice(0, at).trim() === "default") return /^"([^"]*)"/.exec(line.slice(at + 1).trim())?.[1] ?? null;
+    if (at > 0 && line.slice(0, at).trimEnd() === "  default") return /^"([^"]*)"/.exec(line.slice(at + 1).trim())?.[1] ?? null;
   }
   return null;
 }
@@ -304,15 +301,16 @@ export function defaultOf(lines, name) {
 // values of tofu/production.auto.tfvars, and the name, when they leave it out, its default in
 // tofu/variables.tf. Null with no tofu/ci.env in the repository: no project to compare with.
 export function serviceOrigin(root) {
-  const env = linesOf(path.join(root, "tofu", "ci.env"));
-  if (!env) return null;
-  const named = "GCP_WORKLOAD_IDENTITY_PROVIDER=";
-  const number = PROVIDER.exec(env.find((line) => line.startsWith(named))?.slice(named.length).trim() ?? "")?.[1];
+  const env = textOf(path.join(root, "tofu", "ci.env"));
+  if (env === null) return null;
+  const { values: setup, wrong } = envValues(env);
+  if (wrong !== null) throw new Refusal(`tofu/ci.env holds ${JSON.stringify(wrong)}, not one line of KEY=value of its own, and the number of the project of api's service is not known`);
+  const number = PROVIDER.exec(setup.GCP_WORKLOAD_IDENTITY_PROVIDER ?? "")?.[1];
   if (!number) throw new Refusal("tofu/ci.env names no provider of a federated pool in GCP_WORKLOAD_IDENTITY_PROVIDER, and the number of the project of api's service is not known");
-  const values = linesOf(path.join(root, "tofu", "production.auto.tfvars"));
+  const values = textOf(path.join(root, "tofu", "production.auto.tfvars"))?.split("\n");
   const region = valueOf(values, "region");
   if (!region) throw new Refusal("tofu/production.auto.tfvars names no region, and the region of api's service is not known");
-  const name = valueOf(values, "api_service_name") ?? defaultOf(linesOf(path.join(root, "tofu", "variables.tf")), "api_service_name");
+  const name = valueOf(values, "api_service_name") ?? defaultOf(textOf(path.join(root, "tofu", "variables.tf"))?.split("\n"), "api_service_name");
   if (!name) throw new Refusal("neither tofu/production.auto.tfvars nor the default in tofu/variables.tf names api_service_name, and the name of api's service is not known");
   return `https://${name}-${number}.${region}.run.app`;
 }
@@ -487,7 +485,9 @@ export async function run(deployDir, base, standIns = {}) {
     // here, before the merge, by the files the outputs come from.
     await step("production/deployment.json names api at its service's address", () => {
       if (!deployment) return "api in production/deployment.json is not compared with its service's address: the file was not read";
-      const origin = serviceOrigin(repositoryOf(deployDir, "the address of api's service cannot be read"));
+      const root = topOf(deployDir);
+      if (!root) return `api in production/deployment.json is not compared with its service's address: ${deployDir} is not in a git repository, whose tofu/ would give it`;
+      const origin = serviceOrigin(root);
       if (!origin) return "api in production/deployment.json is not compared with its service's address: the repository has no tofu/ci.env, and so no project";
       if (deployment.api !== origin) throw new Refusal(`production/deployment.json names api ${JSON.stringify(deployment.api)}, not its service's address, ${origin}: the output api_origin, by the project of tofu/ci.env and the values of tofu/production.auto.tfvars (R05)`);
       return `production/deployment.json names api at its service's address, ${origin}`;
