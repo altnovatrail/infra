@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildReadsSpecVersion, Refusal, run } from "../check.mjs";
+import { buildReadsSpecVersion, justProgram, Refusal, run } from "../check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const main = path.join(here, "..", "main.mjs");
@@ -314,4 +314,26 @@ test("every refusal is named, not only the first", async () => {
   assert.ok(!r.ok);
   assert.match(r.stderr, /the rung is author/);
   assert.match(r.stderr, /is lower than v0\.2\.0/);
+});
+
+test("release-verify runs by the just the recipe names, which on a runner of Deploy is not the toolchain stage's", () => {
+  assert.equal(justProgram("/home/runner/work/_temp/tools/bin/just"), "/home/runner/work/_temp/tools/bin/just");
+  for (const named of [undefined, "", "just", "bin/just"]) assert.equal(justProgram(named), "/usr/local/bin/just", `${named} is no absolute path`);
+
+  // check.mjs in a process of its own, as fetch.mjs runs it, with INFRA_JUST at a stand-in for just
+  // that writes down its arguments: verify reaches it, with spec's justfile and release-verify.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-check-just-"));
+  made.push(dir);
+  const just = path.join(dir, "just");
+  fs.writeFileSync(just, `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(path.join(dir, "args"))}\n`, { mode: 0o755 });
+  const check = path.join(here, "..", "check.mjs");
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", `import { verify } from ${JSON.stringify(check)}; verify("api", "v0.2.0", "/nowhere/api_v0.2.0_linux_amd64");`], {
+    encoding: "utf8",
+    env: { ...process.env, INFRA_JUST: just },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const args = fs.readFileSync(path.join(dir, "args"), "utf8").trim().split("\n");
+  assert.deepEqual(args.slice(0, 1), ["-f"]);
+  assert.match(args[1], /spec\/justfile$/);
+  assert.deepEqual(args.slice(2), ["release-verify", "api", "v0.2.0", "/nowhere/api_v0.2.0_linux_amd64"]);
 });

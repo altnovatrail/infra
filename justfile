@@ -7,6 +7,10 @@
 # The Dockerfile whose ARGs ci-tofu and ci-shellcheck read; their tests point it at broken copies.
 dockerfile := env("INFRA_DOCKERFILE", ".devcontainer/Dockerfile")
 
+# The just that runs these recipes, by its absolute path, for the checks of the list, which run spec's
+# release-verify with it: on a runner of Deploy it is not in /usr/local/bin (tools/deploy-check/check.mjs).
+export INFRA_JUST := just_executable()
+
 # One ARG of the Dockerfile, as Docker reads it — quotes, a carriage return and trailing blanks are
 # not part of it — and only if it is one exact version: what ci-tofu, ci-shellcheck and ci-actionlint
 # hold their tool to.
