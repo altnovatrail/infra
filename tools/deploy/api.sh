@@ -222,7 +222,9 @@ run_jobs() {
 }
 
 # A revision by the image's digest with that version of the facts, taking no traffic; when it is
-# the service's ready one, all the traffic to that revision, by its name.
+# ready by its own condition Ready, all the traffic to that revision, by its name. The service's
+# latestReadyRevisionName does not tell: with --no-traffic Cloud Run leaves it on the revision that
+# serves, as the first deployment found (T24).
 roll() {
     local version="$1" described created ready
     echo "==> a revision of ${service}, with no traffic yet"
@@ -230,8 +232,11 @@ roll() {
         --update-secrets="${facts_path}=${secret}:${version}" --no-traffic --quiet > /dev/null
     described="$(describe_service)"
     created="$(jq -r '.status.latestCreatedRevisionName // empty' <<< "$described")"
-    ready="$(jq -r '.status.latestReadyRevisionName // empty' <<< "$described")"
-    [[ -n "$created" && "$created" == "$ready" ]] || fail "the revision ${created:-made} is not ready, and takes no traffic"
+    [[ -n "$created" ]] || fail "the service ${service} names no revision it made"
+    ready="$(gcloud run revisions describe "$created" "${where[@]}" --format=json |
+        jq -r '[.status.conditions[]? | select(.type == "Ready") | .status] | first // empty')" ||
+        fail "the revision ${created} cannot be read"
+    [[ "$ready" == True ]] || fail "the revision ${created} is not ready, and takes no traffic"
     echo "==> all the traffic to ${created}"
     gcloud run services update-traffic "$service" "${where[@]}" --to-revisions="${created}=100" --quiet > /dev/null
 }
