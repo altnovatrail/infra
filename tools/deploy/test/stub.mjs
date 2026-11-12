@@ -43,8 +43,11 @@ function gcloud() {
   const service = state.service;
   switch (true) {
     case command === "run services describe":
-      // As gcloud says a service is not there: in words, with no NOT_FOUND.
-      if (!service || service.name !== subject) fail(`Cannot find service [${subject}]`);
+      if (state.describeError) fail(state.describeError);
+      // As Cloud Run answers the deployment's account for a service not there: its right is on the
+      // service, which is not there to hold it (T24).
+      if (!service || service.name !== subject)
+        fail(`PERMISSION_DENIED: Permission 'run.services.get' denied on resource 'namespaces/p/services/${subject}' (or resource may not exist).`);
       out(
         JSON.stringify({
           status: { traffic: service.traffic, latestCreatedRevisionName: service.latestCreated, latestReadyRevisionName: service.latestReady },
