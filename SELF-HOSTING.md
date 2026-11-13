@@ -28,7 +28,7 @@ You need:
   - Identity Platform: up to 50,000 monthly active users free ([pricing](https://cloud.google.com/identity-platform/pricing)).
   - Firebase Hosting: 10 GB stored and 360 MB a day served free ([pricing](https://firebase.google.com/pricing)).
   - Artifact Registry: 0.5 GiB free ([pricing](https://cloud.google.com/artifact-registry/pricing)).
-  - The state bucket is a few kilobytes in Cloud Storage ([pricing](https://cloud.google.com/storage/pricing)).
+  - The state bucket is a few kilobytes in Cloud Storage ([pricing](https://cloud.google.com/storage/pricing)). The operator's two buckets hold scans and sample files, megabytes: Standard storage in `us-east4` is $0.023 per GiB a month, and the free tier covers only `us-west1`, `us-central1` and `us-east1`, as read on 2026-11-13.
 - **A Google account that may create projects and link them to that billing account.**
 - **A fork of this repository on GitHub**, with Actions turned on, cloned with `--recurse-submodules`.
 - **The devcontainer.** Open the clone in VS Code and choose "Reopen in Container". It has OpenTofu, `just`, Node and the checks at the versions this repository pins.
@@ -57,6 +57,9 @@ budget_currency = "EUR"
 
 workload_identity_pool_id  = "acme-ci"
 github_oidc_subject_prefix = "repo:acme@555/platform@777"
+
+operator_bucket      = "acme-learning-1-operator"
+consent_forms_bucket = "acme-learning-1-consent-forms"
 ```
 
 - **`project_id`** — your new project's ID: 6 to 30 lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen. It is permanent, and it names your app's address `https://<project_id>.web.app` and its sign-in domain `<project_id>.firebaseapp.com`.
@@ -71,6 +74,7 @@ github_oidc_subject_prefix = "repo:acme@555/platform@777"
 
   It must read `repo:<owner>@<owner's number>/<repository>@<repository's number>`, and the pool admits tokens of these two numbers alone. If it prints another form, your repository does not put the numbers into its tokens' subject. GitHub's documentation on OIDC subject claims says how to turn that on; this guide has not checked the steps.
 - **`deploy_environment`, `hosting_environment`** — optional. They name the GitHub environments of api's deployment and of app's publisher, `production` and `production-hosting` by default. The configuration's own environment is always `production-config`.
+- **`operator_bucket`, `consent_forms_bucket`** — the two private buckets `bootstrap.sh` makes in your region (R28): the operator's bucket, where the organizers get the files of the samples page and the scans of their forms by an upload link, and the bucket of the scans of the parents' consent forms, which `api` writes. Bucket names are global, so pick names nobody else has, two different ones, and neither the state bucket's.
 - **`eval_github_subject_prefixes`** — leave it out. The platform's keys for eval are the platform's own (R20). A copy has none.
 
 The other variables of `tofu/variables.tf` have defaults that fit a small copy.
@@ -90,17 +94,25 @@ prefix = "tofu"
 - the state bucket, versioned, in your region;
 - the federated pool and its GitHub provider;
 - the identity the configuration is applied as, `infra-config`, with exactly its roles;
-- three custom roles.
+- six custom roles: three the configuration grants, three the buckets' policies grant;
+- the operator's bucket and the bucket of the scans of consents, in your region, of the class Standard, with uniform access, public access prevention enforced, no soft delete, no object versions and no CORS, and the operator's bucket with its lifecycle rules, which erase the files by their periods (R28);
+- the two service accounts an upload link is signed as, `upload-measure` and `upload-eval-set`, each lent to its own organizer alone;
+- the whole access policy of each bucket: each organizer reads, writes and erases under their own prefixes and lists the operator's bucket, the operator reads the scans, and `api`'s service account creates and erases scans under `consent-forms/` and reads none.
 
-Your billing account's ID goes in the environment, never in a file or your shell's history:
+Your billing account's ID and the addresses of three people go in the environment, never in a file or your shell's history. The people are the Google accounts of the measurement organizer, of the eval-set organizer and of the operator, who reads the scans; they may be one person. Each variable is required: write `none` for a person who should have no access. A variable left unset stops the script before it changes anything, since a run without it would take that person's access away. The script prints none of the addresses.
 
 ```bash
 gcloud billing accounts list
 read -rsp "Billing account: " TF_VAR_billing_account && export TF_VAR_billing_account
+read -rp "Measurement organizer: " BOOTSTRAP_MEASURE_ORGANIZER && export BOOTSTRAP_MEASURE_ORGANIZER
+read -rp "Eval-set organizer: " BOOTSTRAP_EVAL_SET_ORGANIZER && export BOOTSTRAP_EVAL_SET_ORGANIZER
+read -rp "Operator: " BOOTSTRAP_OPERATOR && export BOOTSTRAP_OPERATOR
 just bootstrap
 ```
 
-It is safe to run again: every step looks before it makes, and it brings back what drifted. Run it again whenever `bootstrap.sh` or the values it reads change, before you merge.
+It is safe to run again: every step looks before it makes, and it brings back what drifted, the buckets' settings and policies among it. Run it again whenever `bootstrap.sh` or the values it reads change, before you merge, with the same three addresses.
+
+On a new copy `api`'s service account does not exist yet: the first apply makes it ([section 6](#6-first-apply)). The script then makes the bucket of the scans without its binding, and says so. Run it again after the first apply.
 
 At the end it prints two lines. Neither is a secret:
 
@@ -137,6 +149,8 @@ The platform's own ruleset also requires secret scanning, DCO, CodeQL and SonarC
 Commit `tofu/production.auto.tfvars`, `tofu/backend.hcl` and `tofu/ci.env`. Open a pull request in your fork, and merge it once its checks pass. They include the configuration's own tests (`just tf-check`). They run on synthetic values: `tofu/tests/terraform.tfvars` sets every variable, so nothing you write in `production.auto.tfvars` reaches them.
 
 The merge starts the workflow `Deploy` (`.github/workflows/deploy.yml`), and its job `Configuration` applies the configuration as `infra-config`. On the platform, the first apply made 48 resources with no refusal of rights. Run the workflow again by hand with no part chosen: its apply should say "No changes".
+
+Then run `just bootstrap` again, with the same values in the environment ([section 4](#4-bootstrap)): it grants `api`'s service account, which the apply has just made, its right on the scans' prefix. Until then `api` cannot store a parent's consent form.
 
 Your fork also carries the platform's list, `deploy/production.json` and the files of `deploy/production/`, and no run of yours has delivered it yet. So the same run builds the image of the `api` release that list names and pushes it into your registry, as in step 1 of [Deploying](#9-deploying), and holds `app` back. It is a release every copy may run, and nothing of it goes beyond your registry until you set `api_image`. Leave the list where it is: a pull request may change the list but not remove it, and [Your list](#8-your-list) puts your own values into it. Not run yet: on the platform, the first apply came before there was a list.
 

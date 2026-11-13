@@ -38,6 +38,8 @@ variables {
   budget_currency            = "EUR"
   workload_identity_pool_id  = "acme-ci"
   github_oidc_subject_prefix = "repo:acme@555/platform@777"
+  operator_bucket            = "acme-learning-1-operator"
+  consent_forms_bucket       = "acme-learning-1-consent-forms"
   deploy_environment         = "acme-api"
   hosting_environment        = "acme-site"
   operator_email             = "operator@example.org"

@@ -11,6 +11,9 @@ budget_currency = "USD"
 workload_identity_pool_id  = "infra-github"
 github_oidc_subject_prefix = "repo:example@1000/infra@2000"
 
+operator_bucket      = "novatrail-test-0-operator"
+consent_forms_bucket = "novatrail-test-0-consent-forms"
+
 # Every variable of the configuration is set here: tofu test reads tofu/production.auto.tfvars as
 # well, and this file wins, so no test stands on what a deployment writes there — the platform's
 # values, a copy's, or a later api_image or environment (T30). The ones with a default are null, and

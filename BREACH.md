@@ -17,7 +17,7 @@ It has two parts:
 
 A task of `infra` that changes what part 1 names keeps part 1 true in the same change: a place of learners' data, a secret, a right, a log.
 
-> **Status, 2026-11-13.** Nobody has gone through it in a real breach. The adults the operator let in by a code of `api invite` learn on the platform, and no children do (R25). The operator's bucket is not built yet (Д11 of [DEBT.md](DEBT.md)).
+> **Status, 2026-11-13.** Nobody has gone through it in a real breach. The adults the operator let in by a code of `api invite` learn on the platform, and no children do (R25). The operator's bucket and the bucket of the scans are in `tofu/bootstrap.sh`, but not made on the project yet (Д11 of [DEBT.md](DEBT.md)).
 
 ## Part 1. Any copy
 
@@ -40,7 +40,8 @@ You learn of it from:
 | Neon, the project's branch `production`: the database `api` and the store of OpenFGA, the database `openfga`, with Neon's history window, which keeps earlier states for restores | the account — its ID, the sign-in service's UID, the owner's statement that they are an adult, the PIN's hash —, the consents, the profiles, the attempts, the learner model (sources 3.12) | the passwords of the Neon roles, inside four connection strings; the operator's Neon account |
 | Secret Manager: `api-database-url` and `api-openfga-database-url`, the pooler's strings, and `api-migrate-database-url` and `api-migrate-openfga-database-url`, the direct ones | the four connection strings | `api-run`, the account the service and every job of `api` run as; `api-deploy`, which may run the jobs as `api-run`, from the GitHub environment `production` alone (`tofu/identities.tf`); the operator's own Google account, in Cloud Shell; `infra-config`, which CI applies the configuration as, administers Secret Manager (`tofu/bootstrap.sh`) |
 | Firebase Authentication, in the same project | the email of each owner's Google account, by UID | `api-run`, by the role `signInUsers`: it reads, updates and deletes users; the operator, in the Firebase console |
-| the operator's bucket | not built yet (Д11). The task that builds it adds its row here | — |
+| the operator's bucket, `operator_bucket` of `tofu/production.auto.tfvars` (`novatrail-operator` on the platform), in the project's region ([architecture 3.7](docs/architecture.md#37-the-operators-bucket)) | the files of the samples page — samples of handwriting of adults and children —, the scans of their forms, which carry names and signatures, the organizers' records and the runner's reports | the measurement organizer, who reads, writes and erases under `measure/` and `child/`, and the eval-set organizer, under `eval-set/`, each by their Google account; both list the names in the whole bucket; `upload-measure` and `upload-eval-set`, which only create objects under the upload prefixes: an upload page signed as one of them lets whoever holds it upload, not read, for at most 12 hours; `infra-config`, which reads, writes and erases every object and may change the bucket's policy through `roles/firebase.admin`, and may run a Cloud Run job as any service account of the project (R28); the project's owners |
+| the bucket of the scans, `consent_forms_bucket` (`novatrail-consent-forms`), beside it | the scans of the parents' consent forms that `api` takes from `app`, under `consent-forms/` | `api-run`, which creates and erases them and reads none; the operator, who reads and lists them by their Google account; `infra-config`, as for the operator's bucket; the project's owners |
 | the platform's logs | no identifiers, no IP addresses and no content: the request logs are excluded, and the log of `api` holds neither email nor UID (R07; sources 3.12) | — |
 | Firebase's own logs | IP addresses: Firebase Auth keeps them a few weeks, Firebase Hosting a few months (П-9) | Google |
 
@@ -74,6 +75,17 @@ gcloud iam service-accounts get-iam-policy <account>        # api-run, api-deplo
 
 Remove what is not in `tofu/` by hand at once — `gcloud projects remove-iam-policy-binding`, or the console. If the grant is in `tofu/`, remove it there too, or the next apply puts it back. Admin Activity shows who made each grant (section 4). To stop CI from deploying meanwhile, `gh workflow disable deploy.yml`.
 
+**A person's access to a bucket of section 2 must end** — an organizer's or the operator's account was taken, or a person no longer has the role. `tofu/bootstrap.sh` holds each bucket's whole policy and the policy of each upload service account, so run it, as in [SELF-HOSTING.md, section 4](SELF-HOSTING.md#4-bootstrap), with that person's variable set to `none`: `BOOTSTRAP_MEASURE_ORGANIZER`, `BOOTSTRAP_EVAL_SET_ORGANIZER` or `BOOTSTRAP_OPERATOR`. It takes back their bindings in the buckets and their right to sign as their upload service account, and whatever else the policies hold that the script does not name. Read the policies after it:
+
+```bash
+gcloud storage buckets get-iam-policy gs://<operator_bucket>
+gcloud storage buckets get-iam-policy gs://<consent_forms_bucket>
+gcloud iam service-accounts get-iam-policy upload-measure@<project>.iam.gserviceaccount.com
+gcloud iam service-accounts get-iam-policy upload-eval-set@<project>.iam.gserviceaccount.com
+```
+
+An upload page that reached the wrong person can only add files, and its policy expires at most 12 hours after it was signed (R28). To stop it sooner, take the upload role from its upload service account by hand — `gcloud storage buckets remove-iam-policy-binding gs://<operator_bucket> --member=serviceAccount:upload-measure@<project>.iam.gserviceaccount.com --role=projects/<project>/roles/bucketUploader --all`, or `upload-eval-set` —, and run the script again only once the page has expired, since it grants the role back. That this stops a page already signed, nobody has checked yet. Erase what the page uploaded. Through `roles/firebase.admin` CI reads every object of both buckets: to stop CI meanwhile, `gh workflow disable deploy.yml`.
+
 **Your own Google, Neon or GitHub account was taken.** Change its password, sign out every session, check its second factor, and then go through the rows of section 2 that this account opens.
 
 **Last resort.** `api_serving = false` in `tofu/production.auto.tfvars` and an apply remove the service of `api` (R11): the platform stops for everyone until it comes back. To bring it back, set it to `true`, apply and then run `just deploy-api` at once. The apply makes the service from `api_image`, the image of the first deployment, and `just deploy-api` moves it to the release of the list (R11, R15).
@@ -86,7 +98,7 @@ Remove what is not in `tofu/` by hand at once — `gcloud projects remove-iam-po
   gcloud logging read 'logName="projects/<project>/logs/cloudaudit.googleapis.com%2Factivity"' --project=<project> --freshness=400d
   ```
 
-- **What the logs do not show.** Who read a secret's version is Data Access audit, `AccessSecretVersion` (sources 2.6), and the platform neither turns it on nor stores it (R07). Whether to log the reads of the secrets is open, [architecture 2.8](docs/architecture.md#28-auditing-the-reads-of-the-secrets).
+- **What the logs do not show.** Who read a secret's version is Data Access audit, `AccessSecretVersion` (sources 2.6), and the platform neither turns it on nor stores it (R07). Whether to log the reads of the secrets is open, [architecture 2.8](docs/architecture.md#28-auditing-the-reads-of-the-secrets). Nor does any log show who read, wrote or erased an object of the operator's buckets: that is Data Access audit of Cloud Storage, which is off, and every sink excludes it, since an upload's entry would hold the address of the adult who sends it (R07, R28; sources 10.4). The erasures of the lifecycle rules are not logged at all. A change of a bucket's settings or policy is Admin Activity.
 - **The log of `api`** — 30 days in the project's region: the method, the code, the cause of a refusal and the time of each call, without the body, the address or the UID (architecture 3.4). Look for bursts and for refusals.
 - **Policy Denied** — 30 days: who a policy refused, with their email.
 - **GitHub**: `gh run list --workflow deploy.yml` and the deployments of the environment `production`.

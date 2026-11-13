@@ -449,10 +449,11 @@ There is no cloud in the code other than Google Cloud. `bootstrap.sh` and the ro
 | the settings with defaults | `api_service_name` and `api_jobs` — the names of the service, its service accounts, the jobs and their secrets come from them; the periods of the logs and the images, the alerts' thresholds, the service's size and limits — `tofu/variables.tf` | own, and the defaults shared |
 | `api` and `signIn` in `/deployment.json` | the outputs `api_origin` — the address of the copy's service — and `app_sign_in` of the copy's module | own |
 | eval | `eval_github_subject_prefixes`, empty by default: no secrets, no pool | the platform's only |
+| the operator's bucket and the bucket of the scans, and who holds them | `operator_bucket` and `consent_forms_bucket` in `production.auto.tfvars`; the addresses of the organizers and of the operator in `BOOTSTRAP_MEASURE_ORGANIZER`, `BOOTSTRAP_EVAL_SET_ORGANIZER` and `BOOTSTRAP_OPERATOR`, each `none` for no one (R28) | own |
 | the list, `/deployment.json`, the facts | the copy's directory `deploy/` | own (Т-20; R96 spec) |
 | the release files of `api` and `app` | the releases of `altnovatrail`, `release-verify` | shared (R105, R106 spec) |
 | the format of `/deployment.json` | the submodule's `spec/deployment/` | shared (R85 spec) |
-| names | the constants of the module and of `bootstrap.sh`: `infra-config`, `hosting-publish`, the secrets `api-admission-facts`, `api-database-url` and `api-openfga-database-url`, the registry `images`, the container `api` and the facts volume `admission-facts` at the path `/etc/api/admission`, the custom roles; the project's name "NovaTrail" and the label `novatrail-infra`. | shared: they are inside the copy's project |
+| names | the constants of the module and of `bootstrap.sh`: `infra-config`, `hosting-publish`, `upload-measure`, `upload-eval-set`, the prefixes of the buckets, the secrets `api-admission-facts`, `api-database-url` and `api-openfga-database-url`, the registry `images`, the container `api` and the facts volume `admission-facts` at the path `/etc/api/admission`, the custom roles; the project's name "NovaTrail" and the label `novatrail-infra`. | shared: they are inside the copy's project |
 | CI's sign-in | GitHub's Workload Identity Federation; without GitHub Actions, the same recipes by hand (T30) | shared |
 
 ### 3.6. The tool: OpenTofu
@@ -473,7 +474,7 @@ OpenTofu, the open fork of Terraform, at an exact version, describes the infrast
 
 ### 3.7. The operator's bucket
 
-The private Cloud Storage bucket of R125 spec: the measurement organizer and the eval-set organizer get the files of the samples page and the scans of their forms into it by an upload link. Beside it is a bucket of its own for the scans of the parents' consent forms that `api` puts there from `app` (R116, R124–R126, R136 spec). What was decided and why is R28, with the 2026-11-13 amendment to R13; the sources are sources 7.2 and 10.1–10.6. There is no code yet (Д11): T46 makes the buckets in `bootstrap.sh`, T47 gives `api` its variables, T54 is the organizer's tool, and T49 rolls it out and checks it on the project.
+The private Cloud Storage bucket of R125 spec: the measurement organizer and the eval-set organizer get the files of the samples page and the scans of their forms into it by an upload link. Beside it is a bucket of its own for the scans of the parents' consent forms that `api` puts there from `app` (R116, R124–R126, R136 spec). What was decided and why is R28, with the 2026-11-13 amendment to R13; the sources are sources 7.2 and 10.1–10.6. `tofu/bootstrap.sh` makes the buckets and their access (T46); T47 gives `api` its variables, T54 is the organizer's tool, and T49 makes them on the project and checks them there (Д11).
 
 **Who makes them.** `tofu/bootstrap.sh`, with the operator's rights, as the pools and the custom roles (R13): the two buckets and their settings, the lifecycle rules, the custom roles, the upload service accounts and the whole IAM policy of each bucket. The module grants nothing in them and only names the scans' bucket to `api` (T47). A rerun of the script brings the settings, the rules and the policies back where they have drifted, as for `infra-config`.
 
@@ -485,7 +486,7 @@ The private Cloud Storage bucket of R125 spec: the measurement organizer and the
 "Without CI" of R125 spec therefore does not hold. CI's door is the environment `production-config`, where only `main` runs, after a review (R13, R18).
 
 **The values.**
-- the buckets' names — `operator_bucket` and `consent_forms_bucket` in `tofu/production.auto.tfvars`, `<project>-operator` and `<project>-consent-forms` for `novatrail`: the script and the module read them from the same place;
+- the buckets' names — `operator_bucket` and `consent_forms_bucket` in `tofu/production.auto.tfvars`, `<project>-operator` and `<project>-consent-forms` for `novatrail`: the script and the module read them from the same place. The module takes both as variables, required, of the form the script takes and different, so that a plan reads the file without a warning; it uses only the scans' bucket (T47);
 - the addresses of the people — from the environment, never from a file, each from a variable of its own: the measurement organizer `BOOTSTRAP_MEASURE_ORGANIZER`, the eval-set organizer `BOOTSTRAP_EVAL_SET_ORGANIZER`, the operator `BOOTSTRAP_OPERATOR`. A variable that is not set is a refusal before the first call of `gcloud`: a rerun from a shell that lacks one would otherwise take a person's access away. The value `none` means no binding for that person. The alerts' `TF_VAR_operator_email` is not reused: it may be a list, not a Google account. Today all three are the author (R139 spec).
 
 **The settings** of both buckets (sources 10.2, 10.3):
@@ -543,7 +544,7 @@ The organizer gives the page to the adult, who opens it in a browser and sends t
 | `measure/samples/`, `child/samples/` | `age` 728 | — | 2 years from the session (R124, R125 spec); nobody rewrites a sample |
 | `measure/records/`, `child/records/`, `measure/reports/`, `child/reports/` | `daysSinceCustomTime` 728 | the session of the record, or of the earliest sample the report names | erased with the samples (R124 spec) |
 | `measure/forms/`, `child/forms/` | `daysSinceCustomTime` 1827 | the session plus 730 days, of the last session under the form; moved forward by a new session; on a withdrawal the form is rewritten with the day of the erasure | 5 years after its samples are erased (R124, R125 spec) |
-| `eval-set/forms/` | `age` 364, and `daysSinceCustomTime` 364 | the signature, on the record beside the form | 12 months from the signature, when no sample was contributed (R126 spec) |
+| `eval-set/forms/` | `age` 364, and `daysSinceCustomTime` 364: two rules, and either erases | the signature, on the record beside the form | 12 months from the signature, when no sample was contributed (R126 spec) |
 | `eval-set/contributed-forms/` | none | — | as long as a sample is published (R126 spec) |
 | `eval-set/samples/` | none | — | not set by R126 spec — row В32 |
 
@@ -558,6 +559,7 @@ A Custom-Time cannot decrease, but a rewrite of the object resets it. A form wit
 - a Custom-Time in the future is accepted;
 - `DELETE` of an absent object without `storage.objects.get` answers 404, which `sweep` takes for "erased already" (Д29 `api`);
 - `api-run` and an upload service account cannot read an object, nor an organizer another's prefix or the scans.
+- that `gcloud storage buckets get-iam-policy` reads a policy in version 3, with its conditions, so that a run again of the script grants nothing anew, that `gcloud storage buckets describe --format='value(location)'` prints the place the script compares with the region, and `gcloud storage buckets list --format='value(name)'` the names it finds its buckets by among the project's (sources 10.7).
 
 ## 4. Sources
 

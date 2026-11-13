@@ -1,7 +1,7 @@
 // The test of tofu/bootstrap.sh, with no cloud: gcloud-stub.mjs stands in for gcloud ahead on
 // PATH, and synthetic values stand in for production.auto.tfvars and backend.hcl. It holds the
-// script to what R13 says it makes, to what it takes back on a run again, to its refusals, and to
-// never printing the billing account. Run by `just bootstrap-test`.
+// script to what R13 and R28 say it makes, to what it takes back on a run again, to its refusals,
+// and to never printing the billing account or a person's address. Run by `just bootstrap-test`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -29,7 +29,16 @@ budget_currency = "USD"
 
 workload_identity_pool_id  = "infra-github"
 github_oidc_subject_prefix = "${subject}"
+
+operator_bucket      = "${project}-operator"
+consent_forms_bucket = "${project}-consent-forms"
 ${extra}`;
+
+// The people of the operator's buckets, synthetic, and none of them ever in what the script prints.
+const measureOrganizer = "measure.organizer@example.com";
+const evalSetOrganizer = "eval.organizer@example.com";
+const operator = "operator.person@example.com";
+const people = { BOOTSTRAP_MEASURE_ORGANIZER: measureOrganizer, BOOTSTRAP_EVAL_SET_ORGANIZER: evalSetOrganizer, BOOTSTRAP_OPERATOR: operator };
 
 // A directory with the values, a bin with the stand-in gcloud, and the stand-in's state and log.
 function world({ values = tfvars(), backend = 'bucket = "novatrail-test-0-state"\nprefix = "tofu"\n', gcloud = true } = {}) {
@@ -56,19 +65,22 @@ function world({ values = tfvars(), backend = 'bucket = "novatrail-test-0-state"
     },
     run(env = {}) {
       fs.rmSync(this.log, { force: true });
+      // A variable given as undefined is left out of the environment altogether.
+      const given = {
+        // The system's directories alone, and none where a real gcloud might be.
+        PATH: `${path.join(dir, "bin")}:/usr/bin:/bin`,
+        HOME: dir,
+        BOOTSTRAP_TOFU_DIR: path.join(dir, "tofu"),
+        BOOTSTRAP_RETRY_DELAY: "0",
+        TF_VAR_billing_account: billing,
+        STUB_STATE: this.state,
+        STUB_LOG: this.log,
+        ...people,
+        ...env,
+      };
       const result = spawnSync("bash", [script], {
         encoding: "utf8",
-        env: {
-          // The system's directories alone, and none where a real gcloud might be.
-          PATH: `${path.join(dir, "bin")}:/usr/bin:/bin`,
-          HOME: dir,
-          BOOTSTRAP_TOFU_DIR: path.join(dir, "tofu"),
-          BOOTSTRAP_RETRY_DELAY: "0",
-          TF_VAR_billing_account: billing,
-          STUB_STATE: this.state,
-          STUB_LOG: this.log,
-          ...env,
-        },
+        env: Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined)),
       });
       return { ...result, output: result.stdout + result.stderr };
     },
@@ -90,8 +102,9 @@ test("a first run makes the project, its state, the pool and the configuration's
 
   assert.deepEqual(Object.keys(s.projects), [project]);
   assert.equal(s.billingLinks[project], `billingAccounts/${billing}`);
-  assert.deepEqual(s.buckets["gs://novatrail-test-0-state"], {
-    project,
+  const { project: holder, location, versioning, policy } = s.buckets["gs://novatrail-test-0-state"];
+  assert.deepEqual({ holder, location, versioning, policy }, {
+    holder: project,
     location: "us-east4",
     versioning: true,
     policy: [{ role: "roles/storage.objectAdmin", member: account, condition: "" }],
@@ -320,6 +333,8 @@ budget_currency = "EUR"
 
 workload_identity_pool_id  = "acme-ci"
 github_oidc_subject_prefix = "repo:acme@555/platform@777"
+operator_bucket            = "acme-learning-1-operator"
+consent_forms_bucket       = "acme-learning-1-consent-forms"
 deploy_environment         = "acme-api"
 hosting_environment        = "acme-site"
 `;
@@ -329,6 +344,8 @@ hosting_environment        = "acme-site"
   const s = w.read();
   assert.deepEqual(Object.keys(s.projects), ["acme-learning-1"]);
   assert.equal(s.buckets["gs://acme-learning-1-state"].location, "europe-west3");
+  assert.equal(s.buckets["gs://acme-learning-1-operator"].location, "europe-west3");
+  assert.equal(s.buckets["gs://acme-learning-1-consent-forms"].location, "europe-west3");
   assert.deepEqual(Object.keys(s.pools), ["acme-ci"], "the copy's pool alone, and no pool of eval");
   assert.equal(s.providers["acme-ci/github"].condition, "assertion.repository_owner_id=='555' && assertion.repository_id=='777'");
   assert.match(r.stdout, /repo:acme@555\/platform@777:environment:production-config/);
@@ -454,4 +471,316 @@ test("a role whose reading fails for a passing reason is read again, not made an
   const r = w.run({ STUB_FAIL_ONCE: "iam roles describe apiDeployer" });
   assert.equal(r.status, 0, r.output);
   assert.ok(!w.calls().some((c) => c.join(" ").startsWith("iam roles create")), w.calls().map((c) => c.join(" ")).join("\n"));
+});
+
+// -- the operator's buckets (R28; docs/architecture.md, section 3.7) -----------------------------
+
+const operatorBucket = `gs://${project}-operator`;
+const consentBucket = `gs://${project}-consent-forms`;
+const apiRun = `api-run@${project}.iam.gserviceaccount.com`;
+const uploadMeasure = `upload-measure@${project}.iam.gserviceaccount.com`;
+const uploadEvalSet = `upload-eval-set@${project}.iam.gserviceaccount.com`;
+const role = (id) => `projects/${project}/roles/${id}`;
+const under = (bucket, ...prefixes) => prefixes.map((p) => `resource.name.startsWith('projects/_/buckets/${bucket.slice(5)}/objects/${p}')`).join(" || ");
+const sorted = (policy) => [...policy].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+
+// A world whose first apply has made api's service account, as the module names it.
+function applied(setup) {
+  const w = world(setup);
+  w.seed({ accounts: { [apiRun]: { policy: [] } } });
+  return w;
+}
+
+const lifecycle = {
+  lifecycle: {
+    rule: [
+      { action: { type: "Delete" }, condition: { age: 728, matchesPrefix: ["measure/samples/", "child/samples/"] } },
+      { action: { type: "Delete" }, condition: { daysSinceCustomTime: 728, matchesPrefix: ["measure/records/", "child/records/", "measure/reports/", "child/reports/"] } },
+      { action: { type: "Delete" }, condition: { daysSinceCustomTime: 1827, matchesPrefix: ["measure/forms/", "child/forms/"] } },
+      { action: { type: "Delete" }, condition: { age: 364, matchesPrefix: ["eval-set/forms/"] } },
+      { action: { type: "Delete" }, condition: { daysSinceCustomTime: 364, matchesPrefix: ["eval-set/forms/"] } },
+    ],
+  },
+};
+
+const operatorPolicy = [
+  { role: "roles/storage.objectUser", member: `user:${measureOrganizer}`, condition: under(operatorBucket, "measure/", "child/") },
+  { role: role("operatorBucketLister"), member: `user:${measureOrganizer}`, condition: "" },
+  { role: "roles/storage.objectUser", member: `user:${evalSetOrganizer}`, condition: under(operatorBucket, "eval-set/") },
+  { role: role("operatorBucketLister"), member: `user:${evalSetOrganizer}`, condition: "" },
+  { role: role("bucketUploader"), member: `serviceAccount:${uploadMeasure}`, condition: under(operatorBucket, "measure/samples/", "measure/forms/", "child/samples/", "child/forms/") },
+  { role: role("bucketUploader"), member: `serviceAccount:${uploadEvalSet}`, condition: under(operatorBucket, "eval-set/samples/", "eval-set/forms/") },
+];
+const consentPolicy = [
+  { role: "roles/storage.objectViewer", member: `user:${operator}`, condition: "" },
+  { role: role("consentFormsWriter"), member: `serviceAccount:${apiRun}`, condition: under(consentBucket, "consent-forms/") },
+];
+
+test("both buckets are made in the region, Standard, uniform, closed to the public, with no soft delete, versions or CORS", () => {
+  const w = world();
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  const s = w.read();
+  for (const name of [operatorBucket, consentBucket]) {
+    const { policy, ...settings } = s.buckets[name];
+    assert.deepEqual(settings, {
+      project,
+      location: "us-east4",
+      storageClass: "STANDARD",
+      uniform: true,
+      publicAccessPrevention: "enforced",
+      softDelete: "0",
+      versioning: false,
+      lifecycle: name === operatorBucket ? lifecycle : null,
+      cors: null,
+    }, name);
+  }
+});
+
+test("the lifecycle of the operator's bucket erases each prefix by its period, and the scans' bucket has none", () => {
+  const w = world();
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  assert.deepEqual(s.buckets[operatorBucket].lifecycle, lifecycle);
+  assert.equal(s.buckets[consentBucket].lifecycle, null);
+});
+
+test("the custom roles of the buckets hold exactly their permissions, and none of them reads an object", () => {
+  const w = world();
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  assert.deepEqual(s.roles[`${project}/operatorBucketLister`].permissions, ["storage.objects.list"]);
+  assert.deepEqual(s.roles[`${project}/consentFormsWriter`].permissions.sort(), ["storage.objects.create", "storage.objects.delete"]);
+  assert.deepEqual(s.roles[`${project}/bucketUploader`].permissions, ["storage.objects.create"]);
+});
+
+test("each bucket's policy is exactly its bindings, each under the condition of its prefixes", () => {
+  const w = applied();
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  const s = w.read();
+  assert.deepEqual(sorted(s.buckets[operatorBucket].policy), sorted(operatorPolicy));
+  assert.deepEqual(sorted(s.buckets[consentBucket].policy), sorted(consentPolicy));
+  // api neither reads nor lists a scan, and has nothing in the operator's bucket.
+  assert.deepEqual(s.buckets[consentBucket].policy.filter((b) => b.member === `serviceAccount:${apiRun}`).map((b) => b.role), [role("consentFormsWriter")]);
+  assert.ok(!s.buckets[operatorBucket].policy.some((b) => b.member.includes("api-run")));
+});
+
+test("each upload service account is lent to its own organizer alone", () => {
+  const w = world();
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  assert.deepEqual(s.accounts[uploadMeasure].policy, [{ role: "roles/iam.serviceAccountTokenCreator", member: `user:${measureOrganizer}`, condition: "" }]);
+  assert.deepEqual(s.accounts[uploadEvalSet].policy, [{ role: "roles/iam.serviceAccountTokenCreator", member: `user:${evalSetOrganizer}`, condition: "" }]);
+});
+
+test("without api's service account the scans' bucket is made without its binding, and a run after the first apply grants it", () => {
+  const w = world();
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  assert.ok(!w.read().buckets[consentBucket].policy.some((b) => b.member.includes("api-run")));
+  assert.match(r.stdout, /Run this script again after the first apply, which makes api-run@/);
+
+  const s = w.read();
+  s.accounts[apiRun] = { policy: [] };
+  w.seed(s);
+  const again = w.run();
+  assert.equal(again.status, 0, again.output);
+  assert.deepEqual(sorted(w.read().buckets[consentBucket].policy), sorted(consentPolicy));
+  assert.doesNotMatch(again.stdout, /Run this script again after the first apply/);
+});
+
+test("api's service account is the one the module names after api_service_name", () => {
+  const w = world({ values: tfvars('api_service_name = "learn"') });
+  w.seed({ accounts: { [`learn-run@${project}.iam.gserviceaccount.com`]: { policy: [] } } });
+  assert.equal(w.run().status, 0);
+  assert.deepEqual(
+    w.read().buckets[consentBucket].policy.filter((b) => b.role === role("consentFormsWriter")).map((b) => b.member),
+    [`serviceAccount:learn-run@${project}.iam.gserviceaccount.com`],
+  );
+});
+
+test("a person given as none has no binding, and one person who is both organizers lists the bucket once", () => {
+  const w = applied();
+  assert.equal(w.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: "none", BOOTSTRAP_OPERATOR: "NONE" }).status, 0);
+  const s = w.read();
+  assert.ok(!s.buckets[operatorBucket].policy.some((b) => b.member === `user:${evalSetOrganizer}`));
+  assert.deepEqual(s.accounts[uploadEvalSet].policy, []);
+  assert.deepEqual(s.buckets[consentBucket].policy.map((b) => b.role), [role("consentFormsWriter")]);
+
+  const both = applied();
+  assert.equal(both.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: measureOrganizer.toUpperCase() }).status, 0);
+  const policy = both.read().buckets[operatorBucket].policy.filter((b) => b.member === `user:${measureOrganizer}`);
+  assert.deepEqual(sorted(policy), sorted([
+    { role: "roles/storage.objectUser", member: `user:${measureOrganizer}`, condition: under(operatorBucket, "measure/", "child/") },
+    { role: "roles/storage.objectUser", member: `user:${measureOrganizer}`, condition: under(operatorBucket, "eval-set/") },
+    { role: role("operatorBucketLister"), member: `user:${measureOrganizer}`, condition: "" },
+  ]));
+});
+
+test("a run again leaves the buckets' policies alone, and brings back what drifted in their settings and access", () => {
+  const w = applied();
+  assert.equal(w.run().status, 0);
+  const steady = w.run();
+  assert.equal(steady.status, 0, steady.output);
+  assert.ok(!w.calls().some((c) => c.includes("add-iam-policy-binding") && (c.includes(operatorBucket) || c.includes(consentBucket) || c.includes(uploadMeasure))), "nothing held as it is given is granted again");
+
+  const s = w.read();
+  Object.assign(s.buckets[operatorBucket], { uniform: false, publicAccessPrevention: "inherited", softDelete: "7d", versioning: true, cors: [{ origin: ["*"] }], lifecycle: { lifecycle: { rule: [] } } });
+  Object.assign(s.buckets[consentBucket], { softDelete: "7d", lifecycle: lifecycle });
+  s.buckets[operatorBucket].policy = s.buckets[operatorBucket].policy.map((b) =>
+    b.member === `user:${measureOrganizer}` && b.role === "roles/storage.objectUser" ? { ...b, condition: "true" } : b,
+  );
+  s.buckets[operatorBucket].policy.push(
+    { role: "roles/storage.legacyBucketReader", member: `projectViewer:${project}`, condition: "" },
+    { role: "roles/storage.objectViewer", member: `serviceAccount:${uploadMeasure}`, condition: "" },
+  );
+  s.buckets[consentBucket].policy.push(
+    { role: "roles/storage.objectViewer", member: `serviceAccount:${apiRun}`, condition: "" },
+    { role: role("operatorBucketLister"), member: `user:${measureOrganizer}`, condition: "" },
+  );
+  s.accounts[uploadMeasure].policy.push(
+    { role: "roles/iam.serviceAccountTokenCreator", member: `user:${evalSetOrganizer}`, condition: "" },
+    { role: "roles/iam.serviceAccountUser", member: account, condition: "" },
+  );
+  w.seed(s);
+
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  const after = w.read();
+  const { policy: operatorHeld, ...operatorSettings } = after.buckets[operatorBucket];
+  assert.deepEqual(operatorSettings, { project, location: "us-east4", storageClass: "STANDARD", uniform: true, publicAccessPrevention: "enforced", softDelete: "0", versioning: false, lifecycle, cors: null });
+  assert.equal(after.buckets[consentBucket].softDelete, "0");
+  assert.equal(after.buckets[consentBucket].lifecycle, null);
+  assert.deepEqual(sorted(operatorHeld), sorted(operatorPolicy));
+  assert.deepEqual(sorted(after.buckets[consentBucket].policy), sorted(consentPolicy));
+  assert.deepEqual(after.accounts[uploadMeasure].policy, [{ role: "roles/iam.serviceAccountTokenCreator", member: `user:${measureOrganizer}`, condition: "" }]);
+  assert.deepEqual(makes(w.calls()), [], "a run again makes nothing");
+});
+
+test("a bucket of the name found in another place is refused, not used", () => {
+  const w = world();
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  s.buckets[operatorBucket].location = "us";
+  w.seed(s);
+  const r = w.run();
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, new RegExp(`the bucket ${operatorBucket} is in US, not in us-east4`));
+});
+
+test("no address of a person is printed, not even in gcloud's error about a binding", () => {
+  const ok = applied();
+  const r = ok.run();
+  assert.equal(r.status, 0, r.output);
+  for (const address of [measureOrganizer, evalSetOrganizer, operator]) {
+    assert.ok(!r.output.includes(address), r.output);
+  }
+
+  for (const failing of [`add-iam-policy-binding ${operatorBucket}`, `add-iam-policy-binding ${uploadEvalSet}`, `add-iam-policy-binding ${consentBucket}`]) {
+    const fresh = applied();
+    const refused = fresh.run({ STUB_FAIL: failing });
+    assert.notEqual(refused.status, 0, `${failing} fails the run`);
+    for (const address of [measureOrganizer, evalSetOrganizer, operator, billing]) {
+      assert.ok(!refused.output.includes(address), `${failing}: ${refused.output}`);
+    }
+    assert.match(refused.output, /<address>/, failing);
+  }
+});
+
+test("refusals of the buckets' values and of the people, each before any call to gcloud", async (t) => {
+  const cases = [
+    ["no measurement organizer", {}, { BOOTSTRAP_MEASURE_ORGANIZER: undefined }, /BOOTSTRAP_MEASURE_ORGANIZER is not set/],
+    ["no eval-set organizer", {}, { BOOTSTRAP_EVAL_SET_ORGANIZER: undefined }, /BOOTSTRAP_EVAL_SET_ORGANIZER is not set/],
+    ["no operator", {}, { BOOTSTRAP_OPERATOR: "" }, /BOOTSTRAP_OPERATOR is not set/],
+    ["an organizer that is not an address", {}, { BOOTSTRAP_MEASURE_ORGANIZER: "measure organizer" }, /BOOTSTRAP_MEASURE_ORGANIZER is neither the address of a Google account nor none/],
+    ["no operator's bucket", { values: tfvars().replace(/^operator_bucket.*$/m, "") }, {}, /operator_bucket is not filled in yet/],
+    ["a scans' bucket of another form", { values: tfvars().replace(`"${project}-consent-forms"`, '"Consent Forms"') }, {}, /consent_forms_bucket is not of the form/],
+    ["one bucket for both", { values: tfvars().replace(`"${project}-consent-forms"`, `"${project}-operator"`) }, {}, /operator_bucket and consent_forms_bucket are one bucket/],
+    ["the state bucket for the files", { values: tfvars().replace(`"${project}-operator"`, `"${project}-state"`) }, {}, /is the state bucket of backend\.hcl/],
+  ];
+  for (const [name, setup, env, message] of cases) {
+    await t.test(name, () => {
+      const w = world(setup);
+      const r = w.run(env);
+      assert.notEqual(r.status, 0, `${name}: ${r.output}`);
+      assert.match(r.stderr, message);
+      assert.deepEqual(w.calls(), []);
+      for (const address of [measureOrganizer, evalSetOrganizer, operator]) assert.ok(!r.output.includes(address), r.output);
+    });
+  }
+});
+
+// BREACH.md, section 3: a person's access ends by a run again with their variable set to none.
+test("a run again with a person set to none takes back all they held, and keeps the others' access", () => {
+  const w = applied();
+  assert.equal(w.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: measureOrganizer }).status, 0);
+  const r = w.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: "none", BOOTSTRAP_OPERATOR: "none" });
+  assert.equal(r.status, 0, r.output);
+  const s = w.read();
+  assert.deepEqual(sorted(s.buckets[operatorBucket].policy.filter((b) => b.member.startsWith("user:"))), sorted([
+    { role: "roles/storage.objectUser", member: `user:${measureOrganizer}`, condition: under(operatorBucket, "measure/", "child/") },
+    { role: role("operatorBucketLister"), member: `user:${measureOrganizer}`, condition: "" },
+  ]));
+  assert.deepEqual(s.accounts[uploadEvalSet].policy, []);
+  assert.deepEqual(s.accounts[uploadMeasure].policy.map((b) => b.member), [`user:${measureOrganizer}`]);
+  assert.deepEqual(s.buckets[consentBucket].policy.map((b) => b.role), [role("consentFormsWriter")]);
+  assert.ok(!r.output.includes(operator) && !r.output.includes(measureOrganizer), r.output);
+});
+
+test("one person who is both organizers keeps both prefixes when one condition of theirs drifted", () => {
+  const w = applied();
+  assert.equal(w.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: measureOrganizer }).status, 0);
+  const s = w.read();
+  s.buckets[operatorBucket].policy.push({ role: "roles/storage.objectUser", member: `user:${measureOrganizer}`, condition: "true" });
+  w.seed(s);
+  assert.equal(w.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: measureOrganizer }).status, 0);
+  assert.deepEqual(
+    w.read().buckets[operatorBucket].policy.filter((b) => b.role === "roles/storage.objectUser").map((b) => b.condition).sort(),
+    [under(operatorBucket, "eval-set/"), under(operatorBucket, "measure/", "child/")].sort(),
+  );
+});
+
+test("a deleted or a former person taken back is named by neither address, in what is printed or in gcloud's error", () => {
+  const former = "former.organizer@example.com";
+  const w = applied();
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  s.buckets[operatorBucket].policy.push({ role: "roles/storage.objectUser", member: `deleted:user:${former}?uid=123`, condition: "" });
+  w.seed(s);
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  assert.ok(!r.output.includes(former), r.output);
+  assert.match(r.stdout, /roles\/storage\.objectUser of a deleted account: not named here, taken back/);
+
+  const again = w.read();
+  again.buckets[consentBucket].policy.push({ role: "roles/storage.objectViewer", member: `user:${former}`, condition: "" });
+  w.seed(again);
+  const refused = w.run({ STUB_FAIL: `remove-iam-policy-binding ${consentBucket}` });
+  assert.notEqual(refused.status, 0);
+  assert.ok(!refused.output.includes(former), refused.output);
+  assert.match(refused.output, /<address>/);
+});
+
+test("an upload service account holds nothing on the project", () => {
+  const w = world();
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  s.projectPolicy[project].push(
+    { role: "roles/storage.objectAdmin", member: `serviceAccount:${uploadMeasure}`, condition: "" },
+    { role: "roles/storage.objectViewer", member: `serviceAccount:${uploadEvalSet}`, condition: "true" },
+  );
+  w.seed(s);
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  assert.ok(!w.read().projectPolicy[project].some((b) => b.member.includes("upload-")), "no role of an upload service account is left on the project");
+});
+
+test("a bucket of the name in another project is neither taken over nor changed", () => {
+  const w = world();
+  w.seed({ buckets: { [operatorBucket]: { project: "someone-else", location: "us-east4", lifecycle: null, policy: [] } } });
+  const r = w.run();
+  assert.notEqual(r.status, 0);
+  assert.deepEqual(w.read().buckets[operatorBucket], { project: "someone-else", location: "us-east4", lifecycle: null, policy: [] });
+  assert.ok(!w.calls().some((c) => c.includes(operatorBucket) && (c.includes("update") || c.includes("add-iam-policy-binding") || c.includes("remove-iam-policy-binding"))));
 });
