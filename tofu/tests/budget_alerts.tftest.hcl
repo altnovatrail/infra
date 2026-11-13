@@ -48,7 +48,7 @@ run "no_operator_makes_no_alert" {
   command = plan
 
   assert {
-    condition     = length(google_monitoring_notification_channel.operator) == 0 && length(google_monitoring_alert_policy.api) == 0 && length(google_monitoring_alert_policy.api_jobs) == 0
+    condition     = length(google_monitoring_notification_channel.operator) == 0 && length(google_monitoring_alert_policy.api) == 0 && length(google_monitoring_alert_policy.api_jobs) == 0 && length(google_monitoring_alert_policy.api_jobs_missed) == 0
     error_message = "With no operator's address, neither the alerts nor their channel are made."
   }
 
@@ -110,7 +110,7 @@ run "an_operator_gets_the_load_and_the_error_alerts" {
   }
 
   assert {
-    condition     = length(google_monitoring_alert_policy.api_jobs) == 0
+    condition     = length(google_monitoring_alert_policy.api_jobs) == 0 && length(google_monitoring_alert_policy.api_jobs_missed) == 0
     error_message = "With no service, nothing runs by the clock, and there is no alert on it."
   }
 }
@@ -142,6 +142,87 @@ run "an_operator_hears_of_a_failed_job_by_the_clock" {
   assert {
     condition     = google_monitoring_alert_policy.api_jobs[0].conditions[0].condition_threshold[0].threshold_value == 0 && google_monitoring_alert_policy.api_jobs[0].conditions[0].condition_threshold[0].comparison == "COMPARISON_GT"
     error_message = "One failed execution is enough."
+  }
+}
+
+# With an operator and the service: an alert on a job by the clock that has not run for 25 hours,
+# whatever the cause, read from the same count of completed executions, with no result asked: no
+# point in the window is the miss (R07; Д18).
+run "an_operator_hears_of_a_job_by_the_clock_that_did_not_run" {
+  command = plan
+
+  variables {
+    operator_email = "operator@example.com"
+    api_image      = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_serving    = true
+  }
+
+  assert {
+    condition     = length(google_monitoring_alert_policy.api_jobs_missed) == 1 && google_monitoring_alert_policy.api_jobs_missed[0].notification_channels == tolist([google_monitoring_notification_channel.operator[0].name])
+    error_message = "The alert on a job by the clock that did not run is made, and mails the operator."
+  }
+
+  assert {
+    condition = (
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].filter ==
+      "resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"api-sweep\" AND metric.type=\"run.googleapis.com/job/completed_execution_count\"" &&
+      length(google_monitoring_alert_policy.api_jobs_missed[0].conditions) == 1
+    )
+    error_message = "It counts every completed execution of api-sweep, in a condition of its own, whatever its result: a run that failed still ran, and that one the alert above mails."
+  }
+
+  assert {
+    condition = (
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].aggregations[0].alignment_period == "90000s" &&
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].aggregations[0].per_series_aligner == "ALIGN_SUM" &&
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].aggregations[0].cross_series_reducer == "REDUCE_SUM"
+    )
+    error_message = "It sums the job's executions of every result over the last 25 hours, the longest window an alert may roll."
+  }
+
+  assert {
+    condition = (
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].comparison == "COMPARISON_LT" &&
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].threshold_value == 1 &&
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].evaluation_missing_data == "EVALUATION_MISSING_DATA_ACTIVE" &&
+      google_monitoring_alert_policy.api_jobs_missed[0].conditions[0].condition_threshold[0].duration == "300s"
+    )
+    error_message = "No execution in the window opens it, and no data at all is that very miss: a day with no run writes no point."
+  }
+
+  assert {
+    condition     = google_monitoring_alert_policy.api_jobs_missed[0].alert_strategy[0].notification_prompts == tolist(["OPENED"]) && google_monitoring_alert_policy.api_jobs_missed[0].alert_strategy[0].auto_close == "1800s"
+    error_message = "It mails when it opens alone: a close with no data would read as a run."
+  }
+}
+
+# Each job by the clock is a condition of its own, so one job's runs never hide another's miss; a
+# job every half hour, of 3000s, still keeps a point in 25 hours, and is taken.
+run "each_job_by_the_clock_is_watched_on_its_own" {
+  command = plan
+
+  variables {
+    operator_email = "operator@example.com"
+    api_image      = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_serving    = true
+    api_jobs = {
+      sweep = {
+        args     = ["sweep"]
+        schedule = "0 9 * * *"
+      }
+      often = {
+        args     = ["often"]
+        schedule = "*/30 * * * *"
+        timeout  = "3000s"
+      }
+    }
+  }
+
+  assert {
+    condition = toset([for c in google_monitoring_alert_policy.api_jobs_missed[0].conditions : c.condition_threshold[0].filter]) == toset([
+      for name in ["api-sweep", "api-often"] : "resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"${name}\" AND metric.type=\"run.googleapis.com/job/completed_execution_count\""
+    ])
+    error_message = "Each job by the clock has a condition of its own, on its executions alone."
   }
 }
 

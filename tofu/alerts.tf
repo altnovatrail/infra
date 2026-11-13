@@ -4,8 +4,8 @@
 #
 # The spend alert hears of a burst only once Billing has counted it, hours later; these read the
 # platform's own count of api's requests and mail the operator while it lasts and again once it is
-# over; the one on the jobs by the clock mails once, at a failed run. They point at the metrics and at api's own log, never at request logs: the platform keeps
-# none.
+# over; the two on the jobs by the clock mail once, at a failed run and at a day with no run. They
+# point at the metrics and at api's own log, never at request logs: the platform keeps none.
 #
 # The operator's address is a person's, so it is no part of the public description of the
 # deployment: it arrives as TF_VAR_operator_email, and every plan prints it as a sensitive value. A
@@ -176,6 +176,80 @@ resource "google_monitoring_alert_policy" "api_jobs" {
       - api's own log, in the bucket `${google_logging_project_bucket_config.logs.bucket_id}`, shows each step of the pass with its counts.
 
       The next pass picks up what this one left. A failure day after day leaves deletions and the terms of retention standing.
+    EOT
+  }
+
+  depends_on = [google_project_service.enabled]
+}
+
+# A job by the clock that did not run at all: Cloud Scheduler could not call it — its account's
+# right, the job's address —, the schedule is paused, or Cloud Scheduler failed. No execution writes
+# no point, so the alert above stays silent; Cloud Scheduler has no metric of its own and retries no
+# failed call (the 2026-11-13 amendment to R07). This counts each job's executions whatever their
+# result, over the last 25 hours, the longest window an alert may roll, and takes no data as the
+# condition met: a job that runs every day, and completes within the hour, always has a point in it,
+# and a day with no run empties it about an hour after the run it missed. A condition on absence
+# waits 23.5 hours at most, less than a day, and would open at each day's gap (T34). So a job by the
+# clock runs every day, and its timeout is under the hour (variables.tf). Each job is a condition of
+# its own, so that one job's points never stand for another's missing ones, and each is a metric
+# charged as the others. A job with no run yet has no data either: made, renamed or added, it may
+# mail before its first run. It mails only when the incident opens: Cloud Monitoring also closes
+# one that has had no data for a day more than auto_close, and a mail of that would read as a run.
+resource "google_monitoring_alert_policy" "api_jobs_missed" {
+  count = local.operator_named && length(local.api_scheduled_jobs) > 0 ? 1 : 0
+
+  display_name = "${var.api_service_name} jobs by the clock not run"
+  combiner     = "OR"
+  severity     = "WARNING"
+
+  dynamic "conditions" {
+    for_each = local.api_clock_job_names
+
+    content {
+      display_name = "No execution of ${conditions.value} for 25 hours"
+
+      condition_threshold {
+        filter = join(" AND ", [
+          "resource.type=\"cloud_run_job\"",
+          "resource.labels.job_name=\"${conditions.value}\"",
+          "metric.type=\"run.googleapis.com/job/completed_execution_count\"",
+        ])
+
+        # The job's executions of the last 25 hours, every result summed: one is enough.
+        aggregations {
+          alignment_period     = "90000s"
+          per_series_aligner   = "ALIGN_SUM"
+          cross_series_reducer = "REDUCE_SUM"
+        }
+
+        comparison      = "COMPARISON_LT"
+        threshold_value = 1
+
+        # No point in the window is the miss itself.
+        duration                = "300s"
+        evaluation_missing_data = "EVALUATION_MISSING_DATA_ACTIVE"
+      }
+    }
+  }
+
+  alert_strategy {
+    auto_close           = "1800s"
+    notification_prompts = ["OPENED"]
+  }
+
+  notification_channels = [google_monitoring_notification_channel.operator[0].name]
+
+  documentation {
+    subject   = "${var.api_service_name}: a job by the clock has not run for a day"
+    mime_type = "text/markdown"
+    content   = <<-EOT
+      One of api's jobs by the clock (${join(", ", [for name in local.api_clock_job_names : "`${name}`"])}) has completed no execution in the last 25 hours: Cloud Scheduler did not start it, or it did not finish. A job made or renamed less than a day ago may have had no run yet.
+
+      - Cloud Scheduler's log of its attempts, `cloudscheduler.googleapis.com/executions` in the bucket `${google_logging_project_bucket_config.logs.bucket_id}`, shows each call and the status it got, in `AttemptFinished`.
+      - ${join(", ", [for name in keys(local.api_scheduled_jobs) : "`gcloud scheduler jobs describe ${google_cloud_scheduler_job.api[name].name} --location=${var.region}`"])} shows whether the schedule is enabled and the status of its last call.
+      - The job's executions in Cloud Run show whether one started and how long it ran.
+
+      The next pass picks up what a missed one left, but until a pass runs, deletions and the terms of retention stand.
     EOT
   }
 
