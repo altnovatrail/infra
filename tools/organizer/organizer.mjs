@@ -21,6 +21,10 @@
 //   untimed
 //       the forms, records and reports that no rule erases, since they have no Custom-Time.
 //
+// gcloud is run by its absolute path, never looked up on PATH: ORGANIZER_GCLOUD, when it is one, or
+// else the first there of the places the Google Cloud CLI installs it — the system's, Homebrew's,
+// Cloud Shell's, and under HOME the archive's and the one SELF-HOSTING.md's install puts.
+//
 // --tfvars=FILE names the values' file, tofu/production.auto.tfvars of the repository unless given:
 // the project and the operator's bucket are read from it, by the reader the deployment reads it with.
 // The page is written where the tool runs; .gitignore keeps upload-*.html out of a commit, since
@@ -390,12 +394,30 @@ export function untimed({ bucket, gcloud = runGcloud, say = console.log }) {
 
 // --- the command line ---------------------------------------------------------------------------
 
+export function gcloudProgram(env = process.env) {
+  if (env.ORGANIZER_GCLOUD) {
+    if (!path.isAbsolute(env.ORGANIZER_GCLOUD)) refuse(`ORGANIZER_GCLOUD is ${env.ORGANIZER_GCLOUD}, and it must be an absolute path`);
+    return env.ORGANIZER_GCLOUD;
+  }
+  const home = env.HOME ?? os.homedir();
+  const places = [
+    "/usr/bin/gcloud",
+    "/usr/local/bin/gcloud",
+    "/opt/homebrew/bin/gcloud",
+    "/google/google-cloud-sdk/bin/gcloud",
+    path.join(home, "google-cloud-sdk", "bin", "gcloud"),
+    path.join(home, ".cache", "infra-tools", "google-cloud-sdk", "bin", "gcloud"),
+  ];
+  return places.find((program) => fs.existsSync(program)) ?? refuse(`there is no gcloud in ${places.join(", ")}: set ORGANIZER_GCLOUD to its absolute path, as export ORGANIZER_GCLOUD="$(command -v gcloud)"`);
+}
+
 export function runGcloud(args) {
+  const program = gcloudProgram();
   try {
     // A listing of a prefix is an object's metadata a kilobyte: more room than Node's 1 MiB.
-    return execFileSync("gcloud", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 256 * 1024 * 1024 });
+    return execFileSync(program, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 256 * 1024 * 1024 });
   } catch (error) {
-    if (error.code === "ENOENT") refuse("there is no gcloud here: run the tool where the Google Cloud CLI is, signed in as the organizer");
+    if (error.code === "ENOENT") refuse(`there is no ${program}: set ORGANIZER_GCLOUD to the absolute path of gcloud`);
     throw new Refusal(`gcloud ${args.slice(0, 3).join(" ")} failed: ${(error.stderr || error.message).trim()}`);
   }
 }
@@ -428,23 +450,33 @@ export function main(argv, { gcloud = runGcloud, say = console.log, cwd = proces
       if (words.length !== 1) refuse("link takes one purpose: measure, child or eval-set");
       const session = flags.session ?? randomId();
       const out = path.resolve(cwd, flags.out ?? `upload-${words[0]}-${session}.html`);
-      // A page already there is not written over: it may be a link already given.
-      if (fs.existsSync(out)) refuse(`${out} is there already: name another with --out=FILE`);
-      const made = link({
-        purpose: words[0],
-        bucket,
-        project,
-        session,
-        gcloud,
-        ...(flags.samples !== undefined && { samples: whole(flags.samples, "samples") }),
-        ...(flags.hours !== undefined && { hours: whole(flags.hours, "hours") }),
-      });
+      // A page already there is not written over: it may be a link already given. The file is made
+      // before anything is signed, and written once the page is.
+      let file;
       try {
-        fs.writeFileSync(out, made.page, { flag: "wx" });
+        file = fs.openSync(out, "wx");
       } catch (error) {
         if (error.code === "EEXIST") refuse(`${out} is there already: name another with --out=FILE`);
         throw error;
       }
+      let made;
+      try {
+        made = link({
+          purpose: words[0],
+          bucket,
+          project,
+          session,
+          gcloud,
+          ...(flags.samples !== undefined && { samples: whole(flags.samples, "samples") }),
+          ...(flags.hours !== undefined && { hours: whole(flags.hours, "hours") }),
+        });
+        fs.writeFileSync(file, made.page);
+      } catch (error) {
+        fs.closeSync(file);
+        fs.rmSync(out, { force: true });
+        throw error;
+      }
+      fs.closeSync(file);
       say(`session ${made.session}, signed as ${made.account}, valid until ${extended(made.expiration)}`);
       say(`the page: ${out}`);
       return;

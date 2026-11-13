@@ -1,6 +1,6 @@
-// The test of tools/organizer/organizer.mjs, with no cloud: gcloud-stub.mjs stands in for gcloud
-// ahead on PATH and signs with a key made here, so that each form's signature is checked as Cloud
-// Storage would check it. It holds the link to R28 — the purpose's own prefixes and upload service
+// The test of tools/organizer/organizer.mjs, with no cloud: gcloud-stub.mjs stands in for gcloud,
+// named to the tool by ORGANIZER_GCLOUD, and signs with a key made here, so that each form's
+// signature is checked as Cloud Storage would check it. It holds the link to R28 — the purpose's own prefixes and upload service
 // account, at most 12 hours, the type and size of each file, a random name for each — and the
 // Custom-Time to section 3.7 of docs/architecture.md. Run by `just organizer-test`.
 
@@ -46,14 +46,15 @@ function world(objects = {}, { tfvars = `project_id = "${project}"\noperator_buc
   fs.writeFileSync(path.join(dir, "values.tfvars"), tfvars);
   fs.writeFileSync(path.join(dir, "state.json"), JSON.stringify({ bucket, objects, signError }));
   fs.writeFileSync(path.join(dir, "log"), "");
-  const run = (...args) => {
+  const runWith = (gcloud, ...args) => {
     const result = spawnSync("node", [tool, ...args, "--tfvars=values.tfvars"], {
       cwd: dir,
       encoding: "utf8",
-      env: { ...process.env, PATH: `${path.join(dir, "bin")}:${process.env.PATH}`, STUB_STATE: path.join(dir, "state.json"), STUB_KEY: path.join(dir, "key.pem"), STUB_LOG: path.join(dir, "log") },
+      env: { ...process.env, ORGANIZER_GCLOUD: gcloud, STUB_STATE: path.join(dir, "state.json"), STUB_KEY: path.join(dir, "key.pem"), STUB_LOG: path.join(dir, "log") },
     });
     return { ...result, output: result.stdout + result.stderr };
   };
+  const run = (...args) => runWith(path.join(dir, "bin", "gcloud"), ...args);
   const calls = () =>
     fs
       .readFileSync(path.join(dir, "log"), "utf8")
@@ -61,7 +62,7 @@ function world(objects = {}, { tfvars = `project_id = "${project}"\noperator_buc
       .filter(Boolean)
       .map((line) => JSON.parse(line));
   const objectsNow = () => JSON.parse(fs.readFileSync(path.join(dir, "state.json"), "utf8")).objects;
-  return { dir, run, calls, objects: objectsNow };
+  return { dir, run, runWith, calls, objects: objectsNow };
 }
 
 // The forms of a page: each one's action, target, hidden fields in order, and its file input.
@@ -199,7 +200,18 @@ test("refusals of link: a purpose, a session, a page already there, a failed sig
   const failed = failing.run("link", "eval-set", "--out=page.html");
   assert.equal(failed.status, 1);
   assert.match(failed.output, /gcloud iam service-accounts sign-blob failed: .*PERMISSION_DENIED/);
-  assert.equal(fs.existsSync(path.join(failing.dir, "page.html")), false);
+  assert.equal(fs.existsSync(path.join(failing.dir, "page.html")), false, "a link not signed leaves no page");
+});
+
+test("gcloud by its absolute path alone, never by PATH", () => {
+  const w = world();
+  const relative = w.runWith("bin/gcloud", "link", "measure", "--out=page.html");
+  assert.equal(relative.status, 1);
+  assert.match(relative.output, /ORGANIZER_GCLOUD is bin\/gcloud, and it must be an absolute path/);
+  const missing = w.runWith(path.join(w.dir, "none", "gcloud"), "link", "measure", "--out=page.html");
+  assert.equal(missing.status, 1);
+  assert.match(missing.output, /there is no .*none\/gcloud: set ORGANIZER_GCLOUD/);
+  assert.equal(fs.existsSync(path.join(w.dir, "page.html")), false);
 });
 
 test("a second link of the same session: the same folders, new names", () => {
