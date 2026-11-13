@@ -265,7 +265,8 @@ A deployment that did not get through is repeated by rerunning its jobs, or fixe
 - the service and the job `api-check` have one facts volume, the module's `admission-facts`, with the version `5` that the deployment added, and the `apply` of the next merge says "No changes" (the second 2026-11-12 amendment to R11);
 - on the project `api-run` has one role, `signInUsers`, and `api-deploy` none: the deployment has enough rights on its own resources (ibid.);
 - a failure of the job `after` in a run is like the failure of any job of the deployment, only the deployment already stands on the new revision with traffic, and this run's `app` does not run (the second 2026-11-12 amendment to R15);
-- the first scheduled run of `sweep` and the cost of Cloud Run and Neon — after T42: the debts Д15 and Д16 of table 4 of [DEBT.md](../DEBT.md).
+- the cost of Cloud Run and Neon — after T42: the debt Д16 of table 4 of [DEBT.md](../DEBT.md);
+- the first scheduled run of `sweep`, 2026-11-13 at 09:00 UTC: `api-scheduler` called it on time, and the pass was clean (the 2026-11-13 amendment to R07; T43).
 
 **Self-hosting** — the same directory `deploy/` with its own `deployment.json` and facts, the same checks and steps in its own project and its own private registry. The signed release files are the same for everyone (R105, R106 spec; Т-20).
 
@@ -361,14 +362,15 @@ The filter applies to an entry that the Logging API or the Telemetry API has alr
 | Cloud Run's request logs, of the service `api` | `httpRequest`: the client's IP address, user agent | excluded — not stored |
 | the logs of the container `api` and of its jobs | events of `api` without identifiers and addresses; for the jobs, counters (R26 api; T28 api) | the bucket in `us-east4`, 30 days |
 | Cloud Run's system logs | platform events about revisions and jobs | the bucket in `us-east4`, 30 days |
+| Cloud Scheduler's log of its attempts, `cloudscheduler.googleapis.com/executions` | for each call of a job by the clock, `AttemptStarted` and `AttemptFinished`: the job, the address of its run, the target type, the scheduled time, Google's text `debugInfo` and the HTTP status; no address or identifier of a person (the 2026-11-13 amendment to R07) | the bucket in `us-east4`, 30 days |
 | Admin Activity | `callerIp` and the caller's email — of the operator and of CI when they edit resources. There are no Identity Platform entries from learners: nobody calls `SignUp` in the project, and the sign-in through the Google window, which creates a user, leaves no entry; T42 did not go through the entries of other services (T42) | `_Required`, `global`, 400 days (Д3); cannot be excluded |
-| System Event | Google's own actions with the project's resources | `_Required`, `global`, 400 days |
+| System Event | Google's own actions with the project's resources; among them each run of a job, `/Jobs.RunJob`, which names no service account of the project (T43) | `_Required`, `global`, 400 days |
 | Policy Denied | `callerIp` and the email of whoever a policy refused | the bucket in `us-east4`, 30 days |
 | Data Access audit | would hold `callerIp` | not turned on, and excluded in each sink (the 2026-11-09 amendment to R07) |
 | the activity log of Identity Platform | would hold every sign-in request | turned off by the module, `monitoring.request_logging` (R16), and excluded in each sink (the 2026-11-09 amendment to R07) |
 | the export of Firebase Hosting's logs | would hold `remoteIp` | not turned on (R06), and excluded in each sink (the second 2026-11-09 amendment to R07) |
 | the logs of Firebase Auth and Firebase Hosting at Firebase itself | IP addresses | at Firebase: Auth "a few weeks", Hosting "a few months" (П-9) |
-| traces | Cloud Run itself, on a part of the requests | `_Trace` in `us-east4`; Cloud Trace API cannot be turned off while Cloud Scheduler needs it (the third 2026-11-09 amendment to R07); the attributes with the first trace: since the service started there have been no traces (Д17) |
+| traces | Cloud Run itself, on a part of the requests | `_Trace` in `us-east4`; Cloud Trace API cannot be turned off while Cloud Scheduler needs it (the third 2026-11-09 amendment to R07); the attributes with the first trace: from the service's start, 2026-11-12, to 2026-11-13 there have been no traces (T42, T43; Д17) |
 
 Cloud Run jobs have no request logs: only services write them.
 
@@ -393,10 +395,13 @@ The project sets up no log-based metrics of its own, where the address would bec
 - that nobody calls `SignUp` in the project, and that Admin Activity has no Identity Platform entries from learners;
 - the values of the label `result` — `succeeded` and `failed`, as the alert expects (the 2026-11-12 amendment to R07).
 
+**Checked on the first scheduled run (T43)**, 2026-11-13:
+- `api-scheduler` called `sweep` at 09:00 UTC, the execution passed, and `completed_execution_count` wrote `succeeded`;
+- Cloud Scheduler's log of its attempts — its name and fields, in the inventory above; Cloud Scheduler has no metric of its own, and a failed call is not retried: `retryConfig` is empty (the 2026-11-13 amendment to R07).
+
 **Not checked:**
 - the attributes of the traces Cloud Run writes itself: there are no traces yet (Д17);
-- the first scheduled run of a job, `sweep` on 2026-11-13 at 09:00 UTC (Д15);
-- Cloud Scheduler's logs of the jobs' invocations — whether it writes them in the project and what is in them: they are not in the inventory above, and the first run of `sweep` will check them (Д15).
+- what Cloud Scheduler writes for a failed attempt: none has failed yet (Д18).
 
 ### 3.5. Self-hosting and the local run
 
