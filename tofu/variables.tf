@@ -329,6 +329,34 @@ variable "api_request_timeout" {
   }
 }
 
+# The operator's buckets (R28). bootstrap.sh makes both and holds all their access, with the
+# operator's rights; the configuration makes neither and grants nothing in them.
+
+variable "operator_bucket" {
+  description = "The operator's bucket of Cloud Storage: the files of the samples page, their forms and the organizers' records and reports (R125, R126 spec). bootstrap.sh reads it from the same file of values and makes it in the region; the configuration does not use it, and takes it here so that a plan reads the file without a warning and checks the name's form. The platform's is novatrail-operator. Bucket names are global."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9_.-]{1,61}[a-z0-9]$", var.operator_bucket))
+    error_message = "operator_bucket is the name of a bucket: 3 to 63 lowercase letters, digits, dots, hyphens and underscores, starting and ending with a letter or a digit."
+  }
+}
+
+variable "consent_forms_bucket" {
+  description = "The bucket of the scans of the parents' consent forms, which api puts there from app under its prefix consent-forms/ (R116, R136 spec). bootstrap.sh reads it from the same file of values, makes it in the region and grants api's service account the right to create and erase objects under the prefix, once the first apply has made that account. The platform's is novatrail-consent-forms. Bucket names are global."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9_.-]{1,61}[a-z0-9]$", var.consent_forms_bucket))
+    error_message = "consent_forms_bucket is the name of a bucket: 3 to 63 lowercase letters, digits, dots, hyphens and underscores, starting and ending with a letter or a digit."
+  }
+
+  validation {
+    condition     = var.consent_forms_bucket != var.operator_bucket
+    error_message = "consent_forms_bucket is not operator_bucket: in one bucket the organizers would list the names of the scans (R28)."
+  }
+}
+
 # Who may deploy: the jobs of one GitHub environment of infra's repository (R11).
 
 variable "workload_identity_pool_id" {

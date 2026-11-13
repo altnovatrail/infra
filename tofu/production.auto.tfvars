@@ -16,6 +16,11 @@ github_oidc_subject_prefix = "repo:altnovatrail@344507087/infra@1425816333"
 # One line, which bootstrap.sh reads; a change of it is a run of bootstrap.sh before the merge.
 eval_github_subject_prefixes = ["repo:altnovatrail@344507087/modules@1425775415", "repo:altnovatrail@344507087/tutor@1425813274"]
 
+# The operator's bucket and the bucket of the scans of consents, which bootstrap.sh makes and keeps,
+# with all their access (R28). A change of either is a run of bootstrap.sh before the merge.
+operator_bucket      = "novatrail-operator"
+consent_forms_bucket = "novatrail-consent-forms"
+
 # The first image of api, v0.1.22, which the first deployment pushed (run 43164987259): the jobs are
 # made with it. From now on the deployment owns which image they run (R11).
 api_image = "us-east4-docker.pkg.dev/novatrail/images/api@sha256:e3430c99f7069a853768f23222bebc6cd6cecb55caa9db58d7272f5ee46352b2"

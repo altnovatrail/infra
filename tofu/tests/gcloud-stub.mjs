@@ -7,7 +7,8 @@
 // STUB_LOG      the log of calls
 // STUB_CURRENCY the billing account's currency, USD unless given
 // STUB_FAIL     a command whose arguments, joined by spaces, hold this text fails, and its error
-//               names the billing account TF_VAR_billing_account gives, as gcloud's errors do
+//               names the billing account TF_VAR_billing_account gives and the member it was
+//               given, as gcloud's errors do
 // STUB_FAIL_ONCE the same, for the first such command alone, with an error that is not NOT_FOUND
 //
 // A policy is printed as one read in version 3 is: a binding under a condition names its role as it
@@ -36,7 +37,8 @@ const fail = (text, code = 1) => {
 };
 
 if (process.env.STUB_FAIL && args.join(" ").includes(process.env.STUB_FAIL)) {
-  fail(`PERMISSION_DENIED: the caller may not act on billingAccounts/${process.env.TF_VAR_billing_account}`);
+  const member = args.find((a) => a.startsWith("--member="));
+  fail(`PERMISSION_DENIED: the caller may not act on billingAccounts/${process.env.TF_VAR_billing_account}${member ? ` for ${member.slice("--member=".length)}` : ""}`);
 }
 if (process.env.STUB_FAIL_ONCE && !state.failedOnce && args.join(" ").includes(process.env.STUB_FAIL_ONCE)) {
   state.failedOnce = true;
@@ -66,6 +68,8 @@ const binding = (list, role, member, condition) => {
     list.push({ role, member, condition });
   }
 };
+// A binding on a bucket or a service account may leave its condition out, and is then bare.
+const conditionOrBare = () => (flag("condition") === undefined && flag("condition-from-file") === undefined ? "" : conditionOf());
 const conditionOf = () => {
   const file = flag("condition-from-file");
   if (file !== undefined) {
@@ -152,19 +156,54 @@ switch (true) {
     (state.roles[`${projectOf()}/${first}`] ?? notFound(`role ${first}`)).deleted = false;
     break;
 
-  case command === "storage buckets describe":
-    if (!state.buckets[first]) notFound(`bucket ${first}`);
-    out(`name: ${first}`);
+  // A bucket's place is shown as Cloud Storage names it, in capitals.
+  case command === "storage buckets describe": {
+    const bucket = state.buckets[first] ?? notFound(`bucket ${first}`);
+    out(flag("format") === "value(location)" ? bucket.location.toUpperCase() : `name: ${first}`);
     break;
+  }
+  // What gcloud gives a bucket it is not told otherwise: Standard, soft delete of 7 days, no
+  // uniform access, public access prevention inherited (sources 10.3, 10.7).
   case command === "storage buckets create":
     if (state.buckets[first]) fail("ALREADY_EXISTS: bucket");
-    state.buckets[first] = { project: projectOf(), location: flag("location"), versioning: false, policy: [] };
+    state.buckets[first] = {
+      project: projectOf(),
+      location: flag("location") ?? "us",
+      storageClass: flag("default-storage-class") ?? "STANDARD",
+      uniform: args.includes("--uniform-bucket-level-access"),
+      publicAccessPrevention: args.includes("--public-access-prevention") ? "enforced" : "inherited",
+      softDelete: flag("soft-delete-duration") ?? "7d",
+      versioning: false,
+      lifecycle: flag("lifecycle-file") === undefined ? null : JSON.parse(fs.readFileSync(flag("lifecycle-file"), "utf8")),
+      cors: null,
+      policy: [],
+    };
     break;
-  case command === "storage buckets update":
-    (state.buckets[first] ?? notFound(`bucket ${first}`)).versioning = args.includes("--versioning");
+  // An update changes what it is given and keeps the rest; it knows the flags the script gives.
+  case command === "storage buckets update": {
+    const bucket = state.buckets[first] ?? notFound(`bucket ${first}`);
+    for (const a of args.filter((a) => a.startsWith("--"))) {
+      const [name, value] = a.slice(2).split(/=(.*)/s);
+      if (name === "versioning" || name === "no-versioning") bucket.versioning = name === "versioning";
+      else if (name === "uniform-bucket-level-access") bucket.uniform = true;
+      else if (name === "public-access-prevention") bucket.publicAccessPrevention = "enforced";
+      else if (name === "default-storage-class") bucket.storageClass = value;
+      else if (name === "clear-soft-delete") bucket.softDelete = "0";
+      else if (name === "clear-cors") bucket.cors = null;
+      else if (name === "clear-lifecycle") bucket.lifecycle = null;
+      else if (name === "lifecycle-file") bucket.lifecycle = JSON.parse(fs.readFileSync(value, "utf8"));
+      else fail(`stub: unknown flag of an update: ${a}`, 2);
+    }
     break;
+  }
   case command === "storage buckets add-iam-policy-binding":
-    binding((state.buckets[first] ?? notFound(`bucket ${first}`)).policy, flag("role"), flag("member"), "");
+    binding((state.buckets[first] ?? notFound(`bucket ${first}`)).policy, flag("role"), flag("member"), conditionOrBare());
+    break;
+  // The buckets of one project, by their names, as `--format=value(name)` prints them.
+  case command === "storage buckets list":
+    for (const [url, bucket] of Object.entries(state.buckets)) {
+      if (bucket.project === projectOf()) out(url.slice("gs://".length));
+    }
     break;
   case command === "storage buckets get-iam-policy":
     printPolicy((state.buckets[first] ?? notFound(`bucket ${first}`)).policy);
@@ -219,7 +258,7 @@ switch (true) {
     break;
   }
   case command === "iam service-accounts add-iam-policy-binding":
-    binding((state.accounts[first] ?? notFound(`service account ${first}`)).policy, flag("role"), flag("member"), "");
+    binding((state.accounts[first] ?? notFound(`service account ${first}`)).policy, flag("role"), flag("member"), conditionOrBare());
     break;
   case command === "iam service-accounts remove-iam-policy-binding": {
     const account = state.accounts[first] ?? notFound(`service account ${first}`);

@@ -4,18 +4,24 @@
 # lives in, the federated pool that CI signs in through and its provider, the identity the
 # configuration is applied as and what that identity may do, the three custom roles the
 # configuration grants, and the pool github-eval with its provider, which the eval jobs of modules
-# and tutor read the keys for eval through (R120 spec; R20). Everything else is the configuration's, and CI applies it.
+# and tutor read the keys for eval through (R120 spec; R20). It also makes and keeps the operator's
+# bucket and the bucket of the scans of consents: their settings and lifecycle rules, the custom
+# roles granted in them, the two upload service accounts and the whole policy of each bucket (R28;
+# the 2026-11-13 amendment to R13). Everything else is the configuration's, and CI applies it.
 #
 # Safe to run again: every step looks before it makes, and what is written here is brought back
 # where it has drifted — the provider's condition, the custom roles' permissions, what the
-# identity holds on the project, the state bucket and the billing account, and who may borrow it.
+# identity holds on the project, the state bucket and the billing account, and who may borrow it,
+# the two buckets' settings, rules and policies, and who may sign as an upload service account.
 # What the identity holds and this script does not name is taken back, and so are Owner and Editor
-# from every service account of the project (R13).
+# from every service account of the project (R13), and whatever else the buckets' and the upload
+# service accounts' policies hold (R28).
 #
 # It reads the deployment's values from production.auto.tfvars and backend.hcl beside it, so that
 # each is written in one place, and prints at the end the two lines a workflow needs before it can
 # sign in at all. The billing account arrives from the environment, as TF_VAR_billing_account, the
-# same way it arrives in a plan, and nothing this script prints holds it.
+# same way it arrives in a plan, and so do the addresses of the organizers and of the operator,
+# each in a variable of its own: nothing this script prints holds any of them.
 #
 # BOOTSTRAP_TOFU_DIR and BOOTSTRAP_RETRY_DELAY are for its test: another directory to read the
 # values from, and the seconds between tries.
@@ -118,6 +124,10 @@ pool="$(hcl_value workload_identity_pool_id "$tfvars")"
 subject_prefix="$(hcl_value github_oidc_subject_prefix "$tfvars")"
 currency="$(hcl_value budget_currency "$tfvars")"
 bucket="$(hcl_value bucket "$backend")"
+operator_bucket="$(hcl_value operator_bucket "$tfvars")"
+consent_forms_bucket="$(hcl_value consent_forms_bucket "$tfvars")"
+api_service_name="$(hcl_value api_service_name "$tfvars")"
+api_service_name="${api_service_name:-api}"
 
 require project_id "$project" '^[a-z][a-z0-9-]{4,28}[a-z0-9]$'
 require region "$region" '^[a-z]+-[a-z]+[0-9]+$'
@@ -125,6 +135,16 @@ require workload_identity_pool_id "$pool" '^[a-z0-9-]{4,32}$'
 require github_oidc_subject_prefix "$subject_prefix" '^repo:[^/@:]+@[0-9]+/[^/@:]+@[0-9]+$'
 require budget_currency "$currency" '^[A-Z]{3}$'
 require bucket "$bucket" '^[a-z0-9][a-z0-9_.-]{1,61}[a-z0-9]$'
+require operator_bucket "$operator_bucket" '^[a-z0-9][a-z0-9_.-]{1,61}[a-z0-9]$'
+require consent_forms_bucket "$consent_forms_bucket" '^[a-z0-9][a-z0-9_.-]{1,61}[a-z0-9]$'
+require api_service_name "$api_service_name" '^[a-z][a-z0-9-]{0,18}[a-z0-9]$'
+
+# Three buckets of three purposes: the state, the organizers' files and the scans that only the
+# operator lists (R28). One name for two would put the policy written for one over the other's files.
+[[ "$operator_bucket" != "$consent_forms_bucket" ]] || fail "operator_bucket and consent_forms_bucket are one bucket, ${operator_bucket}: the organizers would list the names of the scans"
+for named in "$operator_bucket" "$consent_forms_bucket"; do
+    [[ "$named" != "$bucket" ]] || fail "the bucket ${named} of ${tfvars##*/} is the state bucket of ${backend##*/}: learners' files are not kept beside the state"
+done
 
 # The numbers GitHub gives the owner and the repository, which nobody else can take over as a name
 # can be: repo:OWNER@OWNER_ID/NAME@REPOSITORY_ID.
@@ -167,15 +187,42 @@ done
 billing="${TF_VAR_billing_account:-}"
 [[ "$billing" =~ ^[0-9A-Z]{6}-[0-9A-Z]{6}-[0-9A-Z]{6}$ ]] || fail "TF_VAR_billing_account is not set, or is not the id of a billing account, which reads like 01ABCD-234567-89EFGH"
 
-# gcloud names the billing account in its errors about it, and a refusal is the likeliest thing for
-# it to say here. So a command given the account shows what it wrote to stderr with the id replaced
-# by its name.
-billing_hidden() {
-    local errors status=0
+# The people who hold the operator's buckets, each a Google account by a variable of its own, never
+# by a file of the repository (R28): the measurement organizer, the eval-set organizer, and the
+# operator, who lists and reads the scans of consents. A variable not set is a refusal, since a run
+# from a shell that lacks it would take that person's access away; none means no binding for them.
+# Today all three are the author (R139 spec). The address of the alerts, TF_VAR_operator_email, is
+# not reused: it may be a list, not an account. An address is never printed, not even in a refusal.
+person() {
+    local name="$1" who="$2" value
+    [[ -n "${!name:-}" ]] || fail "${name} is not set: the address of the ${who}'s Google account, or none for no binding"
+    value="${!name}"
+    value="${value,,}"
+    [[ "$value" == none || "$value" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || fail "${name} is neither the address of a Google account nor none"
+    printf '%s' "$value"
+}
+measure_organizer="$(person BOOTSTRAP_MEASURE_ORGANIZER "measurement organizer")"
+eval_set_organizer="$(person BOOTSTRAP_EVAL_SET_ORGANIZER "eval-set organizer")"
+operator="$(person BOOTSTRAP_OPERATOR operator)"
+
+# gcloud names the billing account in its errors about it, and a member in its errors about a
+# binding, and a refusal is the likeliest thing for it to say here. So a command given either shows
+# what it wrote to stderr with the account's id and the people's addresses replaced by names. A
+# member being taken back may be a person this run no longer names: hidden_member names it, and it
+# is hidden too. A member reads user:<address>, or deleted:user:<address>?uid=<number> once its
+# account is gone.
+hidden_member=""
+hidden() {
+    local errors status=0 text address member="${hidden_member%%\?*}"
     errors="$(mktemp)"
     "$@" 2> "$errors" || status=$?
-    sed "s/${billing}/<billing account>/g" "$errors" >&2
+    text="$(cat "$errors")"
     rm -f "$errors"
+    text="${text//"$billing"/<billing account>}"
+    for address in "$measure_organizer" "$eval_set_organizer" "$operator" "${member##*:}"; do
+        [[ -z "$address" || "$address" == none ]] || text="${text//"$address"/<address>}"
+    done
+    [[ -z "$text" ]] || printf '%s\n' "$text" >&2
     return "$status"
 }
 
@@ -233,6 +280,31 @@ sign_in_permissions=(
     firebaseauth.users.get
     firebaseauth.users.update
     firebaseauth.users.delete
+)
+
+# The roles of the operator's bucket and of the scans' bucket, which this script alone grants, in
+# the buckets' own policies (R28). Each organizer lists the whole operator's bucket, as a list is
+# granted on the bucket and no condition on names narrows it (sources 10.2); what they read, write
+# and erase, roles/storage.objectUser grants them under a condition on their prefixes.
+lister_role=operatorBucketLister
+lister_permissions=(
+    storage.objects.list
+)
+
+# api's own identity on the scans' prefix: it puts each scan under a new name and erases one by a
+# name from its database, and reads and lists none; an insert that overwrites nothing needs no more
+# (sources 10.2, 10.5).
+consent_writer_role=consentFormsWriter
+consent_writer_permissions=(
+    storage.objects.create
+    storage.objects.delete
+)
+
+# What an upload link may do, as the upload service account that signs it: put a new object under
+# its organizer's upload prefixes, and neither read, list, overwrite nor erase one (R28).
+uploader_role=bucketUploader
+uploader_permissions=(
+    storage.objects.create
 )
 
 # -- what the configuration's identity may do -------------------------------------
@@ -358,7 +430,7 @@ held_by() {
 # The billing account is read first: its currency is the budget's, and a budget in another one would
 # be refused only at the first apply, after a merge.
 echo "==> billing account"
-billed_in="$(billing_hidden gcloud billing accounts describe "$billing" --format='value(currencyCode)')"
+billed_in="$(hidden gcloud billing accounts describe "$billing" --format='value(currencyCode)')"
 if [[ -z "$billed_in" ]]; then
     echo "    its currency is not shown: compare it with budget_currency (${currency}) in the billing console"
 elif [[ "$billed_in" != "$currency" ]]; then
@@ -374,9 +446,9 @@ fi
 project_number="$(retry_read gcloud projects describe "$project" --format='value(projectNumber)')"
 # The budget counts the spend of the account the project pays through, so it is that account or
 # none: a project already paid for by another is not moved here.
-linked="$(billing_hidden retry_read gcloud billing projects describe "$project" --format='value(billingAccountName)')"
+linked="$(hidden retry_read gcloud billing projects describe "$project" --format='value(billingAccountName)')"
 if [[ -z "$linked" ]]; then
-    retry billing_hidden gcloud billing projects link "$project" --billing-account="$billing"
+    retry hidden gcloud billing projects link "$project" --billing-account="$billing"
     echo "    linked to the billing account"
 elif [[ "$linked" != "billingAccounts/${billing}" ]]; then
     fail "the project pays through another billing account than TF_VAR_billing_account: link it by hand, or give that account"
@@ -413,6 +485,15 @@ custom_role "$publisher_role" "Publishes app's build" \
 custom_role "$sign_in_role" "Manages api's users of sign-in" \
     "Reads users of sign-in, revokes their tokens and deletes them. It changes no setting of sign-in." \
     "${sign_in_permissions[@]}"
+custom_role "$lister_role" "Lists the operator's bucket" \
+    "Lists the names of the objects of the operator's bucket, and reads none of them." \
+    "${lister_permissions[@]}"
+custom_role "$consent_writer_role" "Writes api's scans of consents" \
+    "Creates and erases the scans of consents under api's prefix, and reads and lists none." \
+    "${consent_writer_permissions[@]}"
+custom_role "$uploader_role" "Uploads to the operator's bucket" \
+    "Creates new objects under an organizer's upload prefixes, and reads, overwrites and erases none." \
+    "${uploader_permissions[@]}"
 
 echo "==> state bucket gs://${bucket}"
 ensure bucket_exists make_bucket
@@ -527,11 +608,11 @@ while IFS=$'\t' read -r role held_under; do
     echo "    ${role} on gs://${bucket}: taken back"
 done < <(held_by "$member" "$bucket_policy")
 
-billing_policy="$(billing_hidden retry_read gcloud billing accounts get-iam-policy "$billing" \
+billing_policy="$(hidden retry_read gcloud billing accounts get-iam-policy "$billing" \
     --flatten='bindings[].members' --format='value(bindings.role,bindings.members,bindings.condition.expression)')"
 while IFS=$'\t' read -r role _; do
     [[ -n "$role" && " ${billing_wanted[*]} " != *" ${role} "* ]] || continue
-    retry billing_hidden gcloud billing accounts remove-iam-policy-binding "$billing" \
+    retry hidden gcloud billing accounts remove-iam-policy-binding "$billing" \
         --member="$member" --role="$role" --quiet
     echo "    ${role} on the billing account: taken back"
 done < <(held_by "$member" "$billing_policy")
@@ -548,7 +629,7 @@ retry gcloud storage buckets add-iam-policy-binding "gs://${bucket}" \
 echo "    roles/storage.objectAdmin on gs://${bucket}"
 
 for role in "${billing_wanted[@]}"; do
-    retry billing_hidden gcloud billing accounts add-iam-policy-binding "$billing" \
+    retry hidden gcloud billing accounts add-iam-policy-binding "$billing" \
         --member="$member" --role="$role" --quiet
     echo "    ${role} on the billing account"
 done
@@ -619,6 +700,249 @@ retry gcloud iam service-accounts add-iam-policy-binding "$service_account" \
     --project="$project" --member="$borrower" --role=roles/iam.workloadIdentityUser --quiet
 echo "    ${borrower##*/subject/}"
 
+# -- the operator's buckets (R28) -------------------------------------------------
+#
+# The policy of a bucket is one resource, and the configuration would grant it at each apply of CI,
+# so the buckets and all their access are made here, as the pools and the custom roles are (the
+# 2026-11-13 amendment to R13). How they are built and why is docs/architecture.md, section 3.7.
+
+# A member of a policy as the script names it in what it prints: a person by what they are, never
+# by their address, also once their account is deleted.
+shown() {
+    case "$1" in
+        user:* | group:* | domain:*) echo "a ${1%%:*}" ;;
+        deleted:*) echo "a deleted account" ;;
+        *) echo "$1" ;;
+    esac
+}
+
+# A policy, brought to exactly the bindings given: each binding a line of role, member, condition's
+# expression, its title and what the script prints of it, apart by the unit separator, the
+# expression and the title empty for a binding with none. What the policy holds beyond them, under
+# any condition, is taken back; then a binding given and not held under its very expression is
+# granted, and a binding held as it is given is left alone. IAM tells bindings apart by their
+# condition, and gcloud takes a member's role back under every condition at once, so a member whose
+# role is taken back under one is granted the others again. A condition goes in from a file, since
+# its commas would split it on the command line. Which version of the policy gcloud reads it chooses
+# itself (R13); in version 1 a binding under a condition would read as a role named
+# <role>_withcond_<hash>, not given, and taking it back by that name would fail and stop the script
+# rather than pass by it. The first run on the project shows which version it reads (T49).
+#   keep_policy bucket <name> <bindings>...
+#   keep_policy account <email> <bindings>...
+keep_policy() {
+    local kind="$1" target="$2"
+    shift 2
+    local -a group at
+    case "$kind" in
+        bucket) group=(storage buckets) at=("gs://${target}") ;;
+        account) group=(iam service-accounts) at=("$target" --project="$project") ;;
+    esac
+    local line role holder held_under expression title label sep=$'\x1f'
+    local given=$'\n' held=$'\n' cleared=$'\n' policy
+    for line in "$@"; do
+        IFS="$sep" read -r role holder expression _ <<< "$line"
+        given+="${role}${sep}${holder}${sep}${expression}"$'\n'
+    done
+    policy="$(hidden retry_read gcloud "${group[@]}" get-iam-policy "${at[@]}" \
+        --flatten='bindings[].members' --format='value(bindings.role,bindings.members,bindings.condition.expression)')"
+    while IFS=$'\t' read -r role holder held_under; do
+        [[ -n "$role" ]] || continue
+        held+="${role}${sep}${holder}${sep}${held_under}"$'\n'
+        [[ "$given" == *$'\n'"${role}${sep}${holder}${sep}${held_under}"$'\n'* ]] && continue
+        [[ "$cleared" == *$'\n'"${role}${sep}${holder}"$'\n'* ]] && continue
+        hidden_member="$holder" retry hidden gcloud "${group[@]}" remove-iam-policy-binding "${at[@]}" \
+            --member="$holder" --role="$role" --all --quiet
+        cleared+="${role}${sep}${holder}"$'\n'
+        echo "    ${role} of $(shown "$holder")${held_under:+ under a condition}: not named here, taken back"
+    done <<< "$policy"
+    for line in "$@"; do
+        IFS="$sep" read -r role holder expression title label <<< "$line"
+        if [[ "$cleared" != *$'\n'"${role}${sep}${holder}"$'\n'* && "$held" == *$'\n'"${role}${sep}${holder}${sep}${expression}"$'\n'* ]]; then
+            echo "    ${label}"
+            continue
+        fi
+        if [[ -z "$expression" ]]; then
+            retry hidden gcloud "${group[@]}" add-iam-policy-binding "${at[@]}" \
+                --member="$holder" --role="$role" --condition=None --quiet
+        else
+            printf 'expression: %s\ntitle: %s\n' "$expression" "$title" > "$work/binding-condition"
+            retry hidden gcloud "${group[@]}" add-iam-policy-binding "${at[@]}" \
+                --member="$holder" --role="$role" --condition-from-file="$work/binding-condition" --quiet
+        fi
+        echo "    ${label}: granted"
+    done
+}
+
+# A binding, as keep_policy takes it.
+binding() {
+    local IFS=$'\x1f'
+    echo "$*"
+}
+
+# The condition on objects whose names start with one of the prefixes given, in the bucket given.
+under() {
+    local in="$1" prefix expression=""
+    shift
+    for prefix in "$@"; do
+        expression+="${expression:+ || }resource.name.startsWith('projects/_/buckets/${in}/objects/${prefix}')"
+    done
+    echo "$expression"
+}
+
+# A bucket of learners' files, made, or brought back to its settings: in the region, of the class
+# Standard, with uniform access, public access prevention enforced, no soft delete, no object
+# versions and no CORS (R28; sources 10.3, 10.7). It is the project's own or none: names are
+# global, and a bucket of the name in another project, the operator's own among them, would get
+# these rules and this policy over its files, so it is looked for among the project's buckets, and
+# the create of a name taken elsewhere is refused and stops the script. Its place cannot change once
+# it is made, so a bucket of the project found in another place stops the script too.
+at_bucket=""
+data_bucket_exists() {
+    gcloud storage buckets list --project="$project" --format='value(name)' | grep -qxF "$at_bucket"
+}
+make_data_bucket() {
+    gcloud storage buckets create "gs://${at_bucket}" \
+        --project="$project" \
+        --location="$region" \
+        --default-storage-class=STANDARD \
+        --uniform-bucket-level-access \
+        --public-access-prevention \
+        --soft-delete-duration=0
+}
+data_bucket() {
+    at_bucket="$1"
+    local lifecycle="$2" location
+    echo "==> bucket gs://${at_bucket}"
+    ensure data_bucket_exists make_data_bucket
+    location="$(retry_read gcloud storage buckets describe "gs://${at_bucket}" --format='value(location)')"
+    [[ "${location,,}" == "${region,,}" ]] || fail "the bucket gs://${at_bucket} is in ${location:-no place shown}, not in ${region}: a bucket's place cannot change, so move its files to a bucket made anew in the region, by hand"
+    local -a rules=(--clear-lifecycle)
+    [[ -z "$lifecycle" ]] || rules=(--lifecycle-file="$lifecycle")
+    retry gcloud storage buckets update "gs://${at_bucket}" \
+        --default-storage-class=STANDARD \
+        --uniform-bucket-level-access \
+        --public-access-prevention \
+        --clear-soft-delete \
+        --no-versioning \
+        --clear-cors \
+        "${rules[@]}"
+    echo "    in ${region}, Standard, uniform access, public access prevented, no soft delete, no versions, no CORS"
+    if [[ -n "$lifecycle" ]]; then echo "    its lifecycle rules"; else echo "    no lifecycle rule"; fi
+}
+
+# The lifecycle of the operator's bucket, docs/architecture.md, section 3.7. Rules of one action
+# hold where any of them matches, and a rule's conditions where all of them do (sources 10.7). The
+# files of a session are erased by their age, as nobody rewrites one; what an organizer may rewrite,
+# by the Custom-Time the organizer's tool sets: two years are at least 730 days and five years at
+# most 1827, and the link adds up to half a day to the session (sources 10.3).
+cat > "$work/lifecycle.json" << 'LIFECYCLE'
+{
+  "lifecycle": {
+    "rule": [
+      { "action": { "type": "Delete" }, "condition": { "age": 728, "matchesPrefix": ["measure/samples/", "child/samples/"] } },
+      { "action": { "type": "Delete" }, "condition": { "daysSinceCustomTime": 728, "matchesPrefix": ["measure/records/", "child/records/", "measure/reports/", "child/reports/"] } },
+      { "action": { "type": "Delete" }, "condition": { "daysSinceCustomTime": 1827, "matchesPrefix": ["measure/forms/", "child/forms/"] } },
+      { "action": { "type": "Delete" }, "condition": { "age": 364, "matchesPrefix": ["eval-set/forms/"] } },
+      { "action": { "type": "Delete" }, "condition": { "daysSinceCustomTime": 364, "matchesPrefix": ["eval-set/forms/"] } }
+    ]
+  }
+}
+LIFECYCLE
+
+# The scans have no rule: a scan's period is its consent's and five years, and api's sweep erases it
+# (R116, R136 spec).
+data_bucket "$operator_bucket" "$work/lifecycle.json"
+data_bucket "$consent_forms_bucket" ""
+
+# The service accounts an upload link is signed as, one per organizer, so that one's link does not
+# reach the other's prefixes (R28). Each holds nothing on the project, and its own policy lends it to
+# its organizer alone, by the Token Creator, which signs blobs (sources 10.2).
+at_account=""
+upload_account_exists() { gcloud iam service-accounts describe "${at_account}@${project}.iam.gserviceaccount.com" --project="$project"; }
+make_upload_account() {
+    gcloud iam service-accounts create "$at_account" \
+        --project="$project" \
+        --display-name="Signs the ${at_account#upload-} organizer's upload links"
+}
+upload_account() {
+    at_account="$1"
+    local organizer="$2" who="$3"
+    local email="${at_account}@${project}.iam.gserviceaccount.com"
+    local -a bindings=()
+    echo "==> upload service account ${email}"
+    ensure upload_account_exists make_upload_account
+    # Whoever signs as it may act as it in full, so a role on the project would carry an upload link,
+    # and the organizer, past create-only.
+    local role held_under on_project
+    on_project="$(read_project_policy)"
+    while IFS=$'\t' read -r role held_under; do
+        [[ -n "$role" ]] || continue
+        retry gcloud projects remove-iam-policy-binding "$project" \
+            --member="serviceAccount:${email}" --role="$role" --all --quiet
+        echo "    ${role}${held_under:+ under a condition} on the project: taken back"
+    done < <(held_by "serviceAccount:${email}" "$on_project")
+    if [[ "$organizer" == none ]]; then
+        echo "    the ${who}: none, so nobody signs as it"
+    else
+        bindings+=("$(binding roles/iam.serviceAccountTokenCreator "user:${organizer}" "" "" "roles/iam.serviceAccountTokenCreator of the ${who}")")
+    fi
+    keep_policy account "$email" "${bindings[@]}"
+}
+upload_account upload-measure "$measure_organizer" "measurement organizer"
+upload_account upload-eval-set "$eval_set_organizer" "eval-set organizer"
+
+# api's identity is the configuration's, made by the first apply. Until then the scans' bucket is
+# made without its binding, and the script is run again after that apply. A look that fails for
+# another reason than that it is not there is tried again, and stops the script if it keeps failing:
+# read as no identity, it would take api's right away.
+api_account="${api_service_name}-run@${project}.iam.gserviceaccount.com"
+api_exists=true
+if ! gcloud iam service-accounts describe "$api_account" --project="$project" > /dev/null 2> "$work/api-error"; then
+    if grep -q NOT_FOUND "$work/api-error"; then
+        api_exists=false
+    else
+        retry_read gcloud iam service-accounts describe "$api_account" --project="$project" > /dev/null
+    fi
+fi
+
+custom="projects/${project}/roles"
+operator_bindings=()
+if [[ "$measure_organizer" != none ]]; then
+    operator_bindings+=(
+        "$(binding roles/storage.objectUser "user:${measure_organizer}" "$(under "$operator_bucket" measure/ child/)" "measure and child" "roles/storage.objectUser of the measurement organizer, under measure/ and child/")"
+        "$(binding "${custom}/${lister_role}" "user:${measure_organizer}" "" "" "${lister_role} of the measurement organizer")"
+    )
+fi
+if [[ "$eval_set_organizer" != none ]]; then
+    operator_bindings+=(
+        "$(binding roles/storage.objectUser "user:${eval_set_organizer}" "$(under "$operator_bucket" eval-set/)" "eval-set" "roles/storage.objectUser of the eval-set organizer, under eval-set/")"
+    )
+    # One person may be both organizers, and a binding is held once.
+    [[ "$eval_set_organizer" == "$measure_organizer" ]] ||
+        operator_bindings+=("$(binding "${custom}/${lister_role}" "user:${eval_set_organizer}" "" "" "${lister_role} of the eval-set organizer")")
+fi
+operator_bindings+=(
+    "$(binding "${custom}/${uploader_role}" "serviceAccount:upload-measure@${project}.iam.gserviceaccount.com" "$(under "$operator_bucket" measure/samples/ measure/forms/ child/samples/ child/forms/)" "measure and child uploads" "${uploader_role} of upload-measure, under measure/ and child/, samples/ and forms/")"
+    "$(binding "${custom}/${uploader_role}" "serviceAccount:upload-eval-set@${project}.iam.gserviceaccount.com" "$(under "$operator_bucket" eval-set/samples/ eval-set/forms/)" "eval-set uploads" "${uploader_role} of upload-eval-set, under eval-set/samples/ and eval-set/forms/")"
+)
+echo "==> who holds gs://${operator_bucket}"
+keep_policy bucket "$operator_bucket" "${operator_bindings[@]}"
+
+consent_bindings=()
+if [[ "$operator" == none ]]; then
+    echo "    the operator: none, so nobody reads the scans"
+else
+    consent_bindings+=("$(binding roles/storage.objectViewer "user:${operator}" "" "" "roles/storage.objectViewer of the operator")")
+fi
+if [[ "$api_exists" == true ]]; then
+    consent_bindings+=("$(binding "${custom}/${consent_writer_role}" "serviceAccount:${api_account}" "$(under "$consent_forms_bucket" consent-forms/)" "consent-forms" "${consent_writer_role} of ${api_account}, under consent-forms/")")
+fi
+echo "==> who holds gs://${consent_forms_bucket}"
+keep_policy bucket "$consent_forms_bucket" "${consent_bindings[@]}"
+if [[ "$api_exists" == false ]]; then
+    echo "    ${api_account} is not there yet: the first apply makes it, and this script, run again after it, grants it ${consent_writer_role}"
+fi
+
 provider="projects/${project_number}/locations/global/workloadIdentityPools/${pool}/providers/github"
 
 eval_summary=""
@@ -630,6 +954,14 @@ GCP_EVAL_WORKLOAD_IDENTITY_PROVIDER=projects/${project_number}/locations/global/
 "
 fi
 
+api_summary=""
+if [[ "$api_exists" == false ]]; then
+    api_summary="
+
+Run this script again after the first apply, which makes ${api_account}: until then api
+may not write the scans of consents to gs://${consent_forms_bucket}."
+fi
+
 cat << SUMMARY
 
 Done. A workflow signs in with these two lines; neither is a secret:
@@ -639,5 +971,5 @@ GCP_CONFIG_SERVICE_ACCOUNT=${service_account}
 
 ${eval_summary}Left to do once, in the repository's settings rather than here: the environment
 ${config_environment}, which only main may run in, and its secrets TF_VAR_billing_account,
-the same id this script was given, and TF_VAR_operator_email, without which no alert is made.
+the same id this script was given, and TF_VAR_operator_email, without which no alert is made.${api_summary}
 SUMMARY

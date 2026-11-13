@@ -97,3 +97,37 @@ run "the_publisher_in_the_configurations_environment_is_refused" {
 
   expect_failures = [var.hosting_environment]
 }
+
+# The buckets bootstrap.sh makes for the operator are named in the values both read, and the module
+# takes them in the form the script does, and not one bucket for both (R28).
+run "a_bucket_name_of_another_form_is_refused" {
+  command = plan
+
+  variables {
+    operator_bucket = "Novatrail-Operator"
+  }
+
+  expect_failures = [var.operator_bucket]
+}
+
+run "one_bucket_for_the_files_and_the_scans_is_refused" {
+  command = plan
+
+  variables {
+    consent_forms_bucket = "novatrail-test-0-operator"
+  }
+
+  expect_failures = [var.consent_forms_bucket]
+}
+
+# The scans' bucket grants api's service account by the name the module gives it: bootstrap.sh
+# takes the default of api_service_name where the values leave it out, and that default is the
+# module's own.
+run "bootstraps_api_account_is_the_modules" {
+  command = plan
+
+  assert {
+    condition     = google_service_account.api.account_id == "${regex("(?m)^api_service_name=\"\\$\\{api_service_name:-([a-z0-9-]+)\\}\"$", file("bootstrap.sh"))[0]}-run"
+    error_message = "The service account bootstrap.sh grants in the scans' bucket, by the default name of api's service, is the one the module makes."
+  }
+}
