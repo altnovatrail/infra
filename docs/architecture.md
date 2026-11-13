@@ -1,151 +1,151 @@
-# infra — архитектура
+# infra — architecture
 
-> Статус: детализация, эпик E1, закончена 2026-11-08 — разделы 2 и 3; первый код, эпик E2, сделан 2026-11-09 — модуль, `bootstrap.sh`, проверки и выкладка, — и проект платформы `novatrail` поднят. Первая выкладка, 2026-11-12, выкатила по списку `api` v0.1.22 и `app` v0.1.0 на `https://novatrail.web.app` (T24, эпик E4; R25). В тот же день проверки после неё сверили на проекте то, что E1–E4 оставляли первой выкладке (T42). Self-hosting и локальный запуск, эпик E3, сделаны 2026-11-10 — руководство [SELF-HOSTING.md](../SELF-HOSTING.md) и тесты на значениях копии. Эпик E4, первое развёртывание, сделан 2026-11-12, а в нём 2026-11-11 — переход на `spec` v0.15.0, T40, и 2026-11-12 — на v0.15.1, T41; его итог, T38, сверил разделы 3–3.5 с кодом. Текущий эпик — E5, бакет оператора и порядок при утечке ([RUN.md](../RUN.md)); архивы эпиков, E4 среди них, — `docs/plan/`. Вне эпика 2026-11-12 — переход на `spec` v0.16.3 и перестройка документов, T52 (R26): записи источников — в [sources.md](sources.md), а раздел 4 — указатель. Каркас — из заготовки `spec`, 2026-10-19.
+> Status: the detailing, epic E1, finished 2026-11-08 — sections 2 and 3; the first code, epic E2, done 2026-11-09 — the module, `bootstrap.sh`, the checks and the deployment —, and the platform's project `novatrail` is up. The first deployment, 2026-11-12, rolled out by the list `api` v0.1.22 and `app` v0.1.0 to `https://novatrail.web.app` (T24, epic E4; R25). The same day the checks after it verified on the project what E1–E4 had left to the first deployment (T42). Self-hosting and the local run, epic E3, done 2026-11-10 — the guide [SELF-HOSTING.md](../SELF-HOSTING.md) and the tests on a copy's values. Epic E4, the first deployment, done 2026-11-12, and within it, on 2026-11-11, the move to `spec` v0.15.0, T40, and on 2026-11-12 to v0.15.1, T41; its outcome, T38, checked sections 3–3.5 against the code. The current epic is E5, the operator's bucket and the procedure for a breach ([RUN.md](../RUN.md)); the epics' archives, E4 among them, are `docs/plan/`. Outside an epic, on 2026-11-12, the move to `spec` v0.16.3 and the restructuring of the documents, T52 (R26): the records of sources are in [sources.md](sources.md), and section 4 is a pointer. The frame is from the template of `spec`, 2026-10-19.
 >
-> Что делает компонент, чего не делает и что о нём ещё предстоит решить. Это подробности его карточки — architecture 3.11 spec. Карточка остаётся сводкой: если подробности меняют то, что в ней сказано, она правится в `spec` тем же путём, что и вопросы в его реестры (RULES.md, Across repositories).
+> What the component does, what it does not do, and what is still to decide about it. This is the detail of its card — architecture 3.11 spec. The card stays the summary: if the detail changes what the card says, the card is changed in `spec` the same way as the questions for its registers (RULES.md, Across repositories).
 >
-> Почему решено так, а не иначе, — в [decisions.md](decisions.md); план работ — в [RUN.md](../RUN.md). Понятия — concepts spec. Документы и решения `spec` лежат в `spec/docs/` и цитируются с суффиксом «spec».
+> Why it was decided so and not otherwise is in [decisions.md](decisions.md); the work plan is in [RUN.md](../RUN.md). The concepts are concepts spec. The documents and decisions of `spec` are under `spec/docs/` and are cited with the suffix "spec".
 
-## 1. Назначение и границы
+## 1. Purpose and boundaries
 
-**Делает:**
-- описывает кодом общую основу платформы: проекты в облаке, Workload Identity Federation для CI, Artifact Registry, домены, Secret Manager и бюджеты (architecture 3.11 spec). Основа — технологическая база MathTrail Canvas: Cloud Run и управляемые сервисы с масштабированием до нуля, Terraform (R11 spec), а инструмент — его открытый форк OpenTofu, по точной версии (поправка 2026-11-08 к R11 spec; Т-29 закрыт; раздел 3.6). Образец — `infra/` canvas-api: `bootstrap.sh` и один корневой модуль на HCL (architecture 3.11 spec);
-- настраивает журналы и трассы платформы — Cloud Logging и Trace (architecture 3.12 spec):
-  - журналы запросов Cloud Run исключаются в Cloud Logging. Cloud Run пишет их сам, и в их поле `httpRequest` есть IP-адрес клиента, а COPPA относит IP-адрес к персональной информации (architecture 1 spec; privacy 4 spec). Исключаются все, фильтром в каждом sink. Трассы, которые Cloud Run пишет сам на части запросов, возможны: Cloud Trace API не выключить, пока он нужен Cloud Scheduler, — они лежат в `us-east4`, а их атрибуты сверит первая трасса: с начала работы сервиса, 2026-11-12, трасс не было (третья поправка 2026-11-09 и поправка 2026-11-12 к R07; раздел 3.4);
-  - регион журналов — `us-east4`, а бакет `_Required` — в `global`, пока нет организации Google Cloud (R04; R109 spec);
-- выбирает и настраивает хостинг сборки `app` — Firebase Hosting, а своего домена у первого развёртывания нет (R06; раздел 3.3), а к этапу 4 — домен виджетов, отдельный регистрируемый (R16 spec), и хостинг виджетов (architecture 3.12 spec; Т-17). Платформе годится только хостинг, который шлёт свои заголовки ответа — CSP по `csp.json` сборки и кеш, — и отдаёт `/deployment.json` вне архива сборки (Т-17; architecture 3.12 spec). Страница образцов `canvas` переедет на Firebase Hosting отдельным сайтом проекта со своим origin, когда так решит автор: анализ сделан — Google для Hosting обработчик, а IP-адреса он хранит «a few months» (вторая поправка 2026-11-08 к R25 spec; R128 spec; П-9 закрыт);
-- держит бакет оператора — закрытый бакет Cloud Storage в `us-east4` для образцов со страницы образцов, форм к ним и сканов согласий, по префиксу на назначение, с доступом только организаторов и оператора, без CI и агентов, и правилами жизненного цикла; скан формы согласия из `app` пишет туда `api` под своим префиксом: бакет и префикс сервис `api` и задание `sweep` получают переменными `API_CONSENT_FORMS_BUCKET` и `API_CONSENT_FORMS_PREFIX`, а их учётные записи — право создавать и стирать объекты на префиксе, без чтения (R125, R126 spec; поправки 2026-11-09 и 2026-11-10 к R116 spec; architecture 3.11 spec; README `api` v0.1.21, раздел 4). Кода бакета ещё нет — Д11 таблицы 4 [DEBT.md](../DEBT.md), — а как подписывать ссылку на загрузку, — раздел 2.7;
-- выкатывает сервисы и сборку `app` по одному списку точных версий и дайджестов — это решил R106 spec, и Т-19 закрыт. На схеме зависимостей `infra` выкатывает релизы `api` и `app` (repositories 3 spec). Как идёт выкладка (R105 spec, R106 spec; architecture 3.11 spec):
-  - образ сервиса собирает выкладка `infra`: берёт из релиза сервиса бинарник и `Dockerfile`, проверяет их рецептом `spec` `release-verify` (R77 spec), собирает образ на базе `gcr.io/distroless/static-debian13:nonroot` по digest, кладёт его в закрытый Artifact Registry `infra` и выкатывает ревизию Cloud Run по digest образа. Образ `api` собирается по договору его релиза (вторая поправка 2026-11-08 к R106 spec; раздел 3.2). Что сервис кладёт в образ сверх бинарника, делает его собственный код на стадии сборки: у `api` это пакеты модулей. Образов NovaTrail не публикует (RULES.md, Production images);
-  - сборку `app` выкатка проверяет по подписи архива, пишет `/deployment.json` из списка выкатки, приняв его чтением конфигурации развёртывания `spec` своего подмодуля — схемой и правилами — и схемой `deployment.schema.json` этой сборки, а сборке другой версии формата отказывая (поправки 2026-11-08 и 2026-11-09 к R85 spec; R19), собирает заголовок CSP по её `csp.json` и выпускает сборку, файл и заголовок одним выпуском хостинга (R85 spec). Список называет рядом с дайджестом сборки дайджест её `/deployment.json` (Т-19);
-  - откат — revert списка. `api`, а пока формат модуля v0 — и сборка `app`, перешедшая на новую версию формата, откатываются только вперёд (Т-19);
-  - задания `api` при выкладке — миграции до приёма запросов, задание после выкладки — когда ревизия приняла весь трафик — выкладка запускает тем же образом, а факты развёртывания и нижнюю ступень допуска `api` передаёт ревизии из своего репозитория (поправка 2026-11-08 к R106 spec): факты — файлом, томом секрета, путь — в `API_ADMISSION_FACTS_FILE`, ступень — в `API_ADMISSION_RUNG`, а до миграций задание зовёт команду `api`, которая их проверяет (вторая поправка 2026-11-08 к R106 spec);
-  - формат и место списка и кто его правит, что выкатка проверяет до выкладки, что релиз `api` ниже выкаченного отклоняется и как ревизия `api` получает факты и ступень, — решено (R05; раздел 3.2);
-- даёт self-hosting и локальный запуск всей платформы (architecture 3.11 spec): код открыт, и свою копию платформы оператор может развернуть сам (product 3 spec). Self-hosting берёт тот же список и тот же путь выкладки: собирает образ у себя из того же бинарника и по тому же `Dockerfile` (R105 spec, R106 spec). Подписанная сборка `app` у всех одна: конфигурацию развёртывания она читает во время работы из `/deployment.json`, а его оператор self-hosting пишет сам по той же схеме (R85 spec; Т-19). Свои факты для допуска к ИИ self-hosting заявляет сам (Т-20; R96 spec).
+**Does:**
+- describes in code the platform's shared base: the projects in the cloud, Workload Identity Federation for CI, Artifact Registry, the domains, Secret Manager and the budgets (architecture 3.11 spec). The base is the technology base of MathTrail Canvas: Cloud Run and managed services that scale to zero, Terraform (R11 spec), and the tool is its open fork OpenTofu, at an exact version (the 2026-11-08 amendment to R11 spec; Т-29 closed; section 3.6). The model is `infra/` of canvas-api: `bootstrap.sh` and one root module in HCL (architecture 3.11 spec);
+- sets up the platform's logs and traces — Cloud Logging and Trace (architecture 3.12 spec):
+  - Cloud Run's request logs are excluded in Cloud Logging. Cloud Run writes them itself, and their field `httpRequest` holds the client's IP address, while COPPA counts an IP address as personal information (architecture 1 spec; privacy 4 spec). All of them are excluded, by a filter in each sink. The traces that Cloud Run writes itself on a part of the requests are possible — Cloud Trace API cannot be turned off while Cloud Scheduler needs it —: they are kept in `us-east4`, and the first trace will check their attributes: since the service started, 2026-11-12, there have been no traces (the third 2026-11-09 amendment and the 2026-11-12 amendment to R07; section 3.4);
+  - the logs' region is `us-east4`, and the bucket `_Required` is in `global` while there is no Google Cloud organization (R04; R109 spec);
+- chooses and sets up the hosting of the build of `app` — Firebase Hosting, and the first deployment has no domain of its own (R06; section 3.3) —, and by stage 4 the widgets' domain, a separate registrable one (R16 spec), and the hosting of the widgets (architecture 3.12 spec; Т-17). Only a hosting that sends its own response headers — CSP by the build's `csp.json`, and the cache — and serves `/deployment.json` outside the build's archive suits the platform (Т-17; architecture 3.12 spec). The samples page of `canvas` will move to Firebase Hosting as a separate site of the project with its own origin when the author decides so: the analysis is done — Google is a processor for Hosting, and it keeps IP addresses "a few months" (the second 2026-11-08 amendment to R25 spec; R128 spec; П-9 closed);
+- keeps the operator's bucket — a private Cloud Storage bucket in `us-east4` for the samples from the samples page, the forms for them and the scans of consents, with a prefix per purpose, with access only for the organizers and the operator, without CI and agents, and with lifecycle rules; the scan of a consent form from `app` is written there by `api` under its own prefix: the service `api` and the job `sweep` get the bucket and the prefix as the variables `API_CONSENT_FORMS_BUCKET` and `API_CONSENT_FORMS_PREFIX`, and their service accounts get the right to create and erase objects on the prefix, without reading (R125, R126 spec; the 2026-11-09 and 2026-11-10 amendments to R116 spec; architecture 3.11 spec; the README of `api` v0.1.21, section 4). The bucket has no code yet — Д11 of table 4 of [DEBT.md](../DEBT.md) —, and how to sign the upload link is section 2.7;
+- rolls out the services and the build of `app` by one list of exact versions and digests — R106 spec decided this, and Т-19 is closed. In the dependency diagram `infra` rolls out the releases of `api` and `app` (repositories 3 spec). How the deployment goes (R105 spec, R106 spec; architecture 3.11 spec):
+  - a service's image is built by the deployment of `infra`: it takes the binary and the `Dockerfile` from the service's release, checks them with the recipe of `spec` `release-verify` (R77 spec), builds the image on the base `gcr.io/distroless/static-debian13:nonroot` by digest, puts it into the private Artifact Registry of `infra` and rolls out a Cloud Run revision by the image's digest. The image of `api` is built by the contract of its release (the second 2026-11-08 amendment to R106 spec; section 3.2). What a service puts into the image beyond the binary, its own code does at the build stage: for `api` these are the module packages. NovaTrail publishes no images (RULES.md, Production images);
+  - the rollout checks the build of `app` by the archive's signature, writes `/deployment.json` from the rollout list, having accepted it by the reading of the deployment configuration of the `spec` of its submodule — the schema and the rules — and by the schema `deployment.schema.json` of this build, and refusing a build of another format version (the 2026-11-08 and 2026-11-09 amendments to R85 spec; R19), builds the CSP header by the build's `csp.json` and releases the build, the file and the header in one release of the hosting (R85 spec). Beside the build's digest the list names the digest of its `/deployment.json` (Т-19);
+  - a rollback is a revert of the list. `api`, and while the module format is v0 also a build of `app` that has moved to a new format version, roll back only forward (Т-19);
+  - the jobs of `api` at a deployment — the migrations before requests are accepted, the job after the deployment once the revision has taken all the traffic — the deployment runs with the same image, and it hands the revision the deployment facts and the lowest admission rung of `api` from its own repository (the 2026-11-08 amendment to R106 spec): the facts as a file, a secret's volume, the path in `API_ADMISSION_FACTS_FILE`, the rung in `API_ADMISSION_RUNG`, and before the migrations a job calls the command of `api` that checks them (the second 2026-11-08 amendment to R106 spec);
+  - the format and place of the list and who edits it, what the rollout checks before the deployment, that a release of `api` lower than the one rolled out is refused, and how the revision of `api` gets the facts and the rung — decided (R05; section 3.2);
+- gives self-hosting and a local run of the whole platform (architecture 3.11 spec): the code is open, and an operator can deploy their own copy of the platform themselves (product 3 spec). Self-hosting takes the same list and the same path of deployment: it builds the image on its own side from the same binary and by the same `Dockerfile` (R105 spec, R106 spec). The signed build of `app` is one for everyone: it reads the deployment configuration at run time from `/deployment.json`, and the self-hosting operator writes that file themselves by the same schema (R85 spec; Т-19). Self-hosting declares its own facts for the admission to AI itself (Т-20; R96 spec).
 
-**Не делает:**
-- не хранит данных учеников: из частей платформы их на сервере хранит только `api` (architecture 1 spec; R15 spec). Бакет оператора, который `infra` заведёт (Д11), держит не данные учеников из `app`, а образцы со страницы образцов, формы к ним и сканы согласий, и правила к ним — R116, R125 и R126 spec. Базу и сервис входа выбрал `api`: Neon Postgres и Firebase Auth (architecture 3.12 spec);
-- не держит секретов в репозитории: ключи поставщиков ИИ лежат в Secret Manager (architecture 3.12 spec), а читает их сервисный аккаунт `api` (R15 spec). Там же лежат ключи платформы для eval (R24 spec) — `eval-key-anthropic` и `eval-key-openai`, — и читает их CI `modules` и `tutor` через Workload Identity Federation, своим пулом `github-eval`, только job окружения GitHub `eval` (R120 spec; R20). Значения ключей — никогда не в файлах репозитория (RULES.md, Hard rules);
-- не держит кода сервисов и не выпускает их релизы: релиз с подписью — общий workflow из `.github`, который берёт каждый репозиторий с кодом (architecture 3.11 spec; repositories 2.1 spec);
-- не заводит своих кластеров, очередей и шины событий. Фоновые работы — задания Cloud Run по расписанию (architecture 1 spec; R11 spec); Cloud Scheduler и задания Cloud Run выбирают `api` и `infra` вместе (architecture 3.12 spec);
-- не раздаёт пакеты модулей в первом срезе: на этапе 2 они лежат в образе `api`, и медиафайлы раздаёт `api` (architecture 3.10 spec). Кладёт их в образ код самого `api` на стадии сборки, и логики пакетов выкладка не повторяет (R106 spec). Хранилище с CDN в `infra` по рекомендации Т-17 появится, когда модулей станет больше или придут сторонние авторы (repositories 8 spec);
-- не решает регион данных один: его решил `spec` — США, одно место на всех учеников (R109 spec; П-11 закрыт), — а здесь только то, что из этого следует для ресурсов `infra` (R04).
+**Does not:**
+- stores no learners' data: of the platform's parts only `api` stores it on the server (architecture 1 spec; R15 spec). The operator's bucket that `infra` will set up (Д11) holds not learners' data from `app` but the samples from the samples page, the forms for them and the scans of consents, and the rules for them are R116, R125 and R126 spec. The database and the sign-in service were chosen by `api`: Neon Postgres and Firebase Auth (architecture 3.12 spec);
+- keeps no secrets in the repository: the keys of AI providers are in Secret Manager (architecture 3.12 spec), and the service account of `api` reads them (R15 spec). The platform's keys for eval are there too (R24 spec) — `eval-key-anthropic` and `eval-key-openai` —, and CI of `modules` and `tutor` reads them through Workload Identity Federation, with its own pool `github-eval`, only the job of the GitHub environment `eval` (R120 spec; R20). The keys' values are never in the repository's files (RULES.md, Hard rules);
+- holds no code of the services and does not publish their releases: the release with a signature is a shared workflow of `.github` that each repository with code takes (architecture 3.11 spec; repositories 2.1 spec);
+- sets up no clusters, queues or event bus of its own. Background work is Cloud Run jobs on a schedule (architecture 1 spec; R11 spec); Cloud Scheduler and Cloud Run jobs are chosen by `api` and `infra` together (architecture 3.12 spec);
+- does not serve the module packages in the first slice: at stage 2 they are in the image of `api`, and `api` serves the media files (architecture 3.10 spec). The code of `api` itself puts them into the image at the build stage, and the deployment does not repeat the logic of the packages (R106 spec). A store with a CDN in `infra`, by the recommendation of Т-17, comes when there are more modules or third-party authors arrive (repositories 8 spec);
+- does not decide the data's region alone: `spec` decided it — the US, one place for all learners (R109 spec; П-11 closed) —, and here is only what follows from it for the resources of `infra` (R04).
 
-**Данные и связи:**
-- данных учеников и секретов в репозитории нет, как ни в одном (RULES.md, Hard rules). Но то, что он настраивает, — журналы, регион, хостинг — касается данных учеников, поэтому каждое предложение здесь сначала читается по privacy spec (RULES.md, Hard rules). Хостинг и инфраструктура — обработчики данных (privacy 2 spec);
-- в журналах — события, коды, время и версии, без прямых идентификаторов, IP-адресов, работ, прочитанного и текста подсказок (R09 spec; privacy 4 spec; architecture 5 spec). Журналы платформы хранятся 30 дней в `us-east4`, аудит — 400 дней в `global` (R07; П-9);
-- хостинг `app` и сервис входа пишут IP-адрес в свои журналы сами (architecture 1 spec; architecture 3.12 spec; privacy 4 spec; П-9). Хостинг — Firebase Hosting: IP-адреса он хранит несколько месяцев, глобально, и срок не настраивается, а выгрузку его журналов в Cloud Logging `infra` не включает (R06). Сервис входа `api` выбрал — Firebase Auth: IP-адреса он держит несколько недель, а получает их не только при входе — на iPad, в Safari и в мобильных браузерах его скрипт и iframe грузятся при каждом старте `app` (privacy 4 spec; architecture 3.12 spec; П-9);
-- из репозиториев NovaTrail при сборке зависит только от `spec`, а пока платформа работает, никого не зовёт и никем не зовётся (repositories 2.1 spec). Таблица repositories 2.1 spec — о связях между репозиториями и о работе платформы. Инструменты самого `infra` в неё не входят, а они ходят в сеть: к GitHub и Sigstore — проверки и выкладка, к Google — `gcloud` и OpenTofu, к реестру OpenTofu — `tofu init` за провайдерами, к npm — пакеты `tools/` (разделы 3.2 и 3.6). На схеме зависимостей его стрелки — выкладка релизов `api` и `app` (repositories 3 spec);
-- общие проверки CI — поиск секретов, DCO, CodeQL, Scorecard и проверку документов — берёт из `.github` ещё до кода; подключила их T21 `spec` (R30 spec; architecture 3.11 spec). CodeQL читает workflow и код на JavaScript — `tools/` и тесты `tofu/`, вход `languages: javascript-typescript` (T28). HCL и bash CodeQL не читает: его список языков — C/C++, C#, GitHub Actions, Go, Java и Kotlin, JavaScript и TypeScript, Python, Ruby, Rust и Swift ([CodeQL, Supported languages and frameworks](https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/), прочитано 2026-11-09);
-- файл релиза NovaTrail — бинарник сервиса, его `Dockerfile`, архив сборки `app` — входит в выкладку, только когда его принял рецепт `spec` `release-verify` (RULES.md, Release files are verified; R77 spec). Т-27, что сверяет эта проверка, закрыт им же;
-- его сервисы (architecture 3.12 spec): хостинг сборки `app`, домен и хостинг виджетов на этапе 4, Secret Manager, Artifact Registry, Cloud Logging и Trace, а вместе с `api` — Cloud Scheduler и задания Cloud Run;
-- этап 2, вместе с `tutor`, `canvas`, `api`, `app` и `skill-map` (product 11 spec). Репозиторий заведён раньше кода ради документов, а код ждал П-11 — регион данных, который нужен до первого развёртывания (architecture 3.11 spec; repositories 2.1, 6 spec). П-11 закрыт решением R109 spec (R03). Первое приложение — у автора, локально и без развёртывания, так что строку `infra` в сквозном плане `spec` автор отложил до первого развёртывания (R76 spec). Инструмент встаёт в devcontainer вместе с кодом (T14 `spec`), и это OpenTofu: Т-29, который вырос из вопроса В2 этого репозитория, закрыт поправкой 2026-11-08 к R11 spec по строке В10 (R08), а в стадии `toolchain` он стоит с T11 (R09).
+**Data and links:**
+- there are no learners' data and no secrets in the repository, as in no repository of the platform (RULES.md, Hard rules). But what it sets up — the logs, the region, the hosting — touches learners' data, so every proposal here is first read against privacy spec (RULES.md, Hard rules). The hosting and the infrastructure are data processors (privacy 2 spec);
+- the logs hold events, codes, times and versions, without direct identifiers, IP addresses, works, what was read and the text of hints (R09 spec; privacy 4 spec; architecture 5 spec). The platform's logs are kept 30 days in `us-east4`, the audit 400 days in `global` (R07; П-9);
+- the hosting of `app` and the sign-in service write the IP address into their own logs themselves (architecture 1 spec; architecture 3.12 spec; privacy 4 spec; П-9). The hosting is Firebase Hosting: it keeps IP addresses a few months, globally, and the period is not configurable, and `infra` does not turn on the export of its logs to Cloud Logging (R06). The sign-in service that `api` chose is Firebase Auth: it keeps IP addresses a few weeks, and it gets them not only at sign-in — on an iPad, in Safari and in mobile browsers its script and iframe load at every start of `app` (privacy 4 spec; architecture 3.12 spec; П-9);
+- of NovaTrail's repositories it depends at build time only on `spec`, and while the platform runs it calls no one and no one calls it (repositories 2.1 spec). The table of repositories 2.1 spec is about the links between the repositories and about the platform's work. The tools of `infra` itself are not in it, and they go to the network: to GitHub and Sigstore — the checks and the deployment, to Google — `gcloud` and OpenTofu, to the OpenTofu registry — `tofu init` for the providers, to npm — the packages of `tools/` (sections 3.2 and 3.6). In the dependency diagram its arrows are the deployment of the releases of `api` and `app` (repositories 3 spec);
+- it takes the shared checks of CI — secret scanning, DCO, CodeQL, Scorecard and the documents check — from `.github` even before code; T21 of `spec` connected them (R30 spec; architecture 3.11 spec). CodeQL reads the workflows and the code in JavaScript — `tools/` and the tests of `tofu/`, the input `languages: javascript-typescript` (T28). CodeQL does not read HCL and bash: its list of languages is C/C++, C#, GitHub Actions, Go, Java and Kotlin, JavaScript and TypeScript, Python, Ruby, Rust and Swift ([CodeQL, Supported languages and frameworks](https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/), read 2026-11-09);
+- a file of a NovaTrail release — a service's binary, its `Dockerfile`, the build's archive of `app` — enters the deployment only once the recipe of `spec` `release-verify` has accepted it (RULES.md, Release files are verified; R77 spec). Т-27, the question of what this check verifies, was closed by the same decision;
+- its services (architecture 3.12 spec): the hosting of the build of `app`, the widgets' domain and hosting at stage 4, Secret Manager, Artifact Registry, Cloud Logging and Trace, and together with `api` Cloud Scheduler and Cloud Run jobs;
+- stage 2, with `tutor`, `canvas`, `api`, `app` and `skill-map` (product 11 spec). The repository was set up before its code for the sake of its documents, and the code waited for П-11 — the data's region, which is needed before the first deployment (architecture 3.11 spec; repositories 2.1, 6 spec). П-11 is closed by the decision R109 spec (R03). The first app is with the author, local and without a deployment, so the author put off the row of `infra` in the cross-repository plan of `spec` until the first deployment (R76 spec). The tool comes into the devcontainer together with the code (T14 of `spec`), and it is OpenTofu: Т-29, which grew out of this repository's question В2, is closed by the 2026-11-08 amendment to R11 spec by row В10 (R08), and it has been in the stage `toolchain` since T11 (R09).
 
-## 2. Решить при детализации
+## 2. To decide when detailed
 
-Пункты «Решить при детализации» из карточки — по подразделу на пункт, а два пункта о выкатке — в одном, 2.2. Решённый пункт называет запись журнала, а само решение переехало в раздел 3. Вопрос, который выходит за этот репозиторий, уходит «в реестр spec» (RULES.md, Across repositories).
+The points of the card's "To decide when detailed" — a subsection for each point, and the two points about the rollout in one, 2.2. A decided point names the entry of the log, and the decision itself has moved to section 3. A question that goes beyond this repository goes «в реестр spec» (RULES.md, Across repositories).
 
-Эпик E1 решил всё, что карточка оставила детализации, кроме Т-29, а сверх её списка решил один пункт и отложил другой — 2.6, который решил эпик E3. Т-29 закрыл `spec` по строке В10, и «Решить при детализации» в карточке опустел (R08), а с v0.15.0 в нём снова один пункт — как подписывать ссылку на загрузку в бакет оператора (R125 spec; R23), — 2.7:
-- 2.1–2.3 — регион, список выкатки и проверки, хостинг и адреса — решены: R04–R06, разделы 3.1–3.3. Регион закрыл в `spec` R109 spec. Что из 2.2 и 2.3 касается других репозиториев и реестров `spec`, ушло строками «в реестр spec» В4–В7, и `spec` записал все по их рекомендациям (R08): переменные фактов и ступени и команду проверки `api` — вторая поправка 2026-11-08 к R106 spec, перенос формата `/deployment.json` — поправка 2026-11-08 к R85 spec, хостинг, домены и срок IP-адресов Firebase Hosting — Т-17, О-16 и П-9;
-- 2.4 — исключение журналов запросов, сверх списка карточки, — решён: R07, раздел 3.4. Сроки журналов и уточнение privacy 4 spec `spec` записал по строке В8 в П-9 и privacy 4 spec, а карточку под него и под решённое правил по строке В9 (R08);
-- 2.5 — Terraform или OpenTofu — отложен сознательно и решён первым делом эпика E2: OpenTofu, поправка 2026-11-08 к R11 spec по строке В10 (R08), раздел 3.6;
-- 2.6 — self-hosting и локальный запуск всей платформы, сверх списка карточки, — решён эпиком E3: R21, R22, раздел 3.5. Что это меняет в карточке, ушло строкой «в реестр spec» В21, и `spec` записал её в карточку (R23);
-- 2.7 — подпись ссылки на загрузку в бакет оператора — открыт: решает задача бакета, T45 эпика E5 (Д11).
+Epic E1 decided everything the card left to the detailing but Т-29, and beyond the card's list it decided one point and put off another — 2.6, which epic E3 decided. `spec` closed Т-29 by row В10, and the card's "To decide when detailed" became empty (R08), and since v0.15.0 it holds one point again — how to sign the upload link to the operator's bucket (R125 spec; R23) —, 2.7:
+- 2.1–2.3 — the region, the rollout list and the checks, the hosting and the addresses — decided: R04–R06, sections 3.1–3.3. The region was closed in `spec` by R109 spec. What of 2.2 and 2.3 concerns other repositories and the registers of `spec` went as rows «в реестр spec» В4–В7, and `spec` recorded them all by their recommendations (R08): the variables of the facts and the rung and the check command of `api` — the second 2026-11-08 amendment to R106 spec, the move of the format of `/deployment.json` — the 2026-11-08 amendment to R85 spec, the hosting, the domains and the period of the IP addresses of Firebase Hosting — Т-17, О-16 and П-9;
+- 2.4 — the exclusion of the request logs, beyond the card's list — decided: R07, section 3.4. The logs' periods and the clarification of privacy 4 spec were recorded by `spec` by row В8 in П-9 and privacy 4 spec, and it edited the card for it and for what was decided by row В9 (R08);
+- 2.5 — Terraform or OpenTofu — put off on purpose and decided first thing in epic E2: OpenTofu, the 2026-11-08 amendment to R11 spec by row В10 (R08), section 3.6;
+- 2.6 — self-hosting and the local run of the whole platform, beyond the card's list — decided by epic E3: R21, R22, section 3.5. What this changes in the card went as row «в реестр spec» В21, and `spec` recorded it in the card (R23);
+- 2.7 — signing the upload link to the operator's bucket — open: the bucket's task decides it, T45 of epic E5 (Д11).
 
-### 2.1. Регион (П-11)
+### 2.1. Region (П-11)
 
-Решено: R04, по R109 spec; раздел 3.1. Задачи — T01, T08.
+Decided: R04, by R109 spec; section 3.1. Tasks — T01, T08.
 
-### 2.2. Список версий и проверки выкатки (R106 spec)
+### 2.2. The list of versions and the checks of the rollout (R106 spec)
 
-Решено: R05; раздел 3.2. Задача — T02.
+Decided: R05; section 3.2. Task — T02.
 
-### 2.3. Хостинг сборки `app` и домены (Т-17)
+### 2.3. Hosting of the build of `app` and domains (Т-17)
 
-Решено: R06; раздел 3.3. Задача — T03.
+Decided: R06; section 3.3. Task — T03.
 
-### 2.4. Исключение журналов запросов
+### 2.4. Excluding the request logs
 
-Решено: R07; раздел 3.4. Задача — T04.
+Decided: R07; section 3.4. Task — T04.
 
-### 2.5. Terraform или OpenTofu (Т-29)
+### 2.5. Terraform or OpenTofu (Т-29)
 
-Решено: поправка 2026-11-08 к R11 spec, Т-29 закрыт, по строке В10 (R08); раздел 3.6. Задачи — T09 и T10, а инструмент в devcontainer ставит T11, и код под `tofu` проверяет T12.
+Decided: the 2026-11-08 amendment to R11 spec, Т-29 closed, by row В10 (R08); section 3.6. Tasks — T09 and T10, and T11 installs the tool in the devcontainer, and T12 checks the code under `tofu`.
 
-### 2.6. Self-hosting и локальный запуск
+### 2.6. Self-hosting and the local run
 
-Решено эпиком E3, 2026-11-10; раздел 3.5. Пункта «Решить при детализации» о них у карточки не было (architecture 3.11 spec):
-- **self-hosting** — руководство оператора [SELF-HOSTING.md](../SELF-HOSTING.md): основной путь — форк с GitHub Actions, а без них — те же рецепты правами оператора (R21). Свой регион, свой проект Firebase и свои окружения — значения копии, и их держат тесты на значениях копии (T29; поправка 2026-11-10 к R18);
-- **локальный запуск всей платформы** — из исходников, рецептами `api` и `app`, а `infra` даёт описание — «Running the whole platform on one machine» [SELF-HOSTING.md](../SELF-HOSTING.md#12-running-the-whole-platform-on-one-machine) (R22). `api` в нём — origin самого `app`, а пути `api` ведёт прокси сервера `app`; проект входа — dev-проект `api` (ответы `spec` на В19 и В20; поправка 2026-11-11 к R22).
+Decided by epic E3, 2026-11-10; section 3.5. The card had no point of "To decide when detailed" about them (architecture 3.11 spec):
+- **self-hosting** — the operator's guide [SELF-HOSTING.md](../SELF-HOSTING.md): the main path is a fork with GitHub Actions, and without them the same recipes with the operator's rights (R21). Its own region, its own Firebase project and its own environments are the copy's values, and the tests on a copy's values hold them (T29; the 2026-11-10 amendment to R18);
+- **the local run of the whole platform** — from source, by the recipes of `api` and `app`, and `infra` gives a description — "Running the whole platform on one machine" [SELF-HOSTING.md](../SELF-HOSTING.md#12-running-the-whole-platform-on-one-machine) (R22). `api` in it is the origin of `app` itself, and the proxy of the server of `app` leads the paths of `api`; the sign-in project is the dev project of `api` (the answers of `spec` to В19 and В20; the 2026-11-11 amendment to R22).
 
-Задачи — T29–T32; что это меняет в карточке 3.11 spec, — строка В21, которую `spec` записал (R23). Шаги руководства, которые ещё никто не прошёл, — выкладка в E4 и Д9; локальный запуск сверен с первым прогоном 2026-11-12 (поправка 2026-11-12 к R22).
+Tasks — T29–T32; what this changes in the card 3.11 spec is row В21, which `spec` recorded (R23). The steps of the guide that nobody has gone through yet are the deployment in E4 and Д9; the local run is checked against the first run of 2026-11-12 (the 2026-11-12 amendment to R22).
 
-### 2.7. Подпись ссылки на загрузку в бакет оператора (R125 spec)
+### 2.7. Signing the upload link to the operator's bucket (R125 spec)
 
-Открыт. Карточка architecture 3.11 spec оставляет `infra` решить, как подписывать ссылку, по которой организатор замера или eval-набора получает файлы образца и скан формы в бакет оператора. Что уже задано (R125, R126 spec; поправка 2026-11-09 к R116 spec): ссылку даёт организатор, она действует сутки от сеанса, а файл ложится под префикс своего назначения; ни CI, ни агентов в доступе нет. Ключей учётных записей в файлах нет и не будет (RULES.md, Hard rules).
+Open. The card architecture 3.11 spec leaves it to `infra` to decide how to sign the link by which the measurement organizer or the eval-set organizer gets the files of a sample and the scan of a form into the operator's bucket. What is already set (R125, R126 spec; the 2026-11-09 amendment to R116 spec): the organizer gives the link, it is valid for a day from the session, and a file lands under the prefix of its purpose; neither CI nor agents have access. There are no keys of service accounts in files, and there will be none (RULES.md, Hard rules).
 
-Варианты:
-- (а) подписанный URL Cloud Storage, который организатор выписывает своим входом в `gcloud`, через учётную запись загрузки с правом только создавать объекты под префиксом назначения, без ключа — подписью через IAM;
-- (б) подписанная политика POST — то же, но с условиями на имя объекта и размер в самой подписи;
-- (в) ключ учётной записи у организатора — противоречит правилу о секретах и отвергается сразу.
+Options:
+- (a) a Cloud Storage signed URL that the organizer issues with their own sign-in to `gcloud`, through an upload service account with the right only to create objects under the purpose's prefix, with no key — by a signature through IAM;
+- (b) a signed POST policy — the same, but with conditions on the object's name and size in the signature itself;
+- (c) a service account key held by the organizer — contradicts the rule on secrets and is rejected at once.
 
-Рекомендация — решить в задаче бакета, при её планировании, между (а) и (б), сверив по документации Cloud Storage предельный срок подписи, условия политики и права, которые нужны организатору на подпись чужой учётной записью; эти факты здесь ещё не проверены и не утверждаются. Задача — T45 эпика E5 (Д11).
+Recommendation — decide in the bucket's task, when it is planned, between (a) and (b), having checked in Cloud Storage's documentation the longest validity of a signature, the conditions of a policy and the rights the organizer needs to sign as another service account; these facts are not yet checked here and are not stated. Task — T45 of epic E5 (Д11).
 
-## 3. Устройство
+## 3. How it is built
 
-Здесь — то, что решено по разделу 2: из каких частей компонент состоит, его данные и как он связан с другими репозиториями. Решения — R04–R07 и поправка 2026-11-08 к R11 spec (раздел 3.6); модуль и выкладку построил эпик E2 «Первый код».
+Here is what was decided by section 2: which parts the component consists of, its data and how it is linked with other repositories. The decisions are R04–R07 and the 2026-11-08 amendment to R11 spec (section 3.6); the module and the deployment were built by epic E2 «Первый код».
 
-**Из чего состоит репозиторий:**
+**What the repository consists of:**
 
-| Часть | Что делает | Решение |
+| Part | What it does | Decision |
 |---|---|---|
-| `tofu/bootstrap.sh` | один раз, правами оператора: проект и его оплата, бакет состояния, пул Workload Identity Federation для CI, учётная запись конфигурации `infra-config` и её права и свои роли, которые даёт модуль, — `apiDeployer`, `hostingPublisher` и `signInUsers`; второй пул, `github-eval`, — для job eval `modules` и `tutor`, без учётных записей; по образцу canvas-api | R13, R20; R11 spec; образец — canvas-api |
-| корневой модуль OpenTofu, `tofu/` | проект и его сервисы: Artifact Registry, Secret Manager с секретами `api` и ключами eval (R20), бакет журналов и sink с исключениями, место бакета `_Trace`, Firebase с сайтом Hosting и Web App, Identity Platform, учётные записи и их права, бюджет и оповещения, сервис и задания Cloud Run и расписание заданий в Cloud Scheduler. Сервис и задания модуль создаёт с первым образом, который называет `api_image`, а дальше образ, ревизию и версию фактов в томе ставит выкладка по digest, и модуль их не трогает, как `ignore_changes` у canvas-api (sources 8.1). Всё — в регионе раздела 3.1 | R04, R05, R06, R07, R10; поправка 2026-11-08 к R11 spec |
-| `deploy/` | список выкатки, значения `/deployment.json`, файл фактов и схема списка | R05; раздел 3.2 |
-| проверки pull request | схема, `release-verify` и sha256, `deployment.json`, факты, ступень, тег `api` не ниже | R05 |
-| выкладка | рецепты и workflow: образ, задания `api`, ревизия, выпуск сборки `app` на Hosting | R05, R06; разделы 3.2, 3.3 |
+| `tofu/bootstrap.sh` | once, with the operator's rights: the project and its billing, the state bucket, the Workload Identity Federation pool for CI, the configuration's service account `infra-config` and its rights, and the custom roles that the module grants — `apiDeployer`, `hostingPublisher` and `signInUsers`; the second pool, `github-eval`, for the eval job of `modules` and `tutor`, with no service accounts; on the model of canvas-api | R13, R20; R11 spec; model — canvas-api |
+| the OpenTofu root module, `tofu/` | the project and its services: Artifact Registry, Secret Manager with the secrets of `api` and the keys for eval (R20), the log bucket and the sinks with exclusions, the place of the bucket `_Trace`, Firebase with the Hosting site and the Web App, Identity Platform, the service accounts and their rights, the budget and the alerts, the Cloud Run service and jobs and the jobs' schedule in Cloud Scheduler. The module creates the service and the jobs with the first image, which `api_image` names, and after that the deployment sets the image, the revision and the facts' version in the volume by digest, and the module does not touch them, as `ignore_changes` does at canvas-api (sources 8.1). Everything is in the region of section 3.1 | R04, R05, R06, R07, R10; the 2026-11-08 amendment to R11 spec |
+| `deploy/` | the rollout list, the values of `/deployment.json`, the facts file and the list's schema | R05; section 3.2 |
+| the checks of a pull request | the schema, `release-verify` and sha256, `deployment.json`, the facts, the rung, the tag of `api` not lower | R05 |
+| the deployment | recipes and a workflow: the image, the jobs of `api`, the revision, the release of the build of `app` on Hosting | R05, R06; sections 3.2, 3.3 |
 
-Рецепты проверок и выкладки запускаются и без GitHub Actions — ими же пользуется self-hosting (раздел 3.5).
+The recipes of the checks and of the deployment run without GitHub Actions too — self-hosting uses the same ones (section 3.5).
 
-**Связи с другими репозиториями:**
+**Links with other repositories:**
 
-| Репозиторий | Что `infra` берёт | Что `infra` даёт |
+| Repository | What `infra` takes | What `infra` gives |
 |---|---|---|
-| `spec` | правила, `release-verify`, таблицу допуска и формат `/deployment.json` — часть `deployment/` со своей версией, схемой по постоянному пути и векторами чтения (поправки 2026-11-08 и 2026-11-09 к R85 spec; R19) | строки «в реестр spec» таблицы 3 [RUN.md](../RUN.md) |
-| `api` | бинарник и `Dockerfile` релиза по договору сборки, команды проверки конфигурации, миграций, задания после выкладки и `sweep` (R28 api; вторая поправка 2026-11-08 к R106 spec) | образ, ревизию и задания, файл фактов — путь в `API_ADMISSION_FACTS_FILE`, ступень — в `API_ADMISSION_RUNG`, строки баз из секретов, `API_APP_ORIGIN`, расписание `sweep`, адрес `*.run.app` |
-| `app` | архив сборки с `deployment.schema.json`, `csp.json`, `NOTICE` и `LICENSE` (поправка 2026-11-11 к R85 spec) | `/deployment.json`, заголовки, origin `web.app` и разрешённый домен Firebase |
-| `canvas` | — | позже — отдельный сайт Hosting для страницы образцов (R06) |
-| `.github` | общие проверки CI; файлы релизов, которые `infra` выкатывает, подписаны общим `release.yml`, а сверяет подпись `release-verify` `spec` (R77 spec) | — |
-| `tutor` | коды ступеней допуска, `author` и `full`, тип файла фактов и его разбор (R57 tutor) | — |
-| `modules`, `tutor` | — | ключи платформы для eval `eval-key-anthropic` и `eval-key-openai` в Secret Manager, для job окружения GitHub `eval`, через Workload Identity Federation своим пулом `github-eval`, который делает `bootstrap.sh`; имя провайдера и секретов — вывод `eval_access` (R120 spec; R20) |
+| `spec` | the rules, `release-verify`, the admission table and the format of `/deployment.json` — the part `deployment/` with its own version, a schema at a permanent path and reading vectors (the 2026-11-08 and 2026-11-09 amendments to R85 spec; R19) | the rows «в реестр spec» of table 3 of [RUN.md](../RUN.md) |
+| `api` | the release's binary and `Dockerfile` by the build contract, the commands of the configuration check, of the migrations, of the job after the deployment and of `sweep` (R28 api; the second 2026-11-08 amendment to R106 spec) | the image, the revision and the jobs, the facts file — the path in `API_ADMISSION_FACTS_FILE`, the rung — in `API_ADMISSION_RUNG`, the databases' connection strings from the secrets, `API_APP_ORIGIN`, the schedule of `sweep`, the address `*.run.app` |
+| `app` | the build's archive with `deployment.schema.json`, `csp.json`, `NOTICE` and `LICENSE` (the 2026-11-11 amendment to R85 spec) | `/deployment.json`, the headers, the origin `web.app` and the authorized domain of Firebase |
+| `canvas` | — | later, a separate Hosting site for the samples page (R06) |
+| `.github` | the shared checks of CI; the release files that `infra` rolls out are signed by the shared `release.yml`, and `release-verify` of `spec` checks the signature (R77 spec) | — |
+| `tutor` | the codes of the admission rungs, `author` and `full`, the type of the facts file and its parsing (R57 tutor) | — |
+| `modules`, `tutor` | — | the platform's keys for eval `eval-key-anthropic` and `eval-key-openai` in Secret Manager, for the job of the GitHub environment `eval`, through Workload Identity Federation with its own pool `github-eval`, which `bootstrap.sh` makes; the names of the provider and of the secrets are the output `eval_access` (R120 spec; R20) |
 
-### 3.1. Регион
+### 3.1. Region
 
-Регион платформы — США, одно место на всех учеников (R109 spec; П-11 закрыт). Что это значит для ресурсов `infra` — R04. Источники — sources 1.1–1.8.
+The platform's region is the US, one place for all learners (R109 spec; П-11 closed). What this means for the resources of `infra` is R04. Sources: sources 1.1–1.8.
 
-| Ресурс | Место | Почему так и что после создания не меняется |
+| Resource | Place | Why so, and what does not change after creation |
 |---|---|---|
-| сервисы и задания Cloud Run | `us-east4` (Ashburn, Virginia) | рядом с Neon `aws-us-east-1` базы `api`; цены Tier 1 |
-| расписание заданий, Cloud Scheduler | `us-east4` | в регионе заданий, которые оно запускает: модуль ставит его в регион модуля, и первая выкладка его так и создала (T24) |
-| репозиторий Artifact Registry | `us-east4`, регионально | место репозитория не меняется; мультирегион медленнее |
-| секреты Secret Manager | репликация по выбору, место `us-east4` | места репликации не меняются; автоматическая репликация — без ограничений, а региональный секрет доступен только из своего региона, и CI на GitHub, который читает ключи eval (R120 spec), его бы не прочитал |
-| бакет журналов | свой, `us-east4`; sink `_Default` направлен в него | бакет `_Default` создан в `global`, и место бакета не меняется — меняется sink. Журналы запросов Cloud Run исключаются (раздел 3.4) |
-| бакет `_Required` | `global` | sink `_Required` не меняется, а регион бакету даёт только настройка организации или папки до создания проекта; организация связана с доменом, которого до О-16 нет — Д3 в таблице 4 [DEBT.md](../DEBT.md) |
-| бакет трасс `_Trace` | `us-east4`: место по умолчанию для бакетов Observability задано до первой трассы, а бакет создаёт система с первой трассой (поправка 2026-11-09 к R04) | иначе место выберут настройки по умолчанию или сама система, а сменить его может только reprovision, который трассы стирает |
+| Cloud Run services and jobs | `us-east4` (Ashburn, Virginia) | near Neon `aws-us-east-1` of the database of `api`; Tier 1 prices |
+| the jobs' schedule, Cloud Scheduler | `us-east4` | in the region of the jobs it runs: the module puts it in the module's region, and the first deployment created it so (T24) |
+| the Artifact Registry repository | `us-east4`, regional | a repository's place does not change; a multi-region is slower |
+| Secret Manager secrets | user-managed replication, place `us-east4` | the replication's places do not change; automatic replication has no constraints, and a regional secret is accessible only from its own region, and CI on GitHub, which reads the keys for eval (R120 spec), could not read it |
+| the log bucket | its own, `us-east4`; the sink `_Default` is directed to it | the bucket `_Default` is created in `global`, and a bucket's place does not change — the sink changes. Cloud Run's request logs are excluded (section 3.4) |
+| the bucket `_Required` | `global` | the sink `_Required` does not change, and only a setting of an organization or a folder made before the project is created gives the bucket a region; an organization is tied to a domain, and there is none until О-16 — Д3 in table 4 of [DEBT.md](../DEBT.md) |
+| the trace bucket `_Trace` | `us-east4`: the default place for Observability buckets is set before the first trace, and the system creates the bucket with the first trace (the 2026-11-09 amendment to R04) | otherwise the default settings or the system itself would choose the place, and only a reprovision, which erases the traces, can change it |
 
-Не `infra`: базу Neon `aws-us-east-1` держит `api`; Firebase Auth обрабатывает данные только в США при любом регионе; хостинг сборки `app` — Firebase Hosting (R06), глобальный сервис; регион вызовов ИИ R109 spec не решает (R96 spec).
+Not `infra`: `api` keeps the Neon database `aws-us-east-1`; Firebase Auth processes data only in the US whatever the region; the hosting of the build of `app` is Firebase Hosting (R06), a global service; R109 spec does not decide the region of AI calls (R96 spec).
 
-### 3.2. Список выкатки и выкладка
+### 3.2. The rollout list and the deployment
 
-Сервисы и сборку `app` выкатывает `infra`, по одному списку точных версий и дайджестов, а образ сервиса собирает выкладка из файлов его релиза (R105, R106 spec). Репозиторий компонента сам ничего не выкатывает и доступа к production не имеет: проекты и Workload Identity Federation для CI — у `infra` (R106 spec). Как устроены список и выкладка — R05.
+`infra` rolls out the services and the build of `app`, by one list of exact versions and digests, and the deployment builds a service's image from the files of its release (R105, R106 spec). A component's repository rolls out nothing itself and has no access to production: the projects and Workload Identity Federation for CI are with `infra` (R106 spec). How the list and the deployment are built is R05.
 
-**Каталог `deploy/`:**
-- `production.json` — список выкатки;
-- `production/deployment.json` — значения `/deployment.json` сборки `app`, формат 1 (R09 app); `api` в нём — детерминированный адрес сервиса, вывод модуля `api_origin`, `https://<сервис>-<номер проекта>.<регион>.run.app`: он известен до сервиса (вторая поправка 2026-11-10 к R05);
-- `production/facts.json` — файл фактов развёртывания для функции допуска, в форме `facts` таблицы допуска ([текст таблицы допуска](../spec/admission/README.md), раздел 5);
-- `schema/production.schema.json` — схема JSON списка, JSON Schema 2020-12 (R14).
+**The directory `deploy/`:**
+- `production.json` — the rollout list;
+- `production/deployment.json` — the values of `/deployment.json` of the build of `app`, format 1 (R09 app); `api` in it is the deterministic address of the service, the module's output `api_origin`, `https://<service>-<project number>.<region>.run.app`: it is known before the service exists (the second 2026-11-10 amendment to R05);
+- `production/facts.json` — the file of deployment facts for the admission function, in the form `facts` of the admission table ([the admission table's text](../spec/admission/README.md), section 5);
+- `schema/production.schema.json` — the list's JSON schema, JSON Schema 2020-12 (R14).
 
-**Пример списка** — синтетический: версии и дайджесты выдуманы.
+**An example of the list** — synthetic: the versions and digests are made up.
 
 ```json
 {
@@ -176,282 +176,282 @@
 }
 ```
 
-Имя бинарника `api` — по договору его релиза, `api_<тег>_linux_amd64` (R28 api; вторая поправка 2026-11-08 к R106 spec); рядом с бинарником релиз несёт `Dockerfile` и `SHA256SUMS`, у каждого файла — подпись (sources 3.3; T18). Список платформы — `deploy/production.json`: первая выкладка, 2026-11-12, взяла `api` v0.1.22 — команды `serve`, `check`, `migrate`, `after`, `sweep`, `invite`, `countries` и `version` — и `app` v0.1.0, первый релиз сборки (R25). Команда проверки конфигурации пришла в `api` v0.1.16, задание после выкладки — в v0.1.20 (sources 3.10, 3.11).
+The name of the binary of `api` is by the contract of its release, `api_<tag>_linux_amd64` (R28 api; the second 2026-11-08 amendment to R106 spec); beside the binary the release carries the `Dockerfile` and `SHA256SUMS`, each file with a signature (sources 3.3; T18). The platform's list is `deploy/production.json`: the first deployment, 2026-11-12, took `api` v0.1.22 — the commands `serve`, `check`, `migrate`, `after`, `sweep`, `invite`, `countries` and `version` — and `app` v0.1.0, the build's first release (R25). The configuration check command came in `api` v0.1.16, the job after the deployment in v0.1.20 (sources 3.10, 3.11).
 
-**Pull request со списком** — CI без доступа к production:
-1. список — по своей схеме;
-2. бинарник, `Dockerfile` и архив — `release-verify` с репозиторием и тегом из списка, а sha256 каждого — как в списке, и имя бинарника — по договору релиза. Если Sigstore или GitHub не отвечают, файл отклоняется (R77 spec);
-3. `deployment.json` — чтением конфигурации развёртывания `spec` подмодуля, как его читает `app`: схема `deployment/schemas/deployment.schema.json`, затем правила `deployment.api-origin` и `deployment.loopback`, — и по `deployment.schema.json` из архива, а сборка должна читать ту же версию формата, что и `spec` подмодуля, иначе отказ, названы обе (поправки 2026-11-08 и 2026-11-09 к R85 spec; R19); файл — не больше 16 КиБ, а его sha256 — как в списке; `api` в нём — адрес сервиса `api`, вывод `api_origin`, по номеру проекта из `tofu/ci.env` и значениям `tofu/production.auto.tfvars`, а без `ci.env` или вне репозитория git не сравнивается (вторая поправка 2026-11-12 к R14);
-4. `facts.json` — по словарю фактов таблицы допуска тега `spec` подмодуля: это ранний знак, а окончательно файл проверяет образ нового релиза `api` (шаг 4 ниже);
-5. ступень — `full` (R25 api);
-6. тег `api` — не ниже, чем в списке на `main`.
+**A pull request with the list** — CI without access to production:
+1. the list — by its schema;
+2. the binary, the `Dockerfile` and the archive — `release-verify` with the repository and the tag from the list, and the sha256 of each as in the list, and the binary's name by the release's contract. If Sigstore or GitHub does not answer, the file is refused (R77 spec);
+3. `deployment.json` — by the reading of the deployment configuration of the submodule's `spec`, as `app` reads it: the schema `deployment/schemas/deployment.schema.json`, then the rules `deployment.api-origin` and `deployment.loopback` —, and by `deployment.schema.json` from the archive, and the build must read the same format version as the submodule's `spec`, or it is refused, with both named (the 2026-11-08 and 2026-11-09 amendments to R85 spec; R19); the file is no more than 16 KiB, and its sha256 as in the list; `api` in it is the address of the service `api`, the output `api_origin`, by the project number from `tofu/ci.env` and the values of `tofu/production.auto.tfvars`, and without `ci.env` or outside a git repository it is not compared (the second 2026-11-12 amendment to R14);
+4. `facts.json` — by the facts' vocabulary of the admission table of the submodule's tag of `spec`: this is an early sign, and the image of the new release of `api` checks the file finally (step 4 below);
+5. the rung — `full` (R25 api);
+6. the tag of `api` — not lower than in the list on `main`.
 
-**Проверки в коде** (R14; T18) — `tools/deploy-check/` на Node и ajv 8.20.0, рецепт `just deploy-check`. Job CI `Deploy` гоняет их тесты в каждом pull request — синтетику и настоящий релиз `api` v0.1.5 против GitHub и Sigstore, — а сам список, когда pull request меняет то, чем он проверяется: `deploy/`, `tools/deploy-check/` и `tools/deploy/`, их пакеты, `justfile`, тег `spec` или `tofu/variables.tf`, чьё умолчание называет сервис `api`. Правка одних `tofu/ci.env` и `tofu/production.auto.tfvars` список не проверяет: первый pull request форка меняет только их, а список у него ещё платформы, с её адресом `api` (вторая поправка 2026-11-12 к R14). Тот же job гоняет тесты выкладки, установки инструментов и проверку лицензий. `deploy/production.json`, `production/deployment.json` и `production/facts.json` платформы написала первая выкладка (T24).
+**The checks in code** (R14; T18) — `tools/deploy-check/` on Node and ajv 8.20.0, the recipe `just deploy-check`. The CI job `Deploy` runs their tests in every pull request — the synthetic ones and the real release `api` v0.1.5 against GitHub and Sigstore —, and the list itself when the pull request changes what it is checked by: `deploy/`, `tools/deploy-check/` and `tools/deploy/`, their packages, the `justfile`, the tag of `spec` or `tofu/variables.tf`, whose default names the service `api`. An edit of `tofu/ci.env` and `tofu/production.auto.tfvars` alone does not check the list: a fork's first pull request changes only them, and its list is still the platform's, with the platform's address of `api` (the second 2026-11-12 amendment to R14). The same job runs the tests of the deployment and of the tools' installation, and the license check. The platform's `deploy/production.json`, `production/deployment.json` and `production/facts.json` were written by the first deployment (T24).
 
-**Выкладка** — после мержа, из коммита списка. Первое задание проверяет, что `main` стоит на этом коммите, а каждое следующее — на повторной попытке (R45 canvas-api). Выкладка делает только то, что изменилось против коммита последнего прогона, который выложил, — задание `target` ниже (R18).
+**The deployment** — after the merge, from the list's commit. The first job checks that `main` is at this commit, and each next one checks it on a retry (R45 canvas-api). The deployment does only what changed against the commit of the last run that deployed — the job `target` below (R18).
 
-Новый релиз `api`:
-1. конфигурация облака — `tofu apply` из того же коммита (раздел 3.6); этот шаг идёт на каждой выкладке;
-2. тег `api` — не ниже, чем у ревизии, которая сейчас принимает трафик: `main` может опережать production, если прошлая выкладка не дошла. Трафик, поделённый между ревизиями, — отказ: ту выкатку сначала доводят или отменяют руками. Затем повтор `release-verify` и sha256 каждого файла — в задание, которое достаёт production, попадает только проверенный файл. Если реестр уже держит образ под тегом релиза, выкладка берёт его по digest, без повторной проверки и без шага 3;
-3. образ — по договору релиза `api`: бинарник — файлом `api` в контексте сборки `binary`, образ — `docker build --target release --build-context binary=<папка>` по `Dockerfile` из релиза, на базе по digest, которую называет `Dockerfile`; основного контекста стадия не читает (R105 spec; R28 api; вторая поправка 2026-11-08 к R106 spec). Стадия сборки кладёт в образ пакеты модулей командой бинарника, и ей нужна сеть (architecture 3.3 api). Образ — в Artifact Registry `us-east4` (R04), его digest — из push;
-4. проверка конфигурации — заданием Cloud Run тем же образом, с файлом фактов и ступенью нового списка: модуль ставит заданию части `check` том фактов, `API_ADMISSION_FACTS_FILE` и `API_ADMISSION_RUNG`, а выкладка — точную версию фактов, ту, что уйдёт в ревизию (третья поправка 2026-11-10 к R11; поправка 2026-11-10 к R15). Задание — `api check` релиза `api` v0.1.16 (четвёртая поправка 2026-11-10 к R11): неизвестный таблице этого релиза факт останавливает выкладку до миграций. Команду даёт бинарник `api`: она проверяет файл фактов по таблице допуска релиза и ступень и не обслуживает запросов (вторая поправка 2026-11-08 к R106 spec);
-5. задание миграций обеих баз, `api` и `openfga` (R05 api), — тем же образом по digest, командой, которую называет релиз `api`. Не прошло — выкладка останавливается, и новой ревизии нет;
-6. ревизия Cloud Run по digest образа — с файлом фактов томом на точной версии секрета (R05; вторая поправка 2026-11-08 к R106 spec): путь к нему в `API_ADMISSION_FACTS_FILE` и ступень `full` в `API_ADMISSION_RUNG` ставит модуль (поправка 2026-11-09 к R05; R11) — сначала без трафика; когда её собственное условие `Ready` — `True`, весь трафик ей (поправка 2026-11-12 к R15);
-7. задание после выкладки — тем же образом, когда новая ревизия приняла весь трафик (поправка 2026-11-08 к R106 spec): `api after` релиза `api` v0.1.20, со строкой пулера базы `api`, закрывает «unchecked» открытое на пакетах, которых образ больше не даёт (поправка 2026-11-11 к R11). Его отказ останавливает выкладку уже на новой ревизии, а то, что он не закрыл, закроет следующий `sweep`.
+A new release of `api`:
+1. the cloud's configuration — `tofu apply` from the same commit (section 3.6); this step runs at every deployment;
+2. the tag of `api` — not lower than that of the revision that takes the traffic now: `main` may be ahead of production if the last deployment did not get through. Traffic split between revisions is a refusal: that rollout is first finished or undone by hand. Then `release-verify` and the sha256 of each file again — only a checked file gets into the job that reaches production. If the registry already holds an image under the release's tag, the deployment takes it by digest, without the second check and without step 3;
+3. the image — by the contract of the release of `api`: the binary as the file `api` in the build context `binary`, the image by `docker build --target release --build-context binary=<folder>` by the `Dockerfile` from the release, on the base by digest that the `Dockerfile` names; the stage does not read the main context (R105 spec; R28 api; the second 2026-11-08 amendment to R106 spec). The build stage puts the module packages into the image with a command of the binary, and it needs the network (architecture 3.3 api). The image goes to Artifact Registry `us-east4` (R04), its digest from the push;
+4. the configuration check — by a Cloud Run job with the same image, with the facts file and the rung of the new list: the module gives the job of the part `check` the facts' volume, `API_ADMISSION_FACTS_FILE` and `API_ADMISSION_RUNG`, and the deployment gives the exact version of the facts, the one that will go to the revision (the third 2026-11-10 amendment to R11; the 2026-11-10 amendment to R15). The job is `api check` of the release `api` v0.1.16 (the fourth 2026-11-10 amendment to R11): a fact unknown to this release's table stops the deployment before the migrations. The command comes from the binary `api`: it checks the facts file against the release's admission table, and the rung, and serves no requests (the second 2026-11-08 amendment to R106 spec);
+5. the migrations job of both databases, `api` and `openfga` (R05 api), with the same image by digest, by the command that the release of `api` names. If it fails, the deployment stops, and there is no new revision;
+6. the Cloud Run revision by the image's digest — with the facts file as a volume on an exact version of the secret (R05; the second 2026-11-08 amendment to R106 spec): the module sets the path to it in `API_ADMISSION_FACTS_FILE` and the rung `full` in `API_ADMISSION_RUNG` (the 2026-11-09 amendment to R05; R11) — at first with no traffic; when its own condition `Ready` is `True`, all the traffic goes to it (the 2026-11-12 amendment to R15);
+7. the job after the deployment — with the same image, once the new revision has taken all the traffic (the 2026-11-08 amendment to R106 spec): `api after` of the release `api` v0.1.20, with the pooler's string of the database `api`, closes as "unchecked" what is open on packages the image no longer gives (the 2026-11-11 amendment to R11). Its failure stops the deployment already on the new revision, and what it did not close the next `sweep` will close.
 
-Только факты: новая версия секрета фактов, её проверка — шаг 4 на образе, который уже выкачен, — и новая ревизия на этом образе, по его digest, — шаг 6; шагов 2, 3, 5 и 7 нет (поправка 2026-11-10 к R05). Пути «только ступень» нет: ступень у развёртывания всегда `full` (поправка 2026-11-09 к R05). Сборки, миграций и `release-verify` нет: файлы релиза не менялись, и снятие факта не ждёт Sigstore.
+Facts only: a new version of the facts' secret, its check — step 4 on the image already rolled out —, and a new revision on this image, by its digest — step 6; there are no steps 2, 3, 5 and 7 (the 2026-11-10 amendment to R05). There is no path "rung only": the deployment's rung is always `full` (the 2026-11-09 amendment to R05). There is no build, no migrations and no `release-verify`: the release's files did not change, and the removal of a fact does not wait for Sigstore.
 
-Новый релиз `app` — только когда есть сервис `api`: пока `production.auto.tfvars` коммита не ставит `api_serving = true`, прогон `app` не выкатывает, а прогон, который его поставил, выкатывает `app`, даже если тот не менялся (вторая поправка 2026-11-10 к R05):
-1. `release-verify` архива и sha256 — как в шаге 2;
-2. архив раскладывается на хостинг, `/deployment.json` пишется из `deploy/production/deployment.json`, заголовок CSP собирается по `csp.json` архива, и всё выходит одним выпуском хостинга (R85 spec; R09 app). На Firebase Hosting — раздел 3.3 (R06);
-3. домен `app` — в разрешённых доменах проекта Firebase (Т-19): их ставит модуль, конфигурацией облака той же выкладки (R16).
+A new release of `app` — only when the service `api` exists: while the commit's `production.auto.tfvars` does not set `api_serving = true`, a run does not roll out `app`, and the run that set it rolls out `app` even if it did not change (the second 2026-11-10 amendment to R05):
+1. `release-verify` of the archive and the sha256 — as in step 2;
+2. the archive is laid out on the hosting, `/deployment.json` is written from `deploy/production/deployment.json`, the CSP header is built by the archive's `csp.json`, and everything goes out in one release of the hosting (R85 spec; R09 app). On Firebase Hosting — section 3.3 (R06);
+3. the domain of `app` is in the authorized domains of the Firebase project (Т-19): the module sets them, by the cloud's configuration of the same deployment (R16).
 
-**Выкладка `api` в коде** (R15; T19) — `tools/deploy/api.sh`, рецепты `just deploy-api-image`, `deploy-api` и `deploy-api-facts`, на выходах модуля после `apply`:
-- `image` — файлы релиза снова через `release-verify` и sha256, образ `<реестр>/api:<тег>`, digest после push, — или образ, который реестр уже держит под тегом релиза;
-- `release` — шаги выше: отказ релизу ниже того, чей тег в реестре носит образ ревизии с трафиком, образ — или тот, что реестр уже держит под тегом релиза, — новая версия фактов, образ заданиям `check` и `migrate` — заданиям `check` с точной версией фактов, той, что только что добавила, — и их запуск, ревизия без трафика, весь трафик ей по имени, образ остальным заданиям и задания `after`. Без сервиса — только задания;
-- `facts` — путь «только факты»: версия фактов, задания `check` с ней на образе, который принимает трафик, и ревизия.
+**The deployment of `api` in code** (R15; T19) — `tools/deploy/api.sh`, the recipes `just deploy-api-image`, `deploy-api` and `deploy-api-facts`, on the module's outputs after `apply`:
+- `image` — the release's files again through `release-verify` and sha256, the image `<registry>/api:<tag>`, the digest after the push — or the image that the registry already holds under the release's tag;
+- `release` — the steps above: a refusal of a release lower than the one whose tag the image of the revision with traffic carries in the registry, the image — or the one the registry already holds under the release's tag —, a new version of the facts, the image to the jobs `check` and `migrate` — to the jobs `check` with the exact version of the facts, the one it has just added — and their run, a revision without traffic, all the traffic to it by name, the image to the other jobs, and the jobs `after`. Without the service, only the jobs;
+- `facts` — the path "facts only": a version of the facts, the jobs `check` with it on the image that takes the traffic, and a revision.
 
-Какие задания когда запускать, говорит поле `deploy` записи `api_jobs` модуля (вторая поправка 2026-11-09 к R11). По умолчанию это `check` — проверка конфигурации до миграций, `migrate`, `after` — после того, как ревизия приняла весь трафик, — и `sweep` по расписанию: команды релиза `api` v0.1.22, который выкачен (поправки 2026-11-10 и 2026-11-11 к R11).
+Which jobs to run when is said by the field `deploy` of the module's entry `api_jobs` (the second 2026-11-09 amendment to R11). By default these are `check` — the configuration check before the migrations, `migrate`, `after` — after the revision has taken all the traffic —, and `sweep` on a schedule: the commands of the release `api` v0.1.22, which is rolled out (the 2026-11-10 and 2026-11-11 amendments to R11).
 
-**Выпуск `app` в коде** (R17; T20) — `tools/deploy/app.mjs`, рецепты `just deploy-app` и `deploy-app-check`, на выходах модуля после `apply`, `hosting_site` и `hosting_url`, через REST API Hosting:
-- `release` — шаги раздела 3.3: `deployment.json` того sha256, что в списке; архив новой сборки и архив выпущенной — снова `release-verify` и sha256; сервис `api` в выводах модуля и `api` файла, равный `api_origin`, — иначе отказ до Hosting (поправка 2026-11-10 к R17); одна версия с конфигурацией, выпуск с сообщением, которое называет сборку, и проверка ответов;
-- `check` — только проверка ответов сайта, по сборке из списка.
+**The release of `app` in code** (R17; T20) — `tools/deploy/app.mjs`, the recipes `just deploy-app` and `deploy-app-check`, on the module's outputs after `apply`, `hosting_site` and `hosting_url`, through the REST API of Hosting:
+- `release` — the steps of section 3.3: `deployment.json` of the sha256 that is in the list; the archive of the new build and that of the released one — `release-verify` and sha256 again; the service `api` in the module's outputs and the file's `api` equal to `api_origin` — otherwise a refusal before Hosting (the 2026-11-10 amendment to R17); one version with the configuration, a release with a message that names the build, and the check of the responses;
+- `check` — only the check of the site's responses, by the build from the list.
 
-Входит выпуск токеном доступа `hosting-publish` из `gcloud`, а прав, кроме `hostingPublisher`, ему не нужно (третья поправка 2026-11-09 к R12). Проверка pull request смотрит у сборки ту же раскладку и тот же `csp.json`, что выпуск (поправка 2026-11-09 к R14).
+The release signs in with an access token of `hosting-publish` from `gcloud`, and it needs no rights but `hostingPublisher` (the third 2026-11-09 amendment to R12). The check of a pull request looks at the same layout and the same `csp.json` of the build as the release does (the 2026-11-09 amendment to R14).
 
-**Workflow выкладки** (R18; T21) — `.github/workflows/deploy.yml`, после push в `main` по путям того, что он выкладывает, или руками с выбором частей:
+**The deploy workflow** (R18; T21) — `.github/workflows/deploy.yml`, after a push to `main` by the paths of what it deploys, or by hand with a choice of parts:
 
-| Задание | Окружение и учётная запись | Что делает |
+| Job | Environment and service account | What it does |
 |---|---|---|
-| `target` | нет, без входа | `main` на коммите? проект поднят? какие части списка изменились против последнего прогона, который выложил; без `api_image` — только образ `api` |
-| `config` | `production-config`, `infra-config` | `just ci-tf-apply`; выходы модуля — артефактом; все три окружения есть и запускаются только из `main` — `just ci-deploy-environments` |
-| `api` | вывод `deploy_environment`, по умолчанию `production`; `api-deploy` | `just deploy-api`, `deploy-api-facts` или `deploy-api-image` — пока нет `api_image` или руками |
-| `app` | вывод `hosting_environment`, по умолчанию `production-hosting`; `hosting-publish` | `just deploy-app`, после `api`, если оно шло и прошло |
+| `target` | none, without sign-in | is `main` at the commit? is the project up? which parts of the list changed against the last run that deployed; without `api_image`, only the image of `api` |
+| `config` | `production-config`, `infra-config` | `just ci-tf-apply`; the module's outputs as an artifact; all three environments exist and run only from `main` — `just ci-deploy-environments` |
+| `api` | the output `deploy_environment`, by default `production`; `api-deploy` | `just deploy-api`, `deploy-api-facts` or `deploy-api-image` — while there is no `api_image`, or by hand |
+| `app` | the output `hosting_environment`, by default `production-hosting`; `hosting-publish` | `just deploy-app`, after `api` if it ran and passed |
 
-Каждое задание после `target` на повторной попытке спрашивает, стоит ли `main` на коммите. Инструменты ставит `.github/actions/tools` по точным версиям и суммам: OpenTofu, `just` и Node — по `ARG` Dockerfile, Google Cloud CLI, `jq` и `buildx` — по `tools/ci/versions.env`, а движок Docker раннера сверяется с записанной версией.
+Each job after `target` asks on a retry whether `main` is at the commit. `.github/actions/tools` installs the tools at exact versions and sums: OpenTofu, `just` and Node by the `ARG` of the Dockerfile, the Google Cloud CLI, `jq` and `buildx` by `tools/ci/versions.env`, and the runner's Docker engine is checked against the recorded version.
 
-**Шаг оператора перед первой выкладкой** (T23), после `bootstrap.sh`:
-1. `tofu/ci.env` — две строки, которые напечатал `bootstrap.sh`, `GCP_WORKLOAD_IDENTITY_PROVIDER=…` и `GCP_CONFIG_SERVICE_ACCOUNT=…`, и ничего больше; файл коммитится и проходит ревью (третья поправка 2026-11-09 к R13);
-2. окружения GitHub `production-config`, `production` и `production-hosting`: Settings → Environments → New environment, в каждом «Deployment branches and tags» → «Selected branches and tags» → правило `main`. Ни ревьюеров, ни ожидания: одобрение — ревью pull request (R05). Окружение, которого нет, GitHub создаёт сам при первом задании — без правила, и тогда `ci-deploy-environments` задания `config` остановит прогон до заданий `api` и `app` (R18);
-3. в `production-config` — секреты окружения `TF_VAR_billing_account` и `TF_VAR_operator_email`; в других окружениях секретов нет.
+**The operator's step before the first deployment** (T23), after `bootstrap.sh`:
+1. `tofu/ci.env` — the two lines that `bootstrap.sh` printed, `GCP_WORKLOAD_IDENTITY_PROVIDER=…` and `GCP_CONFIG_SERVICE_ACCOUNT=…`, and nothing else; the file is committed and goes through review (the third 2026-11-09 amendment to R13);
+2. the GitHub environments `production-config`, `production` and `production-hosting`: Settings → Environments → New environment, in each "Deployment branches and tags" → "Selected branches and tags" → the rule `main`. No reviewers and no wait timer: the approval is the review of the pull request (R05). An environment that does not exist GitHub creates itself at the first job — with no rule, and then `ci-deploy-environments` of the job `config` stops the run before the jobs `api` and `app` (R18);
+3. in `production-config`, the environment's secrets `TF_VAR_billing_account` and `TF_VAR_operator_email`; the other environments have no secrets.
 
-Пока `tofu/ci.env`, `tofu/production.auto.tfvars` и `tofu/backend.hcl` не лежали в `main`, прогон выкладки был зелёным и ничего не делал. С T23 они там, и каждый мерж, который меняет пути выкладки, применяет конфигурацию в проекте `novatrail`.
+While `tofu/ci.env`, `tofu/production.auto.tfvars` and `tofu/backend.hcl` were not in `main`, a run of the deployment was green and did nothing. Since T23 they are there, and every merge that changes the deployment's paths applies the configuration in the project `novatrail`.
 
-**Откат:**
-- `api` — только вперёд: новый релиз `api` и новый pull request, а тег ниже не пустят ни CI, ни выкладка;
-- сборка `app` — pull request, который возвращает блок `app` списка к прежним значениям: прежняя сборка со своим файлом, одним выпуском. Revert целого коммита, который поднял и `api`, был бы отклонён. Перешедшая на новую версию формата модуля сборка — только вперёд, и это проверяет автор в ревью;
-- факты — pull request с прежним файлом: новая ревизия на том же образе. Ступень всегда `full`, и её откатывать некуда. Срочно закрыть ИИ платформы — снять факт (R96 spec).
+**Rollback:**
+- `api` — only forward: a new release of `api` and a new pull request, and neither CI nor the deployment lets a lower tag through;
+- the build of `app` — a pull request that returns the list's block `app` to its former values: the former build with its own file, in one release. A revert of a whole commit that also raised `api` would be refused. A build that has moved to a new module format version goes only forward, and the author checks this in review;
+- the facts — a pull request with the former file: a new revision on the same image. The rung is always `full`, and there is nowhere to roll it back to. To close the platform AI urgently, remove a fact (R96 spec).
 
-Не дошедшую выкладку повторяют, перезапустив её задания, или чинят вперёд новым pull request.
+A deployment that did not get through is repeated by rerunning its jobs, or fixed forward by a new pull request.
 
-**Реестр и секрет фактов в модуле** (T14):
-- `tofu/registry.tf` — репозиторий Docker `images` в регионе. Очистка держит 5 последних версий в любом состоянии, а удаляет только версии без тега, старше 30 дней; версия, которая подходит и под сохранение, и под удаление, сохраняется (sources 5.4). Выкладка кладёт образ с тегом релиза (T19), так что выкаченный образ тег держит, сколько бы push ни пришло после него, и путь «только факты» встанет на него по digest; тег теряет только push того же релиза руками: выкладка берёт образ, который реестр уже держит под тегом. Модуль репозиторий не удаляет: `deletion_policy = "PREVENT"`. Читать его вне проекта модуль не даёт, а право push — у `api-deploy` (`tofu/identities.tf`);
-- `tofu/secrets.tf` — секрет `api-admission-facts` с репликой только в регионе и без значения: каждую версию добавляет выкладка. Модуль его не удаляет: `deletion_protection = true`, ведь ревизия монтирует одну из его версий. Чтение — учётной записи `api-run`.
+**The registry and the facts' secret in the module** (T14):
+- `tofu/registry.tf` — the Docker repository `images` in the region. The cleanup keeps the 5 latest versions in any state, and deletes only untagged versions older than 30 days; a version that fits both keeping and deletion is kept (sources 5.4). The deployment pushes the image with the release's tag (T19), so the image rolled out keeps its tag however many pushes come after it, and the path "facts only" will stand on it by digest; the tag is lost only by a push of the same release by hand: the deployment takes the image the registry already holds under the tag. The module does not delete the repository: `deletion_policy = "PREVENT"`. The module gives no reading of it outside the project, and the right to push is with `api-deploy` (`tofu/identities.tf`);
+- `tofu/secrets.tf` — the secret `api-admission-facts` with a replica only in the region and with no value: the deployment adds each version. The module does not delete it: `deletion_protection = true`, since the revision mounts one of its versions. Reading is for the service account `api-run`.
 
-**Сервис, задания и учётные записи в модуле** (R11; T15):
-- `tofu/api.tf` — задания `api-<имя>` по списку `api_jobs`, сейчас `check`, `migrate`, `after` и `sweep`, и сервис `api`. Контейнер сервиса и каждого задания назван `api`: безымянный `gcloud` принимает за чужой, и `--update-secrets` заводит свой том фактов вместо тома модуля (поправка 2026-11-12 к R11). Задания появляются, когда `api_image` назовёт первый образ из `images`, а сервис — после них, когда ещё и `api_serving = true`: первая выкладка прогоняет проверку и миграции заданиями до того, как сервис примет первый запрос. Выкладка меняет у них образ, а у сервиса и заданий части `check` — ещё и версию секрета фактов в томе; остальное — модуль. Сервис получает строки пулера обеих баз переменными из их секретов, `API_DATABASE_URL` и `API_OPENFGA_DATABASE_URL`, а `API_APP_ORIGIN` — origin сайта Hosting по умолчанию; том у сервиса один — фактов (поправка 2026-11-10 к R11). Задания с `schedule` — через Cloud Scheduler и учётную запись `api-scheduler`, и только при сервисе: `sweep` — каждый день в 09:00 UTC (вторая поправка 2026-11-10 к R11);
-- `tofu/identities.tf` — `api-run`, которая читает секрет фактов, секреты сервиса и секреты заданий, и `api-deploy`: push в `images`, новая версия секрета фактов, роль `apiDeployer` на сервисе и заданиях — её права держит `bootstrap.sh` (поправка 2026-11-09 к R11) — и право запускать их как `api-run`. Выкладку пускает пул Workload Identity Federation только из окружения GitHub, которое называет вывод `deploy_environment`, по умолчанию `production` (поправка 2026-11-10 к R18);
-- `tofu/secrets.tf` — секреты сервиса, строки пулера `api-database-url` и `api-openfga-database-url`, — сразу, до сервиса, и модуль их не удаляет; секреты, которые называют задания: для `migrate` — прямые строки подключения к обеим базам. Все — без значений, а задание, которое называет секрет сервиса, читает его же.
+**The service, the jobs and the service accounts in the module** (R11; T15):
+- `tofu/api.tf` — the jobs `api-<name>` by the list `api_jobs`, now `check`, `migrate`, `after` and `sweep`, and the service `api`. The container of the service and of each job is named `api`: `gcloud` takes an unnamed one for someone else's, and `--update-secrets` sets up a facts volume of its own in place of the module's (the 2026-11-12 amendment to R11). The jobs appear when `api_image` names the first image from `images`, and the service after them, when `api_serving = true` as well: the first deployment runs the check and the migrations as jobs before the service takes its first request. The deployment changes their image, and for the service and the jobs of the part `check` also the version of the facts' secret in the volume; the rest is the module's. The service gets the pooler's strings of both databases as variables from their secrets, `API_DATABASE_URL` and `API_OPENFGA_DATABASE_URL`, and `API_APP_ORIGIN` — the origin of the default Hosting site; the service has one volume, the facts' (the 2026-11-10 amendment to R11). The jobs with `schedule` run through Cloud Scheduler and the service account `api-scheduler`, and only when the service exists: `sweep` every day at 09:00 UTC (the second 2026-11-10 amendment to R11);
+- `tofu/identities.tf` — `api-run`, which reads the facts' secret, the service's secrets and the jobs' secrets, and `api-deploy`: a push to `images`, a new version of the facts' secret, the role `apiDeployer` on the service and the jobs — `bootstrap.sh` holds its rights (the 2026-11-09 amendment to R11) — and the right to run them as `api-run`. The Workload Identity Federation pool lets the deployment in only from the GitHub environment that the output `deploy_environment` names, by default `production` (the 2026-11-10 amendment to R18);
+- `tofu/secrets.tf` — the service's secrets, the pooler's strings `api-database-url` and `api-openfga-database-url` — at once, before the service, and the module does not delete them; the secrets that the jobs name: for `migrate`, the direct connection strings to both databases. All of them have no values, and a job that names a secret of the service reads that same secret.
 
-**Первая выкладка** (R25; T24), 2026-11-12, — по шагам R11 и SELF-HOSTING.md, «Deploying»:
-1. pull request 54 со списком — образ `api` v0.1.22 в `images`. Прогоны мержей 54 и 56 упали (43159740759, 43161291785), прогон мержа 57 его собрал (43164987259): реестр без пакета `api` и `just` раннера в другом месте (поправки 2026-11-12 к R15 и R14);
-2. четыре строки баз Neon — версиями секретов, руками оператора в Cloud Shell; pull request 58 с `api_image` — задания (прогон 43259718293);
-3. `Deploy` с **api** — `check` и `migrate` (прогон 43264054707). Перед ним упали два: сервиса ещё не было, а `api-deploy` его не читает (43260063441, поправка 2026-11-12 к R15), и строки были без `sslmode=verify-full`, без которого `api` v0.1.22 их не берёт (43262097982);
-4. pull request 60 с `api_serving = true` — сервис, расписание `sweep` и выпуск `app` (прогон 43265402009);
-5. `Deploy` с **api** — ревизия, весь трафик ей и `after` (прогон 43274407909), после pull request 61: прежний прогон остановился на ревизии без трафика (43265811304; поправки 2026-11-12 к R11 и R15);
-6. оператор в Cloud Shell, бинарником релиза `api` и строкой пулера из секрета — `api countries allow US` и `api invite` на каждого ученика (R25 с поправкой 2026-11-12).
+**The first deployment** (R25; T24), 2026-11-12 — by the steps of R11 and SELF-HOSTING.md, "Deploying":
+1. pull request 54 with the list — the image `api` v0.1.22 in `images`. The runs of the merges 54 and 56 failed (43159740759, 43161291785), the run of the merge 57 built it (43164987259): a registry without the package `api`, and the runner's `just` in another place (the 2026-11-12 amendments to R15 and R14);
+2. four connection strings of the Neon databases — as secret versions, by the operator's hand in Cloud Shell; pull request 58 with `api_image` — the jobs (run 43259718293);
+3. `Deploy` with **api** — `check` and `migrate` (run 43264054707). Before it two runs failed: the service did not exist yet, and `api-deploy` does not read it (43260063441, the 2026-11-12 amendment to R15), and the strings were without `sslmode=verify-full`, without which `api` v0.1.22 does not take them (43262097982);
+4. pull request 60 with `api_serving = true` — the service, the schedule of `sweep` and the release of `app` (run 43265402009);
+5. `Deploy` with **api** — the revision, all the traffic to it, and `after` (run 43274407909), after pull request 61: the previous run stopped at the revision without traffic (43265811304; the 2026-11-12 amendments to R11 and R15);
+6. the operator in Cloud Shell, with the binary of the release of `api` and the pooler's string from the secret — `api countries allow US` and `api invite` for each learner (R25 with its 2026-11-12 amendment).
 
-**Проверки после неё** (T42), 2026-11-12:
-- том фактов у сервиса и у задания `api-check` — один, `admission-facts` модуля, с версией `5`, которую добавила выкладка, а `apply` следующего мержа — «No changes» (вторая поправка 2026-11-12 к R11);
-- на проекте у `api-run` одна роль, `signInUsers`, а у `api-deploy` — ни одной: выкладке хватает прав на её ресурсах (там же);
-- отказ задания `after` в прогоне — как отказ любого задания выкладки, только выкладка стоит уже на новой ревизии с трафиком, а `app` этого прогона не идёт (вторая поправка 2026-11-12 к R15);
-- первый запуск `sweep` по расписанию и цена Cloud Run и Neon — после T42: долги Д15 и Д16 таблицы 4 [DEBT.md](../DEBT.md).
+**The checks after it** (T42), 2026-11-12:
+- the service and the job `api-check` have one facts volume, the module's `admission-facts`, with the version `5` that the deployment added, and the `apply` of the next merge says "No changes" (the second 2026-11-12 amendment to R11);
+- on the project `api-run` has one role, `signInUsers`, and `api-deploy` none: the deployment has enough rights on its own resources (ibid.);
+- a failure of the job `after` in a run is like the failure of any job of the deployment, only the deployment already stands on the new revision with traffic, and this run's `app` does not run (the second 2026-11-12 amendment to R15);
+- the first scheduled run of `sweep` and the cost of Cloud Run and Neon — after T42: the debts Д15 and Д16 of table 4 of [DEBT.md](../DEBT.md).
 
-**Self-hosting** — тот же каталог `deploy/` со своими `deployment.json` и фактами, те же проверки и шаги в своём проекте и своём закрытом реестре. Подписанные файлы релизов у всех одни (R105, R106 spec; Т-20).
+**Self-hosting** — the same directory `deploy/` with its own `deployment.json` and facts, the same checks and steps in its own project and its own private registry. The signed release files are the same for everyone (R105, R106 spec; Т-20).
 
-### 3.3. Хостинг сборки `app` и домены
+### 3.3. Hosting of the build of `app` and domains
 
-Сборку `app` раздаёт Firebase Hosting — сайт проекта по умолчанию, план Blaze; бюджет проекта с оповещением — `tofu/budget.tf` (R06; T14): только этот проект, по его номеру, за месяц, письма на 50, 90 и 100 % суммы — администраторам и пользователям платёжного аккаунта, как бюджет шлёт их по умолчанию, и в канал оператора, если он назван (sources 5.4). Сумма и валюта — значения развёртывания, а платёжный аккаунт приходит из окружения, `TF_VAR_billing_account`: он называет, кто платит.
+Firebase Hosting serves the build of `app` — the project's default site, the Blaze plan; the project's budget with an alert is `tofu/budget.tf` (R06; T14): only this project, by its number, per month, emails at 50, 90 and 100 % of the amount — to the billing account's administrators and users, as a budget sends them by default, and to the operator's channel if it is named (sources 5.4). The amount and the currency are values of the deployment, and the billing account comes from the environment, `TF_VAR_billing_account`: it names who pays.
 
-**Выпуск** — шаг выкладки `app` раздела 3.2:
-1. папка выпуска — архив новой сборки, `assets/` сборки, которая сейчас выпущена на Hosting, и `/deployment.json` из `deploy/production/deployment.json`. Выпущенную сборку выкатка узнаёт по выпуску Hosting, а не по списку на `main`: по сообщению выпуска live-канала, `app <тег> <архив> <sha256>`, а после `keeping` — сборка, чьи `assets/` этот выпуск сохранил (вторая поправка 2026-11-09 к R06). Если список называет выпущенную же сборку, прошлой считается та, что после `keeping`. Её архив выкатка проверяет, как новый: `release-verify` и sha256. Выпуска нет — прошлой сборки нет; сообщение другое — отказ. Версия Hosting — полный набор файлов, и без `assets/` прошлой сборки она убрала бы их. Файл того же пути — из новой сборки;
-2. конфигурацию версии пишет выкатка (R17):
-   - `headers` — два набора путей, которые не пересекаются: вне `/assets/**`, `!/@(assets)/**`, — `X-Content-Type-Options: nosniff`, HSTS, CSP по `csp.json` архива с `{api}` и `{authDomain}` из `deployment.json` и с `frame-ancestors 'none'`, и `Cache-Control: no-cache`; под `/assets/**` — `nosniff`, HSTS и `public, max-age=31536000, immutable`. Заголовки Hosting сверяет с путём запроса до rewrites, поэтому они стоят не по пути `index.html`. HSTS на `*.web.app` Hosting ставит свой (sources 4.5);
-   - `csp.json` — таблица «директива → строка источников» с местами `{api}` и `{authDomain}`; другую форму выкатка отклоняет (R17; строка В14 таблицы 3 [RUN.md](../RUN.md));
-   - rewrite SPA на `index.html` — только вне `/assets/**`; `/deployment.json` есть в каждой версии, а Hosting переписывает только путь, где нет файла;
-   - без `Cross-Origin-Opener-Policy: same-origin`;
-3. выпуск — одна версия: файлы и конфигурация вместе;
-4. проверка после выпуска — байты `index.html`, заголовки у `/`, у пути SPA и у файла в `/assets/`, `404` на неизвестный файл в `/assets/`, `/deployment.json` как его читает `app`, байты `/NOTICE` и `/LICENSE` против файлов сборки (поправка 2026-11-11 к R17), и нигде — `Cross-Origin-Opener-Policy: same-origin`.
+**The release** — the step of the deployment of `app` in section 3.2:
+1. the release's folder — the new build's archive, the `assets/` of the build that is now released on Hosting, and `/deployment.json` from `deploy/production/deployment.json`. The rollout learns the released build from the Hosting release, not from the list on `main`: by the message of the live channel's release, `app <tag> <archive> <sha256>`, and after `keeping` the build whose `assets/` this release kept (the second 2026-11-09 amendment to R06). If the list names the very build that is released, the previous one is the one after `keeping`. The rollout checks its archive as it checks a new one: `release-verify` and sha256. No release — no previous build; another message — a refusal. A Hosting version is a full set of files, and without the previous build's `assets/` it would remove them. A file of the same path comes from the new build;
+2. the rollout writes the version's configuration (R17):
+   - `headers` — two sets of paths that do not overlap: outside `/assets/**`, `!/@(assets)/**` — `X-Content-Type-Options: nosniff`, HSTS, CSP by the archive's `csp.json` with `{api}` and `{authDomain}` from `deployment.json` and with `frame-ancestors 'none'`, and `Cache-Control: no-cache`; under `/assets/**` — `nosniff`, HSTS and `public, max-age=31536000, immutable`. Hosting matches headers against the request's path before rewrites, so they are not set by the path `index.html`. On `*.web.app` Hosting sets its own HSTS (sources 4.5);
+   - `csp.json` — a table "directive → string of sources" with the places `{api}` and `{authDomain}`; the rollout refuses another form (R17; row В14 of table 3 of [RUN.md](../RUN.md));
+   - the SPA rewrite to `index.html` — only outside `/assets/**`; `/deployment.json` is in every version, and Hosting rewrites only a path where there is no file;
+   - without `Cross-Origin-Opener-Policy: same-origin`;
+3. the release — one version: the files and the configuration together;
+4. the check after the release — the bytes of `index.html`, the headers at `/`, at an SPA path and at a file in `/assets/`, `404` for an unknown file in `/assets/`, `/deployment.json` as `app` reads it, the bytes of `/NOTICE` and `/LICENSE` against the build's files (the 2026-11-11 amendment to R17), and `Cross-Origin-Opener-Policy: same-origin` nowhere.
 
-Откат — по R05, pull request с прежним блоком `app`; откат версией в консоли Firebase не используется.
+Rollback — by R05, a pull request with the former block `app`; a rollback by a version in the Firebase console is not used.
 
-**Журналы:**
+**Logs:**
 
-| Журнал | IP-адрес | Где и сколько |
+| Log | IP address | Where and how long |
 |---|---|---|
-| журналы самого Firebase Hosting | да | у Firebase, глобально: «a few months», не настраивается (П-9; privacy 4 spec) |
-| выгрузка журналов Hosting в Cloud Logging | да, `remoteIp` | не включается: включить её может только кнопка в консоли Firebase, а если её нажмут, каждый sink исключает `resource.type="firebase_domain"` (вторая поправка 2026-11-09 к R07) |
+| the logs of Firebase Hosting itself | yes | at Firebase, globally: "a few months", not configurable (П-9; privacy 4 spec) |
+| the export of Hosting's logs to Cloud Logging | yes, `remoteIp` | not turned on: only a button in the Firebase console can turn it on, and if it is pressed, each sink excludes `resource.type="firebase_domain"` (the second 2026-11-09 amendment to R07) |
 
-**Адреса и домены:**
+**Addresses and domains:**
 
-| Что | Адрес | Когда меняется |
+| What | Address | When it changes |
 |---|---|---|
-| `app` | `<проект>.web.app` | свой домен у Hosting — когда он будет куплен |
-| `api` | `*.run.app` своего сервиса, CORS — точному origin `app` | когда будет свой домен; как — решить тогда, domain mapping Cloud Run в Preview |
-| `authDomain` Firebase Auth | `<проект>.firebaseapp.com` | не меняется: `app` входит окном (R09 app) |
-| основной домен и домен виджетов | нет | покупаются вместе после О-16, до публичного запуска (О-16, Т-17); виджеты — этап 4, хостинг бандлов — Т-17 |
+| `app` | `<project>.web.app` | its own domain on Hosting — when one is bought |
+| `api` | `*.run.app` of its service, CORS to the exact origin of `app` | when there is a domain of its own; how is to be decided then, Cloud Run's domain mapping is in Preview |
+| `authDomain` of Firebase Auth | `<project>.firebaseapp.com` | does not change: `app` signs in with a window (R09 app) |
+| the main domain and the widgets' domain | none | bought together after О-16, before the public launch (О-16, Т-17); the widgets are stage 4, the hosting of the bundles is Т-17 |
 
-Сайт по умолчанию отвечает на двух адресах, `web.app` и `firebaseapp.com`, с одним содержимым. Origin `app` — только `web.app`: его называют CORS `api` и `/deployment.json`. В разрешённых доменах проекта Firebase (Т-19) — он и `firebaseapp.com`, полным списком модуля (R16).
+The default site answers at two addresses, `web.app` and `firebaseapp.com`, with the same content. The origin of `app` is only `web.app`: the CORS of `api` and `/deployment.json` name it. The authorized domains of the Firebase project (Т-19) are it and `firebaseapp.com`, as the module's full list (R16).
 
-**Страница образцов `canvas`** на хостинг пока не переезжает. Переедет — отдельным сайтом проекта и своим origin, когда так решит автор — анализ сделан, Google для Hosting обработчик (R128 spec; П-9 закрыт): выход `app` стирает хранилище своего origin, а в журналы Firebase тогда попадут и IP-адреса устройств, на которых делают образцы детей (вторая поправка 2026-11-08 к R25 spec).
+**The samples page of `canvas`** does not move to the hosting yet. It will move as a separate site of the project with its own origin when the author decides so — the analysis is done, Google is a processor for Hosting (R128 spec; П-9 closed): the sign-out of `app` erases the storage of its origin, and Firebase's logs would then also get the IP addresses of the devices on which children's samples are made (the second 2026-11-08 amendment to R25 spec).
 
-**В модуле** (R12; T16):
-- `tofu/firebase.tf` — Firebase в проекте и сайт Hosting с ID проекта, `deletion_policy = "PREVENT"`; Web App `app`, тоже `PREVENT`, и выход `app_sign_in` — блок `signIn` для `/deployment.json`: `service`, `apiKey`, `authDomain`, `projectId`, `appId` (R17). Файл пишет автор, а ревью pull request его видит (R05);
-- `tofu/identities.tf` — `hosting-publish`: окружение GitHub, которое называет вывод `hosting_environment`, по умолчанию `production-hosting`, на проекте — роль `hostingPublisher`, Firebase Hosting Admin без создания и удаления сайтов и без `resourcemanager.projects.list`, которого роль проекта не держит, — её создаёт и держит `bootstrap.sh` (поправка и четвёртая поправка 2026-11-09 к R12), и больше ничего: ключей API выпуск не читает (третья поправка 2026-11-09 к R12). До `api`, до конфигурации и до настроек входа эта учётная запись не дотягивается;
-- `tofu/sign_in.tf` — вход в production (R16; T27): Identity Platform, `google_identity_platform_config`, и её API, `identitytoolkit.googleapis.com`. Разрешённые домены — ровно `<проект>.firebaseapp.com` и `<проект>.web.app`, без `localhost`. Вход по почте, по телефону и анонимный выключены, журнал активности выключен, арендаторов и второго фактора нет, а пользователя удаляет только `api`, `disabled_user_deletion = true`. Переход на Identity Platform не отменяется, а `destroy` ресурс только забывает;
-- `tofu/identities.tf` — у `api-run` на проекте роль `signInUsers` из `bootstrap.sh`: `firebaseauth.users.get`, `.update` и `.delete`, без права менять настройки входа; `tofu/api.tf` — `API_FIREBASE_PROJECT_ID` у сервиса и у каждого задания.
+**In the module** (R12; T16):
+- `tofu/firebase.tf` — Firebase in the project and the Hosting site with the project's ID, `deletion_policy = "PREVENT"`; the Web App `app`, also `PREVENT`, and the output `app_sign_in` — the block `signIn` for `/deployment.json`: `service`, `apiKey`, `authDomain`, `projectId`, `appId` (R17). The author writes the file, and the review of the pull request sees it (R05);
+- `tofu/identities.tf` — `hosting-publish`: the GitHub environment that the output `hosting_environment` names, by default `production-hosting`; on the project the role `hostingPublisher`, Firebase Hosting Admin without creating and deleting sites and without `resourcemanager.projects.list`, which a project's role does not hold — `bootstrap.sh` creates and holds it (the 2026-11-09 amendment and fourth amendment to R12) —, and nothing more: the release reads no API keys (the third 2026-11-09 amendment to R12). This service account does not reach `api`, the configuration or the sign-in settings;
+- `tofu/sign_in.tf` — sign-in in production (R16; T27): Identity Platform, `google_identity_platform_config`, and its API, `identitytoolkit.googleapis.com`. The authorized domains are exactly `<project>.firebaseapp.com` and `<project>.web.app`, without `localhost`. Sign-in by email, sign-in by phone and anonymous sign-in are turned off, the activity log is turned off, there are no tenants and no second factor, and only `api` deletes a user, `disabled_user_deletion = true`. The move to Identity Platform cannot be undone, and `destroy` only forgets the resource;
+- `tofu/identities.tf` — `api-run` has on the project the role `signInUsers` from `bootstrap.sh`: `firebaseauth.users.get`, `.update` and `.delete`, without the right to change the sign-in settings; `tofu/api.tf` — `API_FIREBASE_PROJECT_ID` on the service and on each job.
 
-**Вход** — Firebase Auth с Identity Platform, только окном Google (R03 api; R09 app; R16):
+**Sign-in** — Firebase Auth with Identity Platform, only through the Google window (R03 api; R09 app; R16):
 
-| Что | Кто ставит | Где лежит |
+| What | Who sets it | Where it is kept |
 |---|---|---|
-| Identity Platform и её настройки, разрешённые домены | модуль, учётной записью конфигурации | `tofu/sign_in.tf` |
-| вход через Google, OAuth-клиент, экран согласия | оператор, один раз, после первого `apply` | в проекте; секрет клиента — только у Google |
-| права `api` на пользователей входа | `bootstrap.sh` создаёт роль, модуль её даёт | `tofu/bootstrap.sh`, `tofu/identities.tf` |
+| Identity Platform and its settings, the authorized domains | the module, by the configuration's service account | `tofu/sign_in.tf` |
+| sign-in through Google, the OAuth client, the consent screen | the operator, once, after the first `apply` | in the project; the client's secret is only with Google |
+| the rights of `api` on the sign-in users | `bootstrap.sh` creates the role, the module grants it | `tofu/bootstrap.sh`, `tofu/identities.tf` |
 
-Цена — по активным пользователям за месяц: вход через Google бесплатен до 50 000, дальше $0.0055 за каждого (sources 4.7).
+The price is by monthly active users: sign-in through Google is free up to 50,000, then $0.0055 for each (sources 4.7).
 
-**Шаг оператора: вход через Google.** Программно его не сделать: OAuth-клиент и экран согласия API больше не заводит, а провайдер Google в модуле держал бы секрет клиента в состоянии (R16). После первого `apply`, когда модуль перевёл проект на Identity Platform (T23):
-1. консоль Firebase проекта → Authentication → Sign-in method → Add new provider → Google → Enable;
-2. публичное имя проекта — «NovaTrail»; почта поддержки — та, что пользователи увидят на экране согласия, адрес оператора. Если консоль просит Web client ID и Web client secret, клиента `Web application` создать в Google Cloud → APIs & Services → Credentials, с Authorized redirect URI `https://<проект>.firebaseapp.com/__/auth/handler` — обработчиком входа на `authDomain` (sources 4.7), — а секрет вставить только в эту форму: ни в репозиторий, ни в переменные, ни в секреты GitHub он не идёт;
-3. Google Auth Platform: Audience — External и In production: в режиме Testing входят только названные тестовые пользователи, не больше 100 (sources 4.7). Областей — только по умолчанию, email, profile и openid; проверка приложения для них не нужна. Имя и логотип пользователь увидит после brand verification, а до неё — адрес `<проект>.firebaseapp.com`; brand verification — со своим доменом, после О-16;
-4. разрешённые домены в консоли не трогать: их держит модуль, и следующий `apply` уберёт добавленный руками;
-5. `tofu plan` после шага — без изменений: шаг меняет провайдера входа, а не настройки, которые держит модуль.
+**The operator's step: sign-in through Google.** It cannot be done by a program: the API no longer sets up an OAuth client and a consent screen, and the Google provider in the module would keep the client's secret in the state (R16). After the first `apply`, once the module has moved the project to Identity Platform (T23):
+1. the project's Firebase console → Authentication → Sign-in method → Add new provider → Google → Enable;
+2. the project's public name — "NovaTrail"; the support email — the one users will see on the consent screen, the operator's address. If the console asks for a Web client ID and a Web client secret, create a client `Web application` in Google Cloud → APIs & Services → Credentials, with the Authorized redirect URI `https://<project>.firebaseapp.com/__/auth/handler` — the sign-in handler on `authDomain` (sources 4.7) —, and paste the secret only into this form: it goes neither into the repository, nor into variables, nor into GitHub's secrets;
+3. Google Auth Platform: Audience — External and In production: in the mode Testing only the named test users sign in, no more than 100 (sources 4.7). Scopes — only the default ones, email, profile and openid; they need no app verification. The user will see the name and the logo after brand verification, and before it the address `<project>.firebaseapp.com`; brand verification comes with a domain of its own, after О-16;
+4. do not touch the authorized domains in the console: the module holds them, and the next `apply` removes one added by hand;
+5. `tofu plan` after the step shows no changes: the step changes the sign-in provider, not the settings the module holds.
 
-На проекте `novatrail` (T23) консоль на шаге 1 сама создала OAuth-клиента, «auto created by Google Service», и ID и секрета не спросила; второй прогон `Deploy` после включения провайдера — «No changes» (поправка 2026-11-09 к R16). Audience на шаге 3 API не читает: автор подтвердил External и In production снимком экрана консоли.
+On the project `novatrail` (T23) the console at step 1 created the OAuth client itself, "auto created by Google Service", and asked for no ID or secret; the second run of `Deploy` after the provider was turned on says "No changes" (the 2026-11-09 amendment to R16). The API does not read the Audience of step 3: the author confirmed External and In production with a screenshot of the console.
 
-Self-hosting делает тот же шаг в своём проекте.
+Self-hosting does the same step in its own project.
 
-**Первый выпуск**, 2026-11-12, прошёл под `hosting-publish` со своей ролью `hostingPublisher`, хотя Firebase пишет, что свои роли для Hosting не работают (sources 4.5), и проверка после выпуска приняла ответы сайта, `/NOTICE` и `/LICENSE` в их числе (T24). Проверки после выпуска (T42; вторая поправка 2026-11-12 к R17):
-- `!/@(assets)/**` production пускает, и явного списка путей SPA не нужно;
-- неизвестный файл под `/assets/` — 404 со страницей самого Hosting и заголовками путей вне `/assets/**`;
-- HSTS Hosting ставит свой — `max-age=31556926; includeSubDomains; preload`;
-- сверх версии Hosting шлёт `etag`, `last-modified`, `vary`, `alt-svc` и заголовки кеша, а `Cross-Origin-Opener-Policy` — нигде;
-- служебные пути `/__/auth/*` — страницы входа Firebase — Hosting отдаёт без заголовков версии: без CSP и без `nosniff`;
-- окно входа открывается и под другим аккаунтом Google: так вошёл второй ученик (поправка 2026-11-12 к R16).
+**The first release**, 2026-11-12, went through as `hosting-publish` with its custom role `hostingPublisher`, though Firebase writes that custom roles do not work for Hosting (sources 4.5), and the check after the release accepted the site's responses, `/NOTICE` and `/LICENSE` among them (T24). The checks after the release (T42; the second 2026-11-12 amendment to R17):
+- production accepts `!/@(assets)/**`, and no explicit list of SPA paths is needed;
+- an unknown file under `/assets/` gives 404 with Hosting's own page and the headers of the paths outside `/assets/**`;
+- Hosting sets its own HSTS — `max-age=31556926; includeSubDomains; preload`;
+- beyond the version Hosting sends `etag`, `last-modified`, `vary`, `alt-svc` and cache headers, and `Cross-Origin-Opener-Policy` nowhere;
+- Hosting serves the reserved paths `/__/auth/*` — Firebase's sign-in pages — without the version's headers: without CSP and without `nosniff`;
+- the sign-in window opens under another Google account too: that is how the second learner signed in (the 2026-11-12 amendment to R16).
 
-### 3.4. Журналы и трассы
+### 3.4. Logs and traces
 
-Журналы платформы — без прямых идентификаторов и IP-адресов (privacy 4 spec). Как этого держится `infra` — R07.
+The platform's logs are without direct identifiers and IP addresses (privacy 4 spec). How `infra` holds to this is R07.
 
-**Sink и фильтры:**
+**Sinks and filters:**
 
-| Sink | Куда | Фильтр исключения |
+| Sink | Where to | Exclusion filter |
 |---|---|---|
-| `_Default` | свой бакет журналов в `us-east4`, 30 дней (R04) | `LOG_ID("run.googleapis.com/requests")` — журналы запросов Cloud Run; а ещё Data Access, запросы Identity Platform и запросы Hosting — строки ниже |
-| `_Required` | бакет `_Required` в `global`, 400 дней | не меняется; журналов запросов не получает |
-| любой sink, который заведёт проект | — | тот же, что у `_Default` |
+| `_Default` | its own log bucket in `us-east4`, 30 days (R04) | `LOG_ID("run.googleapis.com/requests")` — Cloud Run's request logs; and also Data Access, the requests of Identity Platform and the requests of Hosting — the rows below |
+| `_Required` | the bucket `_Required` in `global`, 400 days | does not change; gets no request logs |
+| any sink the project sets up | — | the same as `_Default`'s |
 
-Фильтр применяется к записи, которую Logging API или Telemetry API уже принял: IP-адрес доходит до Google как до обработчика, но в бакете не хранится. Имя журнала в фильтре сверила T42: при 135 запросах к `api` с начала работы сервиса, 2026-11-12, в бакете нет ни одной записи с `httpRequest` — только `stdout`, `stderr` и `varlog/system` Cloud Run (поправка 2026-11-12 к R07).
+The filter applies to an entry that the Logging API or the Telemetry API has already accepted: the IP address reaches Google as a processor, but is not stored in the bucket. T42 checked the log's name in the filter: with 135 requests to `api` since the service started, 2026-11-12, the bucket has not one entry with `httpRequest` — only Cloud Run's `stdout`, `stderr` and `varlog/system` (the 2026-11-12 amendment to R07).
 
-**Перечень журналов и трасс:**
+**The inventory of logs and traces:**
 
-| Что | Что в нём | Где и сколько |
+| What | What is in it | Where and how long |
 |---|---|---|
-| журналы запросов Cloud Run, у сервиса `api` | `httpRequest`: IP-адрес клиента, user agent | исключены — не хранятся |
-| журналы контейнера `api` и его заданий | события `api` без идентификаторов и адресов; у заданий — счётчики (R26 api; T28 api) | бакет `us-east4`, 30 дней |
-| системные журналы Cloud Run | события платформы о ревизиях и заданиях | бакет `us-east4`, 30 дней |
-| Admin Activity | `callerIp` и почта вызывающего — оператора и CI при правке ресурсов. Записей Identity Platform от учеников нет: `SignUp` в проекте не вызывает никто, а вход окном Google, который заводит пользователя, записи не оставляет; записи других сервисов T42 не перебирала (T42) | `_Required`, `global`, 400 дней (Д3); не исключить |
-| System Event | действия самого Google с ресурсами проекта | `_Required`, `global`, 400 дней |
-| Policy Denied | `callerIp` и почта того, кому политика отказала | бакет `us-east4`, 30 дней |
-| Data Access audit | был бы `callerIp` | не включается и исключён в каждом sink (поправка 2026-11-09 к R07) |
-| журнал активности Identity Platform | был бы каждый запрос входа | выключен модулем, `monitoring.request_logging` (R16), и исключён в каждом sink (поправка 2026-11-09 к R07) |
-| выгрузка журналов Firebase Hosting | была бы `remoteIp` | не включается (R06) и исключена в каждом sink (вторая поправка 2026-11-09 к R07) |
-| журналы Firebase Auth и Firebase Hosting у самого Firebase | IP-адреса | у Firebase: Auth — «a few weeks», Hosting — «a few months» (П-9) |
-| трассы | Cloud Run сам, на части запросов | `_Trace` в `us-east4`; Cloud Trace API не выключить, пока он нужен Cloud Scheduler (третья поправка 2026-11-09 к R07); атрибуты — с первой трассой: с начала работы сервиса трасс не было (Д17) |
+| Cloud Run's request logs, of the service `api` | `httpRequest`: the client's IP address, user agent | excluded — not stored |
+| the logs of the container `api` and of its jobs | events of `api` without identifiers and addresses; for the jobs, counters (R26 api; T28 api) | the bucket in `us-east4`, 30 days |
+| Cloud Run's system logs | platform events about revisions and jobs | the bucket in `us-east4`, 30 days |
+| Admin Activity | `callerIp` and the caller's email — of the operator and of CI when they edit resources. There are no Identity Platform entries from learners: nobody calls `SignUp` in the project, and the sign-in through the Google window, which creates a user, leaves no entry; T42 did not go through the entries of other services (T42) | `_Required`, `global`, 400 days (Д3); cannot be excluded |
+| System Event | Google's own actions with the project's resources | `_Required`, `global`, 400 days |
+| Policy Denied | `callerIp` and the email of whoever a policy refused | the bucket in `us-east4`, 30 days |
+| Data Access audit | would hold `callerIp` | not turned on, and excluded in each sink (the 2026-11-09 amendment to R07) |
+| the activity log of Identity Platform | would hold every sign-in request | turned off by the module, `monitoring.request_logging` (R16), and excluded in each sink (the 2026-11-09 amendment to R07) |
+| the export of Firebase Hosting's logs | would hold `remoteIp` | not turned on (R06), and excluded in each sink (the second 2026-11-09 amendment to R07) |
+| the logs of Firebase Auth and Firebase Hosting at Firebase itself | IP addresses | at Firebase: Auth "a few weeks", Hosting "a few months" (П-9) |
+| traces | Cloud Run itself, on a part of the requests | `_Trace` in `us-east4`; Cloud Trace API cannot be turned off while Cloud Scheduler needs it (the third 2026-11-09 amendment to R07); the attributes with the first trace: since the service started there have been no traces (Д17) |
 
-Журналов запросов у заданий Cloud Run нет: их пишут только сервисы.
+Cloud Run jobs have no request logs: only services write them.
 
-**Для разбора сбоев:**
-- журнал `api` — метод, код, причина отказа и время каждого вызова, без тела, заголовков и адреса (architecture 3.9 api);
-- встроенные метрики Cloud Run в Cloud Monitoring — число запросов, задержки, экземпляры;
-- Error Reporting — по журналам `api`, которые хранятся.
+**For investigating failures:**
+- the log of `api` — the method, the code, the cause of a refusal and the time of each call, without the body, the headers and the address (architecture 3.9 api);
+- Cloud Run's built-in metrics in Cloud Monitoring — the number of requests, latencies, instances;
+- Error Reporting — by the logs of `api` that are stored.
 
-Своих метрик по журналам, где меткой стал бы адрес, проект не заводит: они считаются и по исключённым записям. Оповещения — на встроенных метриках, `tofu/alerts.tf` (T14): нагрузка — запросов к `api` в минуту больше `load_alert_per_minute`, 300 по умолчанию, — и ошибки — ответов класса 5xx в минуту больше `error_alert_per_minute`, 1 по умолчанию, — оба в среднем за пять минут, по `run.googleapis.com/request_count`; третье — запуск задания по расписанию, который не прошёл, по `run.googleapis.com/job/completed_execution_count` с `result` не `succeeded` (поправка 2026-11-10 к R07); оно есть, только пока есть сервис и задания с `schedule`. Письмо — оператору, чей адрес приходит из окружения, `TF_VAR_operator_email`; без адреса нет ни канала, ни оповещений. Первые два пишут, когда условие наступило и когда прошло, а третье — только когда наступило. Текст письма ведёт к метрикам Cloud Run, у третьего — к запускам задания, и к журналу `api`, а не к журналам запросов: их нет. Метрики Cloud Run бесплатны, а сами оповещения Google берёт с 1 сентября 2027 года: $0,35 в месяц за каждую метрику в условии — здесь по одной в каждом из трёх — и $0,50 за миллион точек, которые возвращает запрос условия (sources 5.4).
+The project sets up no log-based metrics of its own, where the address would become a label: they are counted on excluded entries too. The alerts are on built-in metrics, `tofu/alerts.tf` (T14): load — requests to `api` per minute above `load_alert_per_minute`, 300 by default —, and errors — responses of class 5xx per minute above `error_alert_per_minute`, 1 by default —, both averaged over five minutes, by `run.googleapis.com/request_count`; the third — a scheduled run of a job that failed, by `run.googleapis.com/job/completed_execution_count` with `result` not `succeeded` (the 2026-11-10 amendment to R07); it exists only while there are the service and jobs with `schedule`. The email goes to the operator, whose address comes from the environment, `TF_VAR_operator_email`; without an address there is neither a channel nor alerts. The first two write when the condition began and when it ended, and the third only when it began. The email's text leads to Cloud Run's metrics, for the third to the job's runs, and to the log of `api`, not to the request logs: there are none. Cloud Run's metrics are free, and Google charges for the alerts themselves from September 1, 2027: $0.35 a month for each metric in a condition — here one in each of the three — and $0.50 per million points that a condition's query returns (sources 5.4).
 
-**Трассы:** своих у платформы нет, а Cloud Run трассирует часть запросов сам. Cloud Trace API включён: Google включает его в новом проекте, а выключить его не даёт Cloud Scheduler, который от него зависит (третья поправка 2026-11-09 к R07; T23). Место `_Trace` — `us-east4` — задано до любой трассы (R04 с поправкой 2026-11-09).
+**Traces:** the platform has none of its own, and Cloud Run traces a part of the requests itself. Cloud Trace API is enabled: Google enables it in a new project, and Cloud Scheduler, which depends on it, does not let it be turned off (the third 2026-11-09 amendment to R07; T23). The place of `_Trace` — `us-east4` — is set before any trace (R04 with its 2026-11-09 amendment).
 
-**В модуле** — `tofu/logging.tf` (T13):
-- бакет `default-<регион>`, `log_retention_days` — 30 по умолчанию, от 1 до 3650; `deletion_policy = "PREVENT"`: модуль бакет не удаляет — ни `destroy`, ни сменой региона, — иначе `_Default`, который `destroy` не трогает, писал бы в удаляемый бакет;
-- sink `_Default` модуль берёт на себя: провайдер обновляет sink, который уже есть, а при удалении `_Default` не трогает. Прежний фильтр — дословно, назначение — бакет региона, а исключения — блоками `exclusions` самого sink: `cloud-run-request-logs`, `data-access-audit`, `identity-platform-requests` и `firebase-hosting-requests`;
-- sink проекта перечислены одним списком, `local.sinks`, и каждый получает те же исключения; тест держит каждый sink этого списка, а `tf-check` не пускает sink или исключение, объявленные вне него;
-- место `_Trace` — `google_observability_project_settings` с `default_storage_location` региона: настройку провайдер ставит через PATCH, и второй `apply` её повторяет без вреда, а бакет `_Trace` он создаёт через POST, который отказывает, если бакет уже есть, и удалить его не может (поправка 2026-11-09 к R04; sources 2.2);
-- Data Access audit и журнал активности Identity Platform выключены по умолчанию Google, модуль их не включает, а sink их исключает (поправка 2026-11-09 к R07). Журнал активности, кроме того, явно выключен в `tofu/sign_in.tf` (R16).
+**In the module** — `tofu/logging.tf` (T13):
+- the bucket `default-<region>`, `log_retention_days` — 30 by default, from 1 to 3650; `deletion_policy = "PREVENT"`: the module does not delete the bucket — neither by `destroy` nor by a change of region —, or else `_Default`, which `destroy` does not touch, would write to a bucket being deleted;
+- the module takes over the sink `_Default`: the provider updates a sink that already exists, and on deletion does not touch `_Default`. The former filter word for word, the destination the region's bucket, and the exclusions as blocks `exclusions` of the sink itself: `cloud-run-request-logs`, `data-access-audit`, `identity-platform-requests` and `firebase-hosting-requests`;
+- the project's sinks are listed in one list, `local.sinks`, and each gets the same exclusions; a test holds each sink of this list, and `tf-check` lets no sink or exclusion declared outside it through;
+- the place of `_Trace` — `google_observability_project_settings` with the region's `default_storage_location`: the provider sets the setting through PATCH, and a second `apply` repeats it harmlessly, while the bucket `_Trace` it creates through POST, which refuses if the bucket already exists, and it cannot delete it (the 2026-11-09 amendment to R04; sources 2.2);
+- Data Access audit and the activity log of Identity Platform are off by Google's default, the module does not turn them on, and the sink excludes them (the 2026-11-09 amendment to R07). The activity log is besides turned off explicitly in `tofu/sign_in.tf` (R16).
 
-**Проверено после первой выкладки (T42):**
-- имя журнала запросов в фильтре;
-- что `SignUp` в проекте не вызывает никто, а записей Identity Platform от учеников в Admin Activity нет;
-- значения метки `result` — `succeeded` и `failed`, как ждёт оповещение (поправка 2026-11-12 к R07).
+**Checked after the first deployment (T42):**
+- the name of the request log in the filter;
+- that nobody calls `SignUp` in the project, and that Admin Activity has no Identity Platform entries from learners;
+- the values of the label `result` — `succeeded` and `failed`, as the alert expects (the 2026-11-12 amendment to R07).
 
-**Не проверено:**
-- атрибуты трасс, которые Cloud Run пишет сам: трасс ещё нет (Д17);
-- первый запуск задания по расписанию, `sweep` 2026-11-13 в 09:00 UTC (Д15);
-- журналы Cloud Scheduler о вызовах заданий — пишет ли он их в проект и что в них: в перечне выше их нет, а сверит их первый запуск `sweep` (Д15).
+**Not checked:**
+- the attributes of the traces Cloud Run writes itself: there are no traces yet (Д17);
+- the first scheduled run of a job, `sweep` on 2026-11-13 at 09:00 UTC (Д15);
+- Cloud Scheduler's logs of the jobs' invocations — whether it writes them in the project and what is in them: they are not in the inventory above, and the first run of `sweep` will check them (Д15).
 
-### 3.5. Self-hosting и локальный запуск
+### 3.5. Self-hosting and the local run
 
-Self-hosting — копия платформы, которую оператор разворачивает у себя (product 3 spec; architecture 3.11 spec). Из решений E1 и E3 для неё следует:
-- **те же файлы релизов:** образ сервиса оператор собирает у себя из того же бинарника и по тому же `Dockerfile`, после `release-verify`, и держит в своём закрытом реестре (R105, R106 spec);
-- **тот же каталог `deploy/`** — свой список, свои значения `/deployment.json` и свой файл фактов; ступень — `full` (R05; R25 api);
-- **те же проверки и шаги выкладки** — workflow форка, а без GitHub Actions — те же рецепты руками, в своём проекте (R05; R21);
-- **хостинг сборки `app`** — в коде Firebase Hosting на проекте копии. Другой хостинг — вне кода и руководства: со своими заголовками он годится, а без них — более слабая защита (R06; Т-17);
-- **журналы** — то же исключение журналов запросов и те же правила для метрик и трасс (R07);
-- **вход** — тот же модуль и тот же шаг оператора «Вход через Google» (R16; раздел 3.3);
-- **регион** — у копии свой: R109 spec и R04 — о платформе.
+Self-hosting is a copy of the platform that an operator deploys on their own side (product 3 spec; architecture 3.11 spec). From the decisions of E1 and E3 it follows for it:
+- **the same release files:** the operator builds a service's image on their own side from the same binary and by the same `Dockerfile`, after `release-verify`, and keeps it in their own private registry (R105, R106 spec);
+- **the same directory `deploy/`** — its own list, its own values of `/deployment.json` and its own facts file; the rung `full` (R05; R25 api);
+- **the same checks and steps of the deployment** — the fork's workflow, and without GitHub Actions the same recipes by hand, in its own project (R05; R21);
+- **the hosting of the build of `app`** — in code, Firebase Hosting on the copy's project. Another hosting is outside the code and the guide: with its own headers it suits, and without them the protection is weaker (R06; Т-17);
+- **the logs** — the same exclusion of the request logs and the same rules for metrics and traces (R07);
+- **sign-in** — the same module and the same operator's step "Sign-in through Google" (R16; section 3.3);
+- **the region** — the copy has its own: R109 spec and R04 are about the platform.
 
-Другого облака, кроме Google Cloud, в коде нет. `bootstrap.sh` и переменные корневого модуля уже берут значения копии из её `production.auto.tfvars` и `backend.hcl`, а свой проект Firebase модуль ставит на проект копии. Руководство оператора — [SELF-HOSTING.md](../SELF-HOSTING.md), по-английски: основной путь — форк с GitHub Actions, а без них — те же рецепты правами оператора, без ограничений `infra-config` (R21).
+There is no cloud in the code other than Google Cloud. `bootstrap.sh` and the root module's variables already take the copy's values from its `production.auto.tfvars` and `backend.hcl`, and the module puts the copy's own Firebase project on the copy's project. The operator's guide is [SELF-HOSTING.md](../SELF-HOSTING.md), in English: the main path is a fork with GitHub Actions, and without them the same recipes with the operator's rights, without the constraints of `infra-config` (R21).
 
-**Локальный запуск** (R22; T31) — платформа из исходников на одной машине: `api` и `app` идут каждый в своём devcontainer и своими рецептами, а `infra` даёт только описание — «Running the whole platform on one machine» [SELF-HOSTING.md](../SELF-HOSTING.md#12-running-the-whole-platform-on-one-machine). Проекта Firebase, compose, эмуляторов и списка `infra` для него не даёт; почему — R22. `api` в его `/deployment.json` — origin самого `app` на loopback, `http://127.0.0.1:<порт app>`, по правилу `deployment.loopback` (R85 spec), а пути `api` ведёт прокси сервера `app`: нижний слой CSP сборки другого origin по `http` не пускает (поправка 2026-11-11 к R22; строка Д177 RUN.md `spec`). Проект Firebase нужен — формат требует `signIn` и поля эмулятора не знает, — и это dev-проект `api` (строка «сервис входа» таблицы 3.12 spec). Контейнер `app` стоит и на сети `novatrail-api`, а прокси идёт на адрес контейнера `api` в ней, `NOVATRAIL_API=http://<адрес>:8080`, который даёт `hostname -i` в контейнере `api`: имени у него в сети нет до T115 `spec` (строка Д195 RUN.md `spec`). Порт `app` — 5173, закреплённый у обоих серверов, и VS Code пробрасывает его на тот же 5173 хоста. Описание сверено с первой сборкой `app` с `api`, которую автор запустил из исходников 2026-11-12 их рецептами, — T30 `app` и T42 `api`, — и с кодом `app` на `main` 55ab358 и `api` v0.1.27 (поправка 2026-11-12 к R22). `API_APP_ORIGIN` README `api` задаёт, а architecture 3.7 app — нет; работает и то и другое — строка «в реестр spec» В27 RUN.md.
+**The local run** (R22; T31) — the platform from source on one machine: `api` and `app` each run in their own devcontainer and by their own recipes, and `infra` gives only a description — "Running the whole platform on one machine" [SELF-HOSTING.md](../SELF-HOSTING.md#12-running-the-whole-platform-on-one-machine). `infra` gives it no Firebase project, compose, emulators or list; why is R22. `api` in its `/deployment.json` is the origin of `app` itself on loopback, `http://127.0.0.1:<app port>`, by the rule `deployment.loopback` (R85 spec), and the proxy of the server of `app` leads the paths of `api`: the lower layer of the build's CSP does not let in another origin over `http` (the 2026-11-11 amendment to R22; row Д177 of RUN.md of `spec`). A Firebase project is needed — the format requires `signIn` and does not know an emulator's fields —, and it is the dev project of `api` (the row "sign-in service" of table 3.12 spec). The container of `app` is also on the network `novatrail-api`, and the proxy goes to the address of the container `api` in it, `NOVATRAIL_API=http://<address>:8080`, which `hostname -i` gives in the container `api`: it has no name on the network until T115 of `spec` (row Д195 of RUN.md of `spec`). The port of `app` is 5173, fixed for both servers, and VS Code forwards it to the same 5173 of the host. The description is checked against the first build of `app` with `api` that the author ran from source on 2026-11-12 by their recipes — T30 of `app` and T42 of `api` —, and against the code of `app` on `main` 55ab358 and `api` v0.1.27 (the 2026-11-12 amendment to R22). The README of `api` sets `API_APP_ORIGIN`, and architecture 3.7 app does not; both work — the row «в реестр spec» В27 of RUN.md.
 
-**Что копия задаёт сама, а что общее** (T29). Перечень — по коду модуля, `bootstrap.sh`, проверок и выкладки на 2026-11-12. Тесты на значениях копии — `tofu/tests/copy.tftest.hcl`, тест копии в `tofu/tests/bootstrap.test.mjs`, `tools/deploy/test/api.test.mjs` и `app.test.mjs`. Они держат и то, что ни ID проекта `novatrail`, ни регион `us-east4`, ни числа `altnovatrail` до ресурсов и вызовов копии не доходят. Имя «NovaTrail» доходит нарочно: им названы проект, который делает `bootstrap.sh`, и метка версий Hosting, `novatrail-infra`, — строка «имена» таблицы.
+**What a copy sets itself, and what is shared** (T29). The inventory is by the code of the module, `bootstrap.sh`, the checks and the deployment as of 2026-11-12. The tests on a copy's values are `tofu/tests/copy.tftest.hcl`, the copy test in `tofu/tests/bootstrap.test.mjs`, `tools/deploy/test/api.test.mjs` and `app.test.mjs`. They also hold that neither the project ID `novatrail`, nor the region `us-east4`, nor the numbers of `altnovatrail` reach a copy's resources and calls. The name "NovaTrail" reaches it on purpose: it names the project that `bootstrap.sh` makes, and the label of Hosting's versions, `novatrail-infra` — the row "names" of the table.
 
-| Что | Откуда у копии | Своё или общее |
+| What | Where a copy gets it | Own or shared |
 |---|---|---|
-| проект, регион, бюджет и валюта | `production.auto.tfvars` | своё |
-| бакет состояния и префикс | `backend.hcl` | своё |
-| учётная запись CI и провайдер пула для workflow | `tofu/ci.env`, две строки, которые печатает `bootstrap.sh` | своё |
-| платёжный аккаунт, адрес оператора | `TF_VAR_billing_account`, `TF_VAR_operator_email` | своё |
-| пул CI, репозиторий и его числа | `workload_identity_pool_id`, `github_oidc_subject_prefix` | своё |
-| окружения GitHub выкладки и публикации | `deploy_environment`, `hosting_environment`, а workflow берёт их из выводов модуля; `production-config` — константа | своё (поправка 2026-11-10 к R18) |
-| сайт Hosting и домены входа | ID проекта: `<проект>.web.app`, `<проект>.firebaseapp.com`; `web.app` — и origin `app` в `API_APP_ORIGIN` сервиса | своё |
-| образ `api` и сервис | `api_image` — образ из реестра копии, `api_serving` | своё |
-| базы `api` и `openfga` | свой проект Neon; четыре строки подключения — версиями секретов `api-migrate-database-url`, `api-migrate-openfga-database-url`, `api-database-url` и `api-openfga-database-url`, руками оператора | своё |
-| страны и коды приглашения | `api countries allow` и `api invite` — руками оператора, бинарником релиза (R25) | своё |
-| настройки с умолчаниями | `api_service_name` и `api_jobs` — от них имена сервиса, его учётных записей, заданий и их секретов; сроки журналов и образов, пороги оповещений, размер и пределы сервиса — `tofu/variables.tf` | своё, а умолчания — общие |
-| `api` и `signIn` в `/deployment.json` | выводы `api_origin` — адрес сервиса копии — и `app_sign_in` модуля копии | своё |
-| eval | `eval_github_subject_prefixes`, по умолчанию пуст: ни секретов, ни пула | только у платформы |
-| список, `/deployment.json`, факты | каталог `deploy/` копии | своё (Т-20; R96 spec) |
-| файлы релизов `api` и `app` | релизы `altnovatrail`, `release-verify` | общее (R105, R106 spec) |
-| формат `/deployment.json` | `spec/deployment/` подмодуля | общее (R85 spec) |
-| имена | константы модуля и `bootstrap.sh`: `infra-config`, `hosting-publish`, секреты `api-admission-facts`, `api-database-url` и `api-openfga-database-url`, реестр `images`, контейнер `api` и том фактов `admission-facts` по пути `/etc/api/admission`, свои роли; имя проекта «NovaTrail» и метка `novatrail-infra`. | общее: они внутри проекта копии |
-| вход CI | Workload Identity Federation GitHub; без GitHub Actions — те же рецепты руками (T30) | общее |
+| the project, the region, the budget and the currency | `production.auto.tfvars` | own |
+| the state bucket and the prefix | `backend.hcl` | own |
+| the CI service account and the pool's provider for the workflow | `tofu/ci.env`, the two lines that `bootstrap.sh` prints | own |
+| the billing account, the operator's address | `TF_VAR_billing_account`, `TF_VAR_operator_email` | own |
+| the CI pool, the repository and its numbers | `workload_identity_pool_id`, `github_oidc_subject_prefix` | own |
+| the GitHub environments of the deployment and of the publishing | `deploy_environment`, `hosting_environment`, and the workflow takes them from the module's outputs; `production-config` is a constant | own (the 2026-11-10 amendment to R18) |
+| the Hosting site and the sign-in domains | the project ID: `<project>.web.app`, `<project>.firebaseapp.com`; `web.app` is also the origin of `app` in the service's `API_APP_ORIGIN` | own |
+| the image of `api` and the service | `api_image` — an image from the copy's registry, `api_serving` | own |
+| the databases `api` and `openfga` | its own Neon project; four connection strings as versions of the secrets `api-migrate-database-url`, `api-migrate-openfga-database-url`, `api-database-url` and `api-openfga-database-url`, by the operator's hand | own |
+| the countries and the invite codes | `api countries allow` and `api invite` — by the operator's hand, with the release's binary (R25) | own |
+| the settings with defaults | `api_service_name` and `api_jobs` — the names of the service, its service accounts, the jobs and their secrets come from them; the periods of the logs and the images, the alerts' thresholds, the service's size and limits — `tofu/variables.tf` | own, and the defaults shared |
+| `api` and `signIn` in `/deployment.json` | the outputs `api_origin` — the address of the copy's service — and `app_sign_in` of the copy's module | own |
+| eval | `eval_github_subject_prefixes`, empty by default: no secrets, no pool | the platform's only |
+| the list, `/deployment.json`, the facts | the copy's directory `deploy/` | own (Т-20; R96 spec) |
+| the release files of `api` and `app` | the releases of `altnovatrail`, `release-verify` | shared (R105, R106 spec) |
+| the format of `/deployment.json` | the submodule's `spec/deployment/` | shared (R85 spec) |
+| names | the constants of the module and of `bootstrap.sh`: `infra-config`, `hosting-publish`, the secrets `api-admission-facts`, `api-database-url` and `api-openfga-database-url`, the registry `images`, the container `api` and the facts volume `admission-facts` at the path `/etc/api/admission`, the custom roles; the project's name "NovaTrail" and the label `novatrail-infra`. | shared: they are inside the copy's project |
+| CI's sign-in | GitHub's Workload Identity Federation; without GitHub Actions, the same recipes by hand (T30) | shared |
 
-### 3.6. Инструмент: OpenTofu
+### 3.6. The tool: OpenTofu
 
-Инфраструктуру описывает OpenTofu, открытый форк Terraform, по точной версии: код на HCL по образцу `infra/` canvas-api, а инструмент и команды — `tofu` (поправка 2026-11-08 к R11 spec; Т-29 закрыт). Источники — sources 5.1 и 5.2.
+OpenTofu, the open fork of Terraform, at an exact version, describes the infrastructure: the code is in HCL on the model of `infra/` of canvas-api, and the tool and the commands are `tofu` (the 2026-11-08 amendment to R11 spec; Т-29 closed). Sources: sources 5.1 and 5.2.
 
-- **Почему не Terraform:** с версии 1.6.0 он выходит под BUSL 1.1, а поправка 2026-10-22 к R12 spec пускает бесплатные условия только у инструмента, без которого платформу можно развернуть. Terraform 1.5.7, последний под MPL 2.0, — без общедоступного `terraform test` и без `mock_provider`, и больше не развивается.
-- **Что известно на 2026-11-08 (T09):** OpenTofu v1.13.9 от 2026-11-05 — последний релиз, под MPL 2.0; суммы sha256 архивов `linux_amd64` и `linux_arm64` и подпись файла сумм сверены; провайдеры `hashicorp/google` и `hashicorp/google-beta` — в реестре OpenTofu, до 8.10.0, под MPL 2.0; `tofu test` держит `mock_provider`, `override_resource` и `command = plan`, на которых стоят тесты canvas-api.
-- **Против canvas-api меняется:** `tofu` и `tofu test` вместо `terraform`; провайдеры — из реестра OpenTofu, и суммы `.terraform.lock.hcl` — его; инструмент — в стадии `toolchain` devcontainer по `ARG` версии и суммам sha256 (R34 spec; R09), а не на раннере, и CI зовёт его через `spec/tools/toolchain/toolchain.sh` (R30 spec). Код модуля на HCL и тесты переносятся.
-- **Установка** (R09): v1.13.9 в стадии `toolchain`; архив сверяется с суммой до распаковки, а подпись файла сумм `gpg` проверяется руками при каждом подъёме версии. Job CI `OpenTofu` сверяет `tofu version -json` с `ARG`.
-- **Корневой модуль** (R10): `tofu/` — `required_version = "1.13.9"`, провайдеры `google` и `google-beta` 8.10.0, lock-файл с хэшами всех платформ их релиза, частичный backend `gcs`, значения платформы — `tofu/production.auto.tfvars` (T23), API по R04–R07; Cloud Trace модуль не включает, но его включает Google, и он остаётся (третья поправка 2026-11-09 к R07). Тесты — `tofu test` на `mock_provider` с `command = plan`, как у canvas-api, и они идут под `tofu`. Провайдеры поднимает Dependabot, экосистема `opentofu`, одной группой; OpenTofu — руками, по R09.
-- **Разовый шаг** (R13): `tofu/bootstrap.sh` создаёт то, через что конфигурация входит, — проект, бакет состояния, пул и провайдер `github`, который пускает только токены `infra` по числовым ID, учётную запись `infra-config` для заданий окружения `production-config` и свои роли модуля. Если `production.auto.tfvars` называет репозитории eval, скрипт делает и пул `github-eval` с провайдером по условию R120 spec — job окружения `eval` этих репозиториев, не Dependabot; прав на пулы у `infra-config` нет, потому что условия IAM пулы не сужают (R20). Значения он читает из `production.auto.tfvars` и `backend.hcl` в `tofu/`, а запускает его автор (T23). Тесты — на подставном `gcloud`, сверка его условия с ролями модуля в `tofu test` и `_tf-roles` в `tf-check`.
-- **ShellCheck** (поправка 2026-11-09 к R09): v0.11.0 в стадии `toolchain`, по `ARG` и суммам sha256; job `OpenTofu` гоняет его по `bootstrap.sh`, `tools/deploy/*.sh` и `tools/ci/*.sh`.
-- **actionlint** (вторая поправка 2026-11-09 к R09): v1.7.12 в стадии `toolchain`, по `ARG` и суммам sha256; job `OpenTofu` гоняет его по `.github/workflows` со ShellCheck стадии.
-- **Лицензия:** OpenTofu и оба провайдера — MPL 2.0, названные исключения R09 и R10, ShellCheck — GPL-3.0, названное исключение поправки 2026-11-09 к R09 (R12 spec), а actionlint — MIT.
-- **Не проверено:** первый pull request Dependabot `opentofu` — пересоберёт ли он lock-файл на все платформы, как обещает его код. Ресурсы частей T13–T16 первый `apply` создал без единого отказа (T23), кроме сервиса и заданий Cloud Run T15: их нет, пока `api_image` не назовёт образ, а сервиса — и пока не стоит `api_serving`. Под `tofu` они впервые прошли 2026-11-12, без отказа: задания — с `api_image`, сервис — с `api_serving` (T24).
-- **Задачи:** T11 — инструмент в devcontainer и своя проверка в CI; T12 — корневой модуль; T13–T16 — его части; T17 — `bootstrap.sh`; T23 — его запуск и первый `apply`.
+- **Why not Terraform:** since version 1.6.0 it comes out under BUSL 1.1, and the 2026-10-22 amendment to R12 spec admits free terms only for a tool without which the platform can be deployed. Terraform 1.5.7, the last under MPL 2.0, has no generally available `terraform test` and no `mock_provider`, and is no longer developed.
+- **What is known as of 2026-11-08 (T09):** OpenTofu v1.13.9 of 2026-11-05 is the latest release, under MPL 2.0; the sha256 sums of the archives `linux_amd64` and `linux_arm64` and the signature of the sums file are checked; the providers `hashicorp/google` and `hashicorp/google-beta` are in the OpenTofu registry, up to 8.10.0, under MPL 2.0; `tofu test` supports `mock_provider`, `override_resource` and `command = plan`, on which the tests of canvas-api stand.
+- **What changes against canvas-api:** `tofu` and `tofu test` instead of `terraform`; the providers come from the OpenTofu registry, and the sums of `.terraform.lock.hcl` are its; the tool is in the devcontainer's stage `toolchain` by the version's `ARG` and the sha256 sums (R34 spec; R09), not on the runner, and CI calls it through `spec/tools/toolchain/toolchain.sh` (R30 spec). The module's HCL code and the tests carry over.
+- **Installation** (R09): v1.13.9 in the stage `toolchain`; the archive is checked against its sum before unpacking, and the signature of the sums file is checked with `gpg` by hand at each raise of the version. The CI job `OpenTofu` checks `tofu version -json` against the `ARG`.
+- **The root module** (R10): `tofu/` — `required_version = "1.13.9"`, the providers `google` and `google-beta` 8.10.0, a lock file with the hashes of all platforms of their release, a partial backend `gcs`, the platform's values in `tofu/production.auto.tfvars` (T23), the APIs by R04–R07; the module does not enable Cloud Trace, but Google enables it, and it stays (the third 2026-11-09 amendment to R07). The tests are `tofu test` on `mock_provider` with `command = plan`, as at canvas-api, and they run under `tofu`. Dependabot raises the providers, the ecosystem `opentofu`, in one group; OpenTofu is raised by hand, by R09.
+- **The one-time step** (R13): `tofu/bootstrap.sh` creates what the configuration signs in through — the project, the state bucket, the pool and the provider `github`, which admits only the tokens of `infra` by numeric IDs, the service account `infra-config` for the jobs of the environment `production-config`, and the module's custom roles. If `production.auto.tfvars` names eval repositories, the script also makes the pool `github-eval` with a provider by the condition of R120 spec — the job of the environment `eval` of these repositories, not Dependabot; `infra-config` has no rights on pools, because IAM conditions do not narrow pools (R20). It reads the values from `production.auto.tfvars` and `backend.hcl` in `tofu/`, and the author runs it (T23). The tests are on a stub `gcloud`, the check of its condition against the module's roles in `tofu test`, and `_tf-roles` in `tf-check`.
+- **ShellCheck** (the 2026-11-09 amendment to R09): v0.11.0 in the stage `toolchain`, by an `ARG` and sha256 sums; the job `OpenTofu` runs it on `bootstrap.sh`, `tools/deploy/*.sh` and `tools/ci/*.sh`.
+- **actionlint** (the second 2026-11-09 amendment to R09): v1.7.12 in the stage `toolchain`, by an `ARG` and sha256 sums; the job `OpenTofu` runs it on `.github/workflows` with the stage's ShellCheck.
+- **License:** OpenTofu and both providers — MPL 2.0, the named exceptions of R09 and R10, ShellCheck — GPL-3.0, the named exception of the 2026-11-09 amendment to R09 (R12 spec), and actionlint — MIT.
+- **Not checked:** the first pull request of Dependabot `opentofu` — whether it rebuilds the lock file for all platforms, as its code promises. The first `apply` created the resources of the parts T13–T16 without a single refusal (T23), except the Cloud Run service and jobs of T15: they do not exist while `api_image` names no image, and the service also while `api_serving` is not set. Under `tofu` they first went through on 2026-11-12, without a refusal: the jobs with `api_image`, the service with `api_serving` (T24).
+- **Tasks:** T11 — the tool in the devcontainer and its own check in CI; T12 — the root module; T13–T16 — its parts; T17 — `bootstrap.sh`; T23 — its run and the first `apply`.
 
-## 4. Источники
+## 4. Sources
 
-Записи внешних фактов — в [sources.md](sources.md), по записи на источник, а утверждения этого файла ссылаются на свою запись: `sources 1.1` (RULES.md, The bar; R26). Раздел остаётся указателем: на него ссылаются журнал решений и архивы `docs/plan/`, а их не переписывают. Пункт этого раздела, который они называют, — запись [sources.md](sources.md) с тем же заголовком.
+The records of external facts are in [sources.md](sources.md), a record per source, and a claim of this file cites its record: `sources 1.1` (RULES.md, The bar; R26). The section stays a pointer: the decision log and the archives `docs/plan/` cite it, and they are not rewritten. An item of this section that they name is the record of [sources.md](sources.md) with the same heading at commit a2db250, where the headings are still in Russian, and the record's number is the same.

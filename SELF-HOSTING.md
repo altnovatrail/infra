@@ -1,6 +1,6 @@
 # Self-hosting NovaTrail
 
-This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). Those are in Russian, and this guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine).
+This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). This guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine).
 
 > **Status, 2026-11-12.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. Section 12, a local run, is checked against the author's first run from source, on 2026-11-12.
 
@@ -319,7 +319,7 @@ What holds the file to that shape:
 - `api` is the origin of `app` itself. Both servers of `app`, the development server and `vite preview`, listen on `127.0.0.1:5173` with `strictPort`, so a second one on a taken port stops rather than moving to another, and lead `api`'s paths to `NOVATRAIL_API` by a proxy; with no `NOVATRAIL_API`, there is no proxy. `app` serves the file only when its `api` is the origin of the server that serves it. The lower layer of the page's CSP lets no origin over `http` but its own, so a browser would refuse `api` on a port of its own, though the format accepts it (`app`'s `docs/architecture.md`, «Локальный запуск», in Russian).
 - `api` may be `http` only because `app` itself is open on a loopback host: the rule `deployment.loopback`. A loopback host is `127.0.0.1`, `localhost` or `[::1]`, and nothing else.
 - `projectId` is the project in `API_FIREBASE_PROJECT_ID`: `api` accepts ID tokens of that one project.
-- Open `app` at `http://127.0.0.1:5173`, not at `localhost`. The Firebase project of a local run has `127.0.0.1` among its authorized domains (architecture 3.12 spec), and Firebase matches an IP address only exactly (`app`'s `docs/architecture.md`, «Конфигурация развёртывания»).
+- Open `app` at `http://127.0.0.1:5173`, not at `localhost`. The Firebase project of a local run has `127.0.0.1` among its authorized domains (architecture 3.12 spec), and Firebase matches an IP address only exactly (`app`'s `docs/architecture.md`, «Конфигурация развёртывания», in Russian).
 
 ### The two containers
 
@@ -335,7 +335,7 @@ Your browser reaches `app` through a port that VS Code forwards to your machine 
 
 A local run needs one. The format requires `signIn` with the service `firebase`, has no default and no field for an emulator, and `authDomain` is a host name with no port. `api` refuses to start with `FIREBASE_AUTH_EMULATOR_HOST` set, because the emulator verifies no signature (R32 api).
 
-It is `api`'s dev project, on the free Spark plan with sign-in through Google (R03, R39 api): one project for `api` and `app` (architecture 3.12 spec, the row «сервис входа»). For `app`, the author adds to it once, in the Firebase console:
+It is `api`'s dev project, on the free Spark plan with sign-in through Google (R03, R39 api): one project for `api` and `app` (architecture 3.12 spec, the row "sign-in service"). For `app`, the author adds to it once, in the Firebase console:
 
 - a Web App, in Project settings → Your apps, whose app ID goes in `signIn`. Its API key is the project's Web API key, which `api`'s `dev.env` already holds as `API_DEV_WEB_API_KEY`. The author's first sign-in failed on a wrong `apiKey` in `deployment.local.json`, before any request reached `api`;
 - `127.0.0.1` in Authentication → Settings → Authorized domains.
