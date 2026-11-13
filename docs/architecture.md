@@ -33,6 +33,7 @@
 
 **Data and links:**
 - there are no learners' data and no secrets in the repository, as in no repository of the platform (RULES.md, Hard rules). But what it sets up — the logs, the region, the hosting — touches learners' data, so every proposal here is first read against privacy spec (RULES.md, Hard rules). The hosting and the infrastructure are data processors (privacy 2 spec);
+- what the operator does in a breach of learners' data — where the data are and what opens them, how to cut the access, the logs, whom to tell and by when — is the procedure [BREACH.md](../BREACH.md), at the root, in English, for people, as SELF-HOSTING.md is: its part 1 fits any copy, its part 2 is the operator of `novatrail` and the law of Texas (R27);
 - the logs hold events, codes, times and versions, without direct identifiers, IP addresses, works, what was read and the text of hints (R09 spec; privacy 4 spec; architecture 5 spec). The platform's logs are kept 30 days in `us-east4`, the audit 400 days in `global` (R07; П-9);
 - the hosting of `app` and the sign-in service write the IP address into their own logs themselves (architecture 1 spec; architecture 3.12 spec; privacy 4 spec; П-9). The hosting is Firebase Hosting: it keeps IP addresses a few months, globally, and the period is not configurable, and `infra` does not turn on the export of its logs to Cloud Logging (R06). The sign-in service that `api` chose is Firebase Auth: it keeps IP addresses a few weeks, and it gets them not only at sign-in — on an iPad, in Safari and in mobile browsers its script and iframe load at every start of `app` (privacy 4 spec; architecture 3.12 spec; П-9);
 - of NovaTrail's repositories it depends at build time only on `spec`, and while the platform runs it calls no one and no one calls it (repositories 2.1 spec). The table of repositories 2.1 spec is about the links between the repositories and about the platform's work. The tools of `infra` itself are not in it, and they go to the network: to GitHub and Sigstore — the checks and the deployment, to Google — `gcloud` and OpenTofu, to the OpenTofu registry — `tofu init` for the providers, to npm — the packages of `tools/` (sections 3.2 and 3.6). In the dependency diagram its arrows are the deployment of the releases of `api` and `app` (repositories 3 spec);
@@ -50,7 +51,8 @@ Epic E1 decided everything the card left to the detailing but Т-29, and beyond 
 - 2.4 — the exclusion of the request logs, beyond the card's list — decided: R07, section 3.4. The logs' periods and the clarification of privacy 4 spec were recorded by `spec` by row В8 in П-9 and privacy 4 spec, and it edited the card for it and for what was decided by row В9 (R08);
 - 2.5 — Terraform or OpenTofu — put off on purpose and decided first thing in epic E2: OpenTofu, the 2026-11-08 amendment to R11 spec by row В10 (R08), section 3.6;
 - 2.6 — self-hosting and the local run of the whole platform, beyond the card's list — decided by epic E3: R21, R22, section 3.5. What this changes in the card went as row «в реестр spec» В21, and `spec` recorded it in the card (R23);
-- 2.7 — signing the upload link to the operator's bucket — open: the bucket's task decides it, T45 of epic E5 (Д11).
+- 2.7 — signing the upload link to the operator's bucket — open: the bucket's task decides it, T45 of epic E5 (Д11);
+- 2.8 — auditing the reads of the secrets, beyond the card's list — open: found by the procedure for a breach, T44 (R27; Д20).
 
 ### 2.1. Region (П-11)
 
@@ -90,6 +92,16 @@ Options:
 - (c) a service account key held by the organizer — contradicts the rule on secrets and is rejected at once.
 
 Recommendation — decide in the bucket's task, when it is planned, between (a) and (b), having checked in Cloud Storage's documentation the longest validity of a signature, the conditions of a policy and the rights the organizer needs to sign as another service account; these facts are not yet checked here and are not stated. Task — T45 of epic E5 (Д11).
+
+### 2.8. Auditing the reads of the secrets
+
+Open, beyond the card's list; T44 found it while writing the procedure for a breach (R27). Who has read a secret's version — among them the four connection strings to the databases of `api` in Neon, which open learners' data — is `AccessSecretVersion`, a Data Access audit entry (sources 2.6). The project does not turn Data Access on, and every sink excludes it (the 2026-11-09 amendment to R07; section 3.4). So in a breach the logs show who added or disabled a version and who changed a right on a secret — that is Admin Activity —, but not who read the string. The reason R07 gives against Data Access is the `callerIp` in its entries. A read of a secret is made by `api-run`, by the operator in Cloud Shell or by CI: the address is Google's or the operator's, not a learner's. That is an inference from who reads the secrets, not checked on entries.
+
+Options:
+- (a) Data Access, `DATA_READ`, for `secretmanager.googleapis.com` alone, and the exclusion `data-access-audit` of each sink lets those entries through: a read of a version is seen 30 days in the bucket of `us-east4`. To check before: what the entry holds besides the caller and the address, how many entries the instances and jobs of `api` write a day, and what they cost;
+- (b) as now: the procedure says what the logs do not show.
+
+Recommendation — (a), in a task of its own with code, which checks the entries on the project before it decides; until then (b). Debt — Д20.
 
 ## 3. How it is built
 
