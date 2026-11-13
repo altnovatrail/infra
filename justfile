@@ -479,3 +479,8 @@ deploy-target-test:
 # tools/ci/install.sh against stand-ins for curl and docker: no network.
 tools-install-test:
     node --test tools/ci/test/install.test.mjs
+
+# The organizer's tool, tools/organizer/organizer.mjs, against a stand-in for gcloud that signs with a
+# key made by the test: no cloud, no network (R28).
+organizer-test:
+    node --test tools/organizer/test/organizer.test.mjs

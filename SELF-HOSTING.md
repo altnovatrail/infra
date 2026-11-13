@@ -1,8 +1,8 @@
 # Self-hosting NovaTrail
 
-This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). This guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine).
+This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). This guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine). An organizer who gives an upload link to the operator's bucket goes to [section 13](#13-upload-links-to-the-operators-bucket).
 
-> **Status, 2026-11-12.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. Section 12, a local run, is checked against the author's first run from source, on 2026-11-12.
+> **Status, 2026-11-12.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. Section 12, a local run, is checked against the author's first run from source, on 2026-11-12. Section 13, the upload links, is held by tests on a stand-in for `gcloud` and has not run on a project yet.
 
 ## 1. What a copy is
 
@@ -367,3 +367,58 @@ Your copy's project is not for this. The module keeps its authorized domains to 
   - `api` keeps its databases on Neon, not in a container (R05 api).
   - The Hosting emulator was rejected for `app`'s build (R17), and `api` refuses the sign-in emulator.
 - **A list, a `/deployment.json` or facts in `deploy/`.** They name releases and a deployment, and a local run has neither.
+
+## 13. Upload links to the operator's bucket
+
+An adult who writes samples on the samples page, or a parent who signs a form, sends the files to the operator's bucket by an upload link the organizer gives (R28). The link is one HTML page, made by `tools/organizer/organizer.mjs`. Its forms post the files straight to Cloud Storage, each under a random name, so neither your server nor GitHub sees them. A page works for at most 12 hours from when it was made: Google signs it for the upload service account with no key, and such a signature lasts no longer.
+
+Run the tool as the organizer, not as the operator. Use a clone of your fork, since the tool reads your project and the operator's bucket from `tofu/production.auto.tfvars`. Run it on Linux or macOS, or in Cloud Shell, where `gcloud` and Node.js are, signed in as your own Google account: the address `bootstrap.sh` was given for you. The devcontainer has no `gcloud`. The tool needs no package of `tools/`.
+
+**Make a link** at the session, for the purpose `measure` (an adult's measurement), `child` (children's samples) or `eval-set` (an eval set's volunteer):
+
+```bash
+gcloud auth login
+node tools/organizer/organizer.mjs link measure --samples=10
+```
+
+It prints the session's ID, the time the page stops working, and the file it wrote, `upload-<purpose>-<session>.html`, which `.gitignore` keeps out of a commit. Give that file to the adult alone: anyone who holds it can send files under the session's folder until it expires. The page has a form per sample file, `.json` up to 16 MiB, and three forms for the scan of the form, as a PDF, a JPEG or a PNG up to 10 MiB. A form sends one file, once. Each answer opens in a new tab: an XML answer that names a `Key` means the file arrived. A second sending of the same form is refused, since the upload service account cannot overwrite a file.
+
+- `--samples=N` — how many sample forms, 1 to 100; 10 if not given.
+- `--hours=H` — how long the page works, 1 to 12 hours; 12 if not given.
+- `--session=<ID>` — a new page for a session that has one already: more forms, or a page that expired. The files land in the same folders.
+- `--out=FILE` — another name for the page. The tool never writes over a page already there.
+
+**Set each Custom-Time.** The bucket's rules erase forms, records and reports by their Custom-Time, and leave a file without one forever. Set it once you accept a form, and on every record and report you write. Use the session's date in UTC; the tool works out the rest by where the object lies:
+
+| The object | `--date` | Custom-Time the tool sets |
+|---|---|---|
+| a measurement form or a parent's form, `measure/forms/` or `child/forms/` | the last session under the form | that date plus 730 days, so the form stays 5 years after its samples |
+| your record of a session, `measure/records/` or `child/records/` | the session | that date |
+| a runner's report, `measure/reports/` or `child/reports/` | the session of the earliest sample it names | that date |
+| a volunteer's form or its record, `eval-set/forms/` | the signature | that date |
+
+```bash
+node tools/organizer/organizer.mjs time measure/forms/<session>/<name>.pdf --date=2026-11-13
+gcloud storage cp record.json gs://<operator bucket>/measure/records/<name>.json
+node tools/organizer/organizer.mjs time measure/records/<name>.json --date=2026-11-13
+```
+
+A new session under the same form moves its date forward with the same command. The tool refuses a date that would have the rule erase the object at once, which a year mistyped would do: the bucket keeps no erased file. A Custom-Time never moves back:
+
+- **A withdrawal.** You erase the samples of a code before their term. Then rewrite the form with the day you erased them, which starts its 5 years from that day. The form keeps that day, and `time` no longer moves it: a new session takes a new form.
+
+  ```bash
+  node tools/organizer/organizer.mjs withdraw child/forms/<session>/<name>.jpg --erased=2026-11-20
+  ```
+
+- **A contributed sample.** A sample of an eval set enters a module. Then move the volunteer's form and its record out of reach of the 12-month rule:
+
+  ```bash
+  node tools/organizer/organizer.mjs contribute <session>
+  ```
+
+**Check.** `untimed` lists the forms, records and reports of `measure/` and `child/` that have no Custom-Time, which no rule would ever erase:
+
+```bash
+node tools/organizer/organizer.mjs untimed
+```
