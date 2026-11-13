@@ -87,6 +87,9 @@ function world({ values = tfvars(), backend = 'bucket = "novatrail-test-0-state"
   };
 }
 
+// Whether what was printed names a word, in any case: gcloud spells an account as Google keeps it.
+const names = (output, word) => output.toLowerCase().includes(word.toLowerCase());
+
 const makes = (calls) => calls.filter((c) => c.includes("create") || c.includes("create-oidc") || c.includes("link") || c.includes("undelete")).map((c) => c.join(" "));
 
 const unconditioned = (state) =>
@@ -102,13 +105,17 @@ test("a first run makes the project, its state, the pool and the configuration's
 
   assert.deepEqual(Object.keys(s.projects), [project]);
   assert.equal(s.billingLinks[project], `billingAccounts/${billing}`);
-  const { project: holder, location, versioning, policy } = s.buckets["gs://novatrail-test-0-state"];
+  const { project: holder, location, versioning, policy: held } = s.buckets["gs://novatrail-test-0-state"];
+  const policy = held.filter((b) => b.member === account);
   assert.deepEqual({ holder, location, versioning, policy }, {
     holder: project,
     location: "us-east4",
     versioning: true,
     policy: [{ role: "roles/storage.objectAdmin", member: account, condition: "" }],
   });
+  // The bindings Cloud Storage gives a new bucket stay on the state bucket: the script keeps only the
+  // identity's own there.
+  assert.ok(s.buckets["gs://novatrail-test-0-state"].policy.some((b) => b.member === `projectOwner:${project}`));
   for (const api of ["serviceusage.googleapis.com", "cloudresourcemanager.googleapis.com", "iam.googleapis.com", "sts.googleapis.com", "iamcredentials.googleapis.com", "storage.googleapis.com", "observability.googleapis.com", "run.googleapis.com", "firebase.googleapis.com", "firebasehosting.googleapis.com", "identitytoolkit.googleapis.com"]) {
     assert.ok(s.services[project].includes(api), `${api} is enabled`);
   }
@@ -302,13 +309,13 @@ test("the billing account is printed nowhere, not even in gcloud's error about i
   const w = world();
   const ok = w.run();
   assert.equal(ok.status, 0);
-  assert.ok(!ok.output.includes(billing), ok.output);
+  assert.ok(!names(ok.output, billing), ok.output);
 
   for (const failing of ["billing accounts describe", "billing projects link", "billing accounts add-iam-policy-binding"]) {
     const fresh = world();
     const r = fresh.run({ STUB_FAIL: failing });
     assert.notEqual(r.status, 0, `${failing} fails the run`);
-    assert.ok(!r.output.includes(billing), `${failing}: ${r.output}`);
+    assert.ok(!names(r.output, billing), `${failing}: ${r.output}`);
     assert.match(r.output, /<billing account>/, failing);
   }
 });
@@ -415,9 +422,9 @@ test("what the identity holds beyond its lists is taken back, under any conditio
   const mine = after.projectPolicy[project].filter((b) => b.member === account);
   assert.ok(!mine.some((b) => b.role === "roles/iam.roleAdmin"), "a role not named, under a condition, is taken back");
   assert.deepEqual(mine.filter((b) => b.role === "roles/run.admin"), [{ role: "roles/run.admin", member: account, condition: "" }]);
-  assert.deepEqual(after.buckets["gs://novatrail-test-0-state"].policy.map((b) => b.role), ["roles/storage.objectAdmin"]);
+  assert.deepEqual(after.buckets["gs://novatrail-test-0-state"].policy.filter((b) => b.member === account).map((b) => b.role), ["roles/storage.objectAdmin"]);
   assert.deepEqual(after.billingPolicy.map((b) => b.role), ["roles/billing.costsManager"]);
-  assert.ok(!r.output.includes(billing), r.output);
+  assert.ok(!names(r.output, billing), r.output);
 });
 
 test("Owner and Editor are taken from the project's own service accounts, and from nobody else", () => {
@@ -503,7 +510,10 @@ const lifecycle = {
   },
 };
 
+// The one binding of a new bucket each bucket keeps: the project's owners keep the bucket (R28).
+const owners = { role: "roles/storage.legacyBucketOwner", member: `projectOwner:${project}`, condition: "" };
 const operatorPolicy = [
+  owners,
   { role: "roles/storage.objectUser", member: `user:${measureOrganizer}`, condition: under(operatorBucket, "measure/", "child/") },
   { role: role("operatorBucketLister"), member: `user:${measureOrganizer}`, condition: "" },
   { role: "roles/storage.objectUser", member: `user:${evalSetOrganizer}`, condition: under(operatorBucket, "eval-set/") },
@@ -512,6 +522,7 @@ const operatorPolicy = [
   { role: role("bucketUploader"), member: `serviceAccount:${uploadEvalSet}`, condition: under(operatorBucket, "eval-set/samples/", "eval-set/forms/") },
 ];
 const consentPolicy = [
+  owners,
   { role: "roles/storage.objectViewer", member: `user:${operator}`, condition: "" },
   { role: role("consentFormsWriter"), member: `serviceAccount:${apiRun}`, condition: under(consentBucket, "consent-forms/") },
 ];
@@ -606,7 +617,7 @@ test("a person given as none has no binding, and one person who is both organize
   const s = w.read();
   assert.ok(!s.buckets[operatorBucket].policy.some((b) => b.member === `user:${evalSetOrganizer}`));
   assert.deepEqual(s.accounts[uploadEvalSet].policy, []);
-  assert.deepEqual(s.buckets[consentBucket].policy.map((b) => b.role), [role("consentFormsWriter")]);
+  assert.deepEqual(s.buckets[consentBucket].policy.map((b) => b.role).sort(), [role("consentFormsWriter"), owners.role].sort());
 
   const both = applied();
   assert.equal(both.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: measureOrganizer.toUpperCase() }).status, 0);
@@ -674,7 +685,7 @@ test("no address of a person is printed, not even in gcloud's error about a bind
   const r = ok.run();
   assert.equal(r.status, 0, r.output);
   for (const address of [measureOrganizer, evalSetOrganizer, operator]) {
-    assert.ok(!r.output.includes(address), r.output);
+    assert.ok(!names(r.output, address), r.output);
   }
 
   for (const failing of [`add-iam-policy-binding ${operatorBucket}`, `add-iam-policy-binding ${uploadEvalSet}`, `add-iam-policy-binding ${consentBucket}`]) {
@@ -682,7 +693,7 @@ test("no address of a person is printed, not even in gcloud's error about a bind
     const refused = fresh.run({ STUB_FAIL: failing });
     assert.notEqual(refused.status, 0, `${failing} fails the run`);
     for (const address of [measureOrganizer, evalSetOrganizer, operator, billing]) {
-      assert.ok(!refused.output.includes(address), `${failing}: ${refused.output}`);
+      assert.ok(!names(refused.output, address), `${failing}: ${refused.output}`);
     }
     assert.match(refused.output, /<address>/, failing);
   }
@@ -706,7 +717,7 @@ test("refusals of the buckets' values and of the people, each before any call to
       assert.notEqual(r.status, 0, `${name}: ${r.output}`);
       assert.match(r.stderr, message);
       assert.deepEqual(w.calls(), []);
-      for (const address of [measureOrganizer, evalSetOrganizer, operator]) assert.ok(!r.output.includes(address), r.output);
+      for (const address of [measureOrganizer, evalSetOrganizer, operator]) assert.ok(!names(r.output, address), r.output);
     });
   }
 });
@@ -724,8 +735,8 @@ test("a run again with a person set to none takes back all they held, and keeps 
   ]));
   assert.deepEqual(s.accounts[uploadEvalSet].policy, []);
   assert.deepEqual(s.accounts[uploadMeasure].policy.map((b) => b.member), [`user:${measureOrganizer}`]);
-  assert.deepEqual(s.buckets[consentBucket].policy.map((b) => b.role), [role("consentFormsWriter")]);
-  assert.ok(!r.output.includes(operator) && !r.output.includes(measureOrganizer), r.output);
+  assert.deepEqual(s.buckets[consentBucket].policy.map((b) => b.role).sort(), [role("consentFormsWriter"), owners.role].sort());
+  assert.ok(!names(r.output, operator) && !names(r.output, measureOrganizer), r.output);
 });
 
 test("one person who is both organizers keeps both prefixes when one condition of theirs drifted", () => {
@@ -750,7 +761,7 @@ test("a deleted or a former person taken back is named by neither address, in wh
   w.seed(s);
   const r = w.run();
   assert.equal(r.status, 0, r.output);
-  assert.ok(!r.output.includes(former), r.output);
+  assert.ok(!names(r.output, former), r.output);
   assert.match(r.stdout, /roles\/storage\.objectUser of a deleted account: not named here, taken back/);
 
   const again = w.read();
@@ -758,7 +769,7 @@ test("a deleted or a former person taken back is named by neither address, in wh
   w.seed(again);
   const refused = w.run({ STUB_FAIL: `remove-iam-policy-binding ${consentBucket}` });
   assert.notEqual(refused.status, 0);
-  assert.ok(!refused.output.includes(former), refused.output);
+  assert.ok(!names(refused.output, former), refused.output);
   assert.match(refused.output, /<address>/);
 });
 
@@ -783,4 +794,67 @@ test("a bucket of the name in another project is neither taken over nor changed"
   assert.notEqual(r.status, 0);
   assert.deepEqual(w.read().buckets[operatorBucket], { project: "someone-else", location: "us-east4", lifecycle: null, policy: [] });
   assert.ok(!w.calls().some((c) => c.includes(operatorBucket) && (c.includes("update") || c.includes("add-iam-policy-binding") || c.includes("remove-iam-policy-binding"))));
+});
+
+test("the project's owners keep each bucket, and the other bindings of a new bucket are taken back", () => {
+  const w = applied();
+  const r = w.run();
+  assert.equal(r.status, 0, r.output);
+  const s = w.read();
+  for (const name of [operatorBucket, consentBucket]) {
+    const projects = s.buckets[name].policy.filter((b) => b.member.startsWith("project"));
+    assert.deepEqual(projects, [owners], name);
+  }
+  assert.match(r.stdout, /roles\/storage\.legacyObjectOwner of projectOwner:novatrail-test-0: not named here, taken back/);
+  assert.match(r.stdout, /roles\/storage\.legacyBucketOwner of the project's owners\n/);
+});
+
+test("a bucket whose owners' binding is gone stops the script, and its refusal names nobody, in any case", () => {
+  const w = applied();
+  assert.equal(w.run().status, 0);
+  const s = w.read();
+  s.buckets[operatorBucket].policy = s.buckets[operatorBucket].policy.filter((b) => b.member !== `projectOwner:${project}`);
+  w.seed(s);
+  const r = w.run({ STUB_CALLER: "Operator.Person@Example.com" });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /does not have storage\.buckets\.(get|update|getIamPolicy) access/);
+  for (const address of [measureOrganizer, evalSetOrganizer, operator]) {
+    assert.ok(!names(r.output, address), r.output);
+  }
+  assert.match(r.stderr, /<address>/);
+  assert.ok(names(r.stderr, operatorBucket.slice("gs://".length)), "the bucket's name is not hidden as an address");
+});
+
+test("a person's address given with capitals is hidden in gcloud's errors all the same", () => {
+  const w = applied();
+  const r = w.run({ BOOTSTRAP_MEASURE_ORGANIZER: "Measure.Organizer@Example.com", STUB_FAIL: `add-iam-policy-binding ${operatorBucket}` });
+  assert.notEqual(r.status, 0);
+  assert.ok(!names(r.output, measureOrganizer), r.output);
+  assert.match(r.stderr, /<address>/);
+});
+
+test("a person IAM spells with capitals is the same person: a run again takes back and grants nothing", () => {
+  const w = applied();
+  const capitals = { STUB_CAPITALS: "1" };
+  assert.equal(w.run(capitals).status, 0);
+  assert.ok(w.read().accounts[uploadMeasure].policy.some((b) => b.member === "user:Measure.Organizer@example.com"), "the stand-in spells the person with capitals");
+  const r = w.run(capitals);
+  assert.equal(r.status, 0, r.output);
+  assert.doesNotMatch(r.stdout, /taken back/);
+  const people = [operatorBucket, consentBucket, uploadMeasure, uploadEvalSet];
+  assert.ok(!w.calls().some((c) => (c.includes("add-iam-policy-binding") || c.includes("remove-iam-policy-binding")) && people.some((t) => c.includes(t))), "nothing held is taken back or granted again");
+
+  const s = w.read();
+  s.buckets[operatorBucket].policy = s.buckets[operatorBucket].policy.map((b) =>
+    b.member === "user:Measure.Organizer@example.com" && b.role === "roles/storage.objectUser" ? { ...b, condition: "true" } : b,
+  );
+  w.seed(s);
+  const drifted = w.run(capitals);
+  assert.equal(drifted.status, 0, drifted.output);
+  assert.deepEqual(
+    w.read().buckets[operatorBucket].policy.filter((b) => b.role === "roles/storage.objectUser" && b.member.toLowerCase() === `user:${measureOrganizer}`).map((b) => b.condition),
+    [under(operatorBucket, "measure/", "child/")],
+    "a condition that drifted is taken back as IAM spells the person, and granted again",
+  );
+  assert.ok(!names(drifted.output, measureOrganizer), drifted.output);
 });

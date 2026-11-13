@@ -28,6 +28,30 @@
 
 set -euo pipefail
 
+# gcloud names in its errors the account it runs as, the operator's own, spelled as Google keeps it,
+# capitals and all; a member it was given or is taking back, a person this run no longer names among
+# them; and the billing account. A refusal is the likeliest thing for it to say here. So all the
+# script writes to stderr goes through one filter, which replaces any address of a person, in any
+# case, and any billing account's id; a service account's address, which is no person's, stays.
+# What it writes to stdout names neither. The filter is waited for at the end, so that its last
+# lines come before the shell's prompt.
+hide() {
+    sed -E \
+        -e 's/@([A-Za-z0-9.-]*\.gserviceaccount\.com)/<at>\1/g' \
+        -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+/<address>/g' \
+        -e 's/<at>/@/g' \
+        -e 's/[0-9A-Za-z]{6}-[0-9A-Za-z]{6}-[0-9A-Za-z]{6}/<billing account>/g'
+}
+exec 2> >(hide >&2)
+hider=$!
+work=""
+finish() {
+    [[ -z "$work" ]] || rm -rf "$work"
+    exec 2>&-
+    wait "$hider" || true
+}
+trap finish EXIT
+
 here="${BOOTSTRAP_TOFU_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 tfvars="$here/production.auto.tfvars"
 backend="$here/backend.hcl"
@@ -205,27 +229,6 @@ measure_organizer="$(person BOOTSTRAP_MEASURE_ORGANIZER "measurement organizer")
 eval_set_organizer="$(person BOOTSTRAP_EVAL_SET_ORGANIZER "eval-set organizer")"
 operator="$(person BOOTSTRAP_OPERATOR operator)"
 
-# gcloud names the billing account in its errors about it, and a member in its errors about a
-# binding, and a refusal is the likeliest thing for it to say here. So a command given either shows
-# what it wrote to stderr with the account's id and the people's addresses replaced by names. A
-# member being taken back may be a person this run no longer names: hidden_member names it, and it
-# is hidden too. A member reads user:<address>, or deleted:user:<address>?uid=<number> once its
-# account is gone.
-hidden_member=""
-hidden() {
-    local errors status=0 text address member="${hidden_member%%\?*}"
-    errors="$(mktemp)"
-    "$@" 2> "$errors" || status=$?
-    text="$(cat "$errors")"
-    rm -f "$errors"
-    text="${text//"$billing"/<billing account>}"
-    for address in "$measure_organizer" "$eval_set_organizer" "$operator" "${member##*:}"; do
-        [[ -z "$address" || "$address" == none ]] || text="${text//"$address"/<address>}"
-    done
-    [[ -z "$text" ]] || printf '%s\n' "$text" >&2
-    return "$status"
-}
-
 service_account="infra-config@${project}.iam.gserviceaccount.com"
 
 # -- the custom roles the configuration grants ----------------------------------
@@ -348,7 +351,6 @@ expression="api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasO
 # -- the steps ------------------------------------------------------------------
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
 
 project_exists() { gcloud projects describe "$project"; }
 make_project() { gcloud projects create "$project" --name="NovaTrail"; }
@@ -430,7 +432,7 @@ held_by() {
 # The billing account is read first: its currency is the budget's, and a budget in another one would
 # be refused only at the first apply, after a merge.
 echo "==> billing account"
-billed_in="$(hidden gcloud billing accounts describe "$billing" --format='value(currencyCode)')"
+billed_in="$(gcloud billing accounts describe "$billing" --format='value(currencyCode)')"
 if [[ -z "$billed_in" ]]; then
     echo "    its currency is not shown: compare it with budget_currency (${currency}) in the billing console"
 elif [[ "$billed_in" != "$currency" ]]; then
@@ -446,9 +448,9 @@ fi
 project_number="$(retry_read gcloud projects describe "$project" --format='value(projectNumber)')"
 # The budget counts the spend of the account the project pays through, so it is that account or
 # none: a project already paid for by another is not moved here.
-linked="$(hidden retry_read gcloud billing projects describe "$project" --format='value(billingAccountName)')"
+linked="$(retry_read gcloud billing projects describe "$project" --format='value(billingAccountName)')"
 if [[ -z "$linked" ]]; then
-    retry hidden gcloud billing projects link "$project" --billing-account="$billing"
+    retry gcloud billing projects link "$project" --billing-account="$billing"
     echo "    linked to the billing account"
 elif [[ "$linked" != "billingAccounts/${billing}" ]]; then
     fail "the project pays through another billing account than TF_VAR_billing_account: link it by hand, or give that account"
@@ -608,11 +610,11 @@ while IFS=$'\t' read -r role held_under; do
     echo "    ${role} on gs://${bucket}: taken back"
 done < <(held_by "$member" "$bucket_policy")
 
-billing_policy="$(hidden retry_read gcloud billing accounts get-iam-policy "$billing" \
+billing_policy="$(retry_read gcloud billing accounts get-iam-policy "$billing" \
     --flatten='bindings[].members' --format='value(bindings.role,bindings.members,bindings.condition.expression)')"
 while IFS=$'\t' read -r role _; do
     [[ -n "$role" && " ${billing_wanted[*]} " != *" ${role} "* ]] || continue
-    retry hidden gcloud billing accounts remove-iam-policy-binding "$billing" \
+    retry gcloud billing accounts remove-iam-policy-binding "$billing" \
         --member="$member" --role="$role" --quiet
     echo "    ${role} on the billing account: taken back"
 done < <(held_by "$member" "$billing_policy")
@@ -629,7 +631,7 @@ retry gcloud storage buckets add-iam-policy-binding "gs://${bucket}" \
 echo "    roles/storage.objectAdmin on gs://${bucket}"
 
 for role in "${billing_wanted[@]}"; do
-    retry hidden gcloud billing accounts add-iam-policy-binding "$billing" \
+    retry gcloud billing accounts add-iam-policy-binding "$billing" \
         --member="$member" --role="$role" --quiet
     echo "    ${role} on the billing account"
 done
@@ -726,7 +728,10 @@ shown() {
 # its commas would split it on the command line. Which version of the policy gcloud reads it chooses
 # itself (R13); in version 1 a binding under a condition would read as a role named
 # <role>_withcond_<hash>, not given, and taking it back by that name would fail and stop the script
-# rather than pass by it. The first run on the project shows which version it reads (T49).
+# rather than pass by it. On the project it reads a bucket's conditions as they are (T49). A member
+# is compared in any case: IAM keeps a person's address as Google spells the account, capitals and
+# all, and this script takes it in lower case, so that a run would otherwise take each person's
+# binding back and grant it again (T49). One is taken back as IAM spells it.
 #   keep_policy bucket <name> <bindings>...
 #   keep_policy account <email> <bindings>...
 keep_policy() {
@@ -741,32 +746,32 @@ keep_policy() {
     local given=$'\n' held=$'\n' cleared=$'\n' policy
     for line in "$@"; do
         IFS="$sep" read -r role holder expression _ <<< "$line"
-        given+="${role}${sep}${holder}${sep}${expression}"$'\n'
+        given+="${role}${sep}${holder,,}${sep}${expression}"$'\n'
     done
-    policy="$(hidden retry_read gcloud "${group[@]}" get-iam-policy "${at[@]}" \
+    policy="$(retry_read gcloud "${group[@]}" get-iam-policy "${at[@]}" \
         --flatten='bindings[].members' --format='value(bindings.role,bindings.members,bindings.condition.expression)')"
     while IFS=$'\t' read -r role holder held_under; do
         [[ -n "$role" ]] || continue
-        held+="${role}${sep}${holder}${sep}${held_under}"$'\n'
-        [[ "$given" == *$'\n'"${role}${sep}${holder}${sep}${held_under}"$'\n'* ]] && continue
-        [[ "$cleared" == *$'\n'"${role}${sep}${holder}"$'\n'* ]] && continue
-        hidden_member="$holder" retry hidden gcloud "${group[@]}" remove-iam-policy-binding "${at[@]}" \
+        held+="${role}${sep}${holder,,}${sep}${held_under}"$'\n'
+        [[ "$given" == *$'\n'"${role}${sep}${holder,,}${sep}${held_under}"$'\n'* ]] && continue
+        [[ "$cleared" == *$'\n'"${role}${sep}${holder,,}"$'\n'* ]] && continue
+        retry gcloud "${group[@]}" remove-iam-policy-binding "${at[@]}" \
             --member="$holder" --role="$role" --all --quiet
-        cleared+="${role}${sep}${holder}"$'\n'
+        cleared+="${role}${sep}${holder,,}"$'\n'
         echo "    ${role} of $(shown "$holder")${held_under:+ under a condition}: not named here, taken back"
     done <<< "$policy"
     for line in "$@"; do
         IFS="$sep" read -r role holder expression title label <<< "$line"
-        if [[ "$cleared" != *$'\n'"${role}${sep}${holder}"$'\n'* && "$held" == *$'\n'"${role}${sep}${holder}${sep}${expression}"$'\n'* ]]; then
+        if [[ "$cleared" != *$'\n'"${role}${sep}${holder,,}"$'\n'* && "$held" == *$'\n'"${role}${sep}${holder,,}${sep}${expression}"$'\n'* ]]; then
             echo "    ${label}"
             continue
         fi
         if [[ -z "$expression" ]]; then
-            retry hidden gcloud "${group[@]}" add-iam-policy-binding "${at[@]}" \
+            retry gcloud "${group[@]}" add-iam-policy-binding "${at[@]}" \
                 --member="$holder" --role="$role" --condition=None --quiet
         else
             printf 'expression: %s\ntitle: %s\n' "$expression" "$title" > "$work/binding-condition"
-            retry hidden gcloud "${group[@]}" add-iam-policy-binding "${at[@]}" \
+            retry gcloud "${group[@]}" add-iam-policy-binding "${at[@]}" \
                 --member="$holder" --role="$role" --condition-from-file="$work/binding-condition" --quiet
         fi
         echo "    ${label}: granted"
@@ -906,7 +911,15 @@ if ! gcloud iam service-accounts describe "$api_account" --project="$project" > 
 fi
 
 custom="projects/${project}/roles"
-operator_bindings=()
+# Each bucket keeps one of the bindings Cloud Storage gives a new bucket: the project's owners, as
+# legacyBucketOwner. The basic role Owner holds no storage.buckets.get, update, getIamPolicy or
+# setIamPolicy of its own, only through this binding (sources 10.9), so a policy without it would
+# shut out whoever runs this script, the operator, who could then neither keep the bucket nor give
+# its access back; the first run on the project did so (T49). The role reads no object: it lists
+# them, creates and erases them, and keeps the bucket and its policy. The other bindings of a new
+# bucket, of the project's editors and viewers and the owners' object roles, are taken back.
+owners="$(binding roles/storage.legacyBucketOwner "projectOwner:${project}" "" "" "roles/storage.legacyBucketOwner of the project's owners")"
+operator_bindings=("$owners")
 if [[ "$measure_organizer" != none ]]; then
     operator_bindings+=(
         "$(binding roles/storage.objectUser "user:${measure_organizer}" "$(under "$operator_bucket" measure/ child/)" "measure and child" "roles/storage.objectUser of the measurement organizer, under measure/ and child/")"
@@ -928,7 +941,7 @@ operator_bindings+=(
 echo "==> who holds gs://${operator_bucket}"
 keep_policy bucket "$operator_bucket" "${operator_bindings[@]}"
 
-consent_bindings=()
+consent_bindings=("$owners")
 if [[ "$operator" == none ]]; then
     echo "    the operator: none, so nobody reads the scans"
 else

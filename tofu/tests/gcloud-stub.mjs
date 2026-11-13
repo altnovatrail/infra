@@ -10,6 +10,11 @@
 //               names the billing account TF_VAR_billing_account gives and the member it was
 //               given, as gcloud's errors do
 // STUB_FAIL_ONCE the same, for the first such command alone, with an error that is not NOT_FOUND
+// STUB_CALLER   the account the stand-in runs as, which its refusals name as gcloud's do: an owner
+//               of the project, spelled with capitals, as Google keeps an account
+// STUB_CAPITALS a person granted is kept spelled as Google keeps an account, each word of the name
+//               with a capital, as IAM keeps it on the project (T49), and is the same person in
+//               any case
 //
 // A policy is printed as one read in version 3 is: a binding under a condition names its role as it
 // is and carries its expression. Which version the real gcloud reads, the first run shows (T23).
@@ -36,9 +41,10 @@ const fail = (text, code = 1) => {
   process.exit(code);
 };
 
+const caller = process.env.STUB_CALLER ?? "Operator.Person@Example.com";
 if (process.env.STUB_FAIL && args.join(" ").includes(process.env.STUB_FAIL)) {
   const member = args.find((a) => a.startsWith("--member="));
-  fail(`PERMISSION_DENIED: the caller may not act on billingAccounts/${process.env.TF_VAR_billing_account}${member ? ` for ${member.slice("--member=".length)}` : ""}`);
+  fail(`PERMISSION_DENIED: the caller may not act on billingAccounts/${process.env.TF_VAR_billing_account}${member ? ` for ${member.slice("--member=".length)}` : ""}. This command is authenticated as ${caller}`);
 }
 if (process.env.STUB_FAIL_ONCE && !state.failedOnce && args.join(" ").includes(process.env.STUB_FAIL_ONCE)) {
   state.failedOnce = true;
@@ -63,9 +69,13 @@ const positional = args.filter((a) => !a.startsWith("--"));
 const command = positional.slice(0, 3).join(" ");
 const [, , , first] = positional;
 
+const spelled = (member) =>
+  process.env.STUB_CAPITALS && member.startsWith("user:")
+    ? member.replace(/^user:([^@]+)/, (_, name) => `user:${name.replace(/(^|\.)([a-z])/g, (m, dot, letter) => dot + letter.toUpperCase())}`)
+    : member;
 const binding = (list, role, member, condition) => {
-  if (!list.some((b) => b.role === role && b.member === member && b.condition === condition)) {
-    list.push({ role, member, condition });
+  if (!list.some((b) => b.role === role && b.member.toLowerCase() === member.toLowerCase() && b.condition === condition)) {
+    list.push({ role, member: spelled(member), condition });
   }
 };
 // A binding on a bucket or a service account may leave its condition out, and is then bare.
@@ -80,6 +90,26 @@ const conditionOf = () => {
 };
 const projectOf = () => flag("project") ?? fail("no --project");
 const notFound = (what) => fail(`NOT_FOUND: ${what} was not found`);
+// The bindings Cloud Storage gives a new bucket of uniform access, by the convenience values of the
+// project's basic roles (sources 10.9).
+const conveniences = (project) => [
+  { role: "roles/storage.legacyBucketOwner", member: `projectEditor:${project}`, condition: "" },
+  { role: "roles/storage.legacyBucketOwner", member: `projectOwner:${project}`, condition: "" },
+  { role: "roles/storage.legacyBucketReader", member: `projectViewer:${project}`, condition: "" },
+  { role: "roles/storage.legacyObjectOwner", member: `projectEditor:${project}`, condition: "" },
+  { role: "roles/storage.legacyObjectOwner", member: `projectOwner:${project}`, condition: "" },
+  { role: "roles/storage.legacyObjectReader", member: `projectViewer:${project}`, condition: "" },
+];
+// The caller is an owner of the project, and Owner holds none of a bucket's get, update and policy
+// of its own, only through the owners' legacyBucketOwner on the bucket (sources 10.9): without it,
+// what it asks of the bucket is refused, by the words of gcloud's refusal, which name the caller.
+const ownersHold = (url, permission) => {
+  const bucket = state.buckets[url] ?? notFound(`bucket ${url}`);
+  if (!bucket.policy.some((b) => b.role === "roles/storage.legacyBucketOwner" && b.member === `projectOwner:${bucket.project}` && b.condition === "")) {
+    fail(`[${caller.toLowerCase()}] does not have permission to access b instance [${url.slice("gs://".length)}] (or it may not exist): ${caller} does not have ${permission} access to the Google Cloud Storage bucket.`);
+  }
+  return bucket;
+};
 const printPolicy = (list) => {
   for (const b of list) out(`${b.role}\t${b.member}\t${b.condition}`);
 };
@@ -158,7 +188,7 @@ switch (true) {
 
   // A bucket's place is shown as Cloud Storage names it, in capitals.
   case command === "storage buckets describe": {
-    const bucket = state.buckets[first] ?? notFound(`bucket ${first}`);
+    const bucket = ownersHold(first, "storage.buckets.get");
     out(flag("format") === "value(location)" ? bucket.location.toUpperCase() : `name: ${first}`);
     break;
   }
@@ -176,12 +206,12 @@ switch (true) {
       versioning: false,
       lifecycle: flag("lifecycle-file") === undefined ? null : JSON.parse(fs.readFileSync(flag("lifecycle-file"), "utf8")),
       cors: null,
-      policy: [],
+      policy: conveniences(projectOf()),
     };
     break;
   // An update changes what it is given and keeps the rest; it knows the flags the script gives.
   case command === "storage buckets update": {
-    const bucket = state.buckets[first] ?? notFound(`bucket ${first}`);
+    const bucket = ownersHold(first, "storage.buckets.update");
     for (const a of args.filter((a) => a.startsWith("--"))) {
       const [name, value] = a.slice(2).split(/=(.*)/s);
       if (name === "versioning" || name === "no-versioning") bucket.versioning = name === "versioning";
@@ -197,7 +227,7 @@ switch (true) {
     break;
   }
   case command === "storage buckets add-iam-policy-binding":
-    binding((state.buckets[first] ?? notFound(`bucket ${first}`)).policy, flag("role"), flag("member"), conditionOrBare());
+    binding(ownersHold(first, "storage.buckets.setIamPolicy").policy, flag("role"), flag("member"), conditionOrBare());
     break;
   // The buckets of one project, by their names, as `--format=value(name)` prints them.
   case command === "storage buckets list":
@@ -206,10 +236,10 @@ switch (true) {
     }
     break;
   case command === "storage buckets get-iam-policy":
-    printPolicy((state.buckets[first] ?? notFound(`bucket ${first}`)).policy);
+    printPolicy(ownersHold(first, "storage.buckets.getIamPolicy").policy);
     break;
   case command === "storage buckets remove-iam-policy-binding": {
-    const bucket = state.buckets[first] ?? notFound(`bucket ${first}`);
+    const bucket = ownersHold(first, "storage.buckets.getIamPolicy");
     bucket.policy = removeBinding(bucket.policy);
     break;
   }
