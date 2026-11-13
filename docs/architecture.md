@@ -1,6 +1,6 @@
 # infra — architecture
 
-> Status: the detailing, epic E1, finished 2026-11-08 — sections 2 and 3; the first code, epic E2, done 2026-11-09 — the module, `bootstrap.sh`, the checks and the deployment —, and the platform's project `novatrail` is up. The first deployment, 2026-11-12, rolled out by the list `api` v0.1.22 and `app` v0.1.0 to `https://novatrail.web.app` (T24, epic E4; R25). The same day the checks after it verified on the project what E1–E4 had left to the first deployment (T42). Self-hosting and the local run, epic E3, done 2026-11-10 — the guide [SELF-HOSTING.md](../SELF-HOSTING.md) and the tests on a copy's values. Epic E4, the first deployment, done 2026-11-12, and within it, on 2026-11-11, the move to `spec` v0.15.0, T40, and on 2026-11-12 to v0.15.1, T41; its outcome, T38, checked sections 3–3.5 against the code. The current epic is E5, the operator's bucket and the procedure for a breach ([RUN.md](../RUN.md)); the epics' archives, E4 among them, are `docs/plan/`. Outside an epic, on 2026-11-12, the move to `spec` v0.16.3 and the restructuring of the documents, T52 (R26): the records of sources are in [sources.md](sources.md), and section 4 is a pointer. The frame is from the template of `spec`, 2026-10-19.
+> Status: the detailing, epic E1, finished 2026-11-08 — sections 2 and 3; the first code, epic E2, done 2026-11-09 — the module, `bootstrap.sh`, the checks and the deployment —, and the platform's project `novatrail` is up. The first deployment, 2026-11-12, rolled out by the list `api` v0.1.22 and `app` v0.1.0 to `https://novatrail.web.app` (T24, epic E4; R25). The same day the checks after it verified on the project what E1–E4 had left to the first deployment (T42). Self-hosting and the local run, epic E3, done 2026-11-10 — the guide [SELF-HOSTING.md](../SELF-HOSTING.md) and the tests on a copy's values. Epic E4, the first deployment, done 2026-11-12, and within it, on 2026-11-11, the move to `spec` v0.15.0, T40, and on 2026-11-12 to v0.15.1, T41; its outcome, T38, checked sections 3–3.5 against the code. The current epic is E5, the operator's bucket and the procedure for a breach ([RUN.md](../RUN.md)); on 2026-11-13 its T45 decided how the bucket is built and how the upload link is signed (R28; section 3.7); the epics' archives, E4 among them, are `docs/plan/`. Outside an epic, on 2026-11-12, the move to `spec` v0.16.3 and the restructuring of the documents, T52 (R26): the records of sources are in [sources.md](sources.md), and section 4 is a pointer. The frame is from the template of `spec`, 2026-10-19.
 >
 > What the component does, what it does not do, and what is still to decide about it. This is the detail of its card — architecture 3.11 spec. The card stays the summary: if the detail changes what the card says, the card is changed in `spec` the same way as the questions for its registers (RULES.md, Across repositories).
 >
@@ -14,7 +14,7 @@
   - Cloud Run's request logs are excluded in Cloud Logging. Cloud Run writes them itself, and their field `httpRequest` holds the client's IP address, while COPPA counts an IP address as personal information (architecture 1 spec; privacy 4 spec). All of them are excluded, by a filter in each sink. The traces that Cloud Run writes itself on a part of the requests are possible — Cloud Trace API cannot be turned off while Cloud Scheduler needs it —: they are kept in `us-east4`, and the first trace will check their attributes: since the service started, 2026-11-12, there have been no traces (the third 2026-11-09 amendment and the 2026-11-12 amendment to R07; section 3.4);
   - the logs' region is `us-east4`, and the bucket `_Required` is in `global` while there is no Google Cloud organization (R04; R109 spec);
 - chooses and sets up the hosting of the build of `app` — Firebase Hosting, and the first deployment has no domain of its own (R06; section 3.3) —, and by stage 4 the widgets' domain, a separate registrable one (R16 spec), and the hosting of the widgets (architecture 3.12 spec; Т-17). Only a hosting that sends its own response headers — CSP by the build's `csp.json`, and the cache — and serves `/deployment.json` outside the build's archive suits the platform (Т-17; architecture 3.12 spec). The samples page of `canvas` will move to Firebase Hosting as a separate site of the project with its own origin when the author decides so: the analysis is done — Google is a processor for Hosting, and it keeps IP addresses "a few months" (the second 2026-11-08 amendment to R25 spec; R128 spec; П-9 closed);
-- keeps the operator's bucket — a private Cloud Storage bucket in `us-east4` for the samples from the samples page, the forms for them and the scans of consents, with a prefix per purpose, with access only for the organizers and the operator, without CI and agents, and with lifecycle rules; the scan of a consent form from `app` is written there by `api` under its own prefix: the service `api` and the job `sweep` get the bucket and the prefix as the variables `API_CONSENT_FORMS_BUCKET` and `API_CONSENT_FORMS_PREFIX`, and their service accounts get the right to create and erase objects on the prefix, without reading (R125, R126 spec; the 2026-11-09 and 2026-11-10 amendments to R116 spec; architecture 3.11 spec; the README of `api` v0.1.21, section 4). The bucket has no code yet — Д11 of table 4 of [DEBT.md](../DEBT.md) —, and how to sign the upload link is section 2.7;
+- keeps the operator's bucket — a private Cloud Storage bucket in `us-east4` for the samples from the samples page, the forms for them and the scans of consents, with a prefix per purpose, with access only for the organizers and the operator, without CI and agents, as R125 spec asks — CI keeps a reading through Firebase Admin (R28) —, and with lifecycle rules; the scan of a consent form from `app` is written there by `api` under its own prefix: the service `api` and the job `sweep` get the bucket and the prefix as the variables `API_CONSENT_FORMS_BUCKET` and `API_CONSENT_FORMS_PREFIX`, and their service accounts get the right to create and erase objects on the prefix, without reading (R125, R126 spec; the 2026-11-09 and 2026-11-10 amendments to R116 spec; architecture 3.11 spec; the README of `api` v0.1.21, section 4). How it is built is decided — `bootstrap.sh` makes it, and beside it a bucket of their own for the scans of `api`, and holds their access, with the operator's rights; the upload link is a POST policy signed through IAM, with no key, for at most 12 hours; CI reads both buckets all the same through Firebase Admin, and the author leaves it so (R28; section 3.7) —, but they have no code yet: Д11 of table 4 of [DEBT.md](../DEBT.md);
 - rolls out the services and the build of `app` by one list of exact versions and digests — R106 spec decided this, and Т-19 is closed. In the dependency diagram `infra` rolls out the releases of `api` and `app` (repositories 3 spec). How the deployment goes (R105 spec, R106 spec; architecture 3.11 spec):
   - a service's image is built by the deployment of `infra`: it takes the binary and the `Dockerfile` from the service's release, checks them with the recipe of `spec` `release-verify` (R77 spec), builds the image on the base `gcr.io/distroless/static-debian13:nonroot` by digest, puts it into the private Artifact Registry of `infra` and rolls out a Cloud Run revision by the image's digest. The image of `api` is built by the contract of its release (the second 2026-11-08 amendment to R106 spec; section 3.2). What a service puts into the image beyond the binary, its own code does at the build stage: for `api` these are the module packages. NovaTrail publishes no images (RULES.md, Production images);
   - the rollout checks the build of `app` by the archive's signature, writes `/deployment.json` from the rollout list, having accepted it by the reading of the deployment configuration of the `spec` of its submodule — the schema and the rules — and by the schema `deployment.schema.json` of this build, and refusing a build of another format version (the 2026-11-08 and 2026-11-09 amendments to R85 spec; R19), builds the CSP header by the build's `csp.json` and releases the build, the file and the header in one release of the hosting (R85 spec). Beside the build's digest the list names the digest of its `/deployment.json` (Т-19);
@@ -51,7 +51,7 @@ Epic E1 decided everything the card left to the detailing but Т-29, and beyond 
 - 2.4 — the exclusion of the request logs, beyond the card's list — decided: R07, section 3.4. The logs' periods and the clarification of privacy 4 spec were recorded by `spec` by row В8 in П-9 and privacy 4 spec, and it edited the card for it and for what was decided by row В9 (R08);
 - 2.5 — Terraform or OpenTofu — put off on purpose and decided first thing in epic E2: OpenTofu, the 2026-11-08 amendment to R11 spec by row В10 (R08), section 3.6;
 - 2.6 — self-hosting and the local run of the whole platform, beyond the card's list — decided by epic E3: R21, R22, section 3.5. What this changes in the card went as row «в реестр spec» В21, and `spec` recorded it in the card (R23);
-- 2.7 — signing the upload link to the operator's bucket — open: the bucket's task decides it, T45 of epic E5 (Д11);
+- 2.7 — signing the upload link to the operator's bucket — decided by T45 of epic E5: R28, section 3.7;
 - 2.8 — auditing the reads of the secrets, beyond the card's list — open: found by the procedure for a breach, T44 (R27; Д20).
 
 ### 2.1. Region (П-11)
@@ -84,7 +84,9 @@ Tasks — T29–T32; what this changes in the card 3.11 spec is row В21, which 
 
 ### 2.7. Signing the upload link to the operator's bucket (R125 spec)
 
-Open. The card architecture 3.11 spec leaves it to `infra` to decide how to sign the link by which the measurement organizer or the eval-set organizer gets the files of a sample and the scan of a form into the operator's bucket. What is already set (R125, R126 spec; the 2026-11-09 amendment to R116 spec): the organizer gives the link, it is valid for a day from the session, and a file lands under the prefix of its purpose; neither CI nor agents have access. There are no keys of service accounts in files, and there will be none (RULES.md, Hard rules).
+Decided: R28; section 3.7. Task — T45, 2026-11-13. The link is the option (b) below, signed through IAM: without a key a signature lives at most 12 hours (sources 10.1), not a day, and the difference with R125 spec is row В30 of table 3 of [RUN.md](../RUN.md). Below — the question as it stood before T45.
+
+Open until T45. The card architecture 3.11 spec leaves it to `infra` to decide how to sign the link by which the measurement organizer or the eval-set organizer gets the files of a sample and the scan of a form into the operator's bucket. What is already set (R125, R126 spec; the 2026-11-09 amendment to R116 spec): the organizer gives the link, it is valid for a day from the session, and a file lands under the prefix of its purpose; neither CI nor agents have access. There are no keys of service accounts in files, and there will be none (RULES.md, Hard rules).
 
 Options:
 - (a) a Cloud Storage signed URL that the organizer issues with their own sign-in to `gcloud`, through an upload service account with the right only to create objects under the purpose's prefix, with no key — by a signature through IAM;
@@ -111,7 +113,7 @@ Here is what was decided by section 2: which parts the component consists of, it
 
 | Part | What it does | Decision |
 |---|---|---|
-| `tofu/bootstrap.sh` | once, with the operator's rights: the project and its billing, the state bucket, the Workload Identity Federation pool for CI, the configuration's service account `infra-config` and its rights, and the custom roles that the module grants — `apiDeployer`, `hostingPublisher` and `signInUsers`; the second pool, `github-eval`, for the eval job of `modules` and `tutor`, with no service accounts; on the model of canvas-api | R13, R20; R11 spec; model — canvas-api |
+| `tofu/bootstrap.sh` | once, with the operator's rights: the project and its billing, the state bucket, the Workload Identity Federation pool for CI, the configuration's service account `infra-config` and its rights, and the custom roles that the module grants — `apiDeployer`, `hostingPublisher` and `signInUsers`; the second pool, `github-eval`, for the eval job of `modules` and `tutor`, with no service accounts; the operator's bucket and the bucket of the scans of consents, with their access and lifecycle rules, and the two upload service accounts (section 3.7); on the model of canvas-api | R13, R20, R28; R11 spec; model — canvas-api |
 | the OpenTofu root module, `tofu/` | the project and its services: Artifact Registry, Secret Manager with the secrets of `api` and the keys for eval (R20), the log bucket and the sinks with exclusions, the place of the bucket `_Trace`, Firebase with the Hosting site and the Web App, Identity Platform, the service accounts and their rights, the budget and the alerts, the Cloud Run service and jobs and the jobs' schedule in Cloud Scheduler. The module creates the service and the jobs with the first image, which `api_image` names, and after that the deployment sets the image, the revision and the facts' version in the volume by digest, and the module does not touch them, as `ignore_changes` does at canvas-api (sources 8.1). Everything is in the region of section 3.1 | R04, R05, R06, R07, R10; the 2026-11-08 amendment to R11 spec |
 | `deploy/` | the rollout list, the values of `/deployment.json`, the facts file and the list's schema | R05; section 3.2 |
 | the checks of a pull request | the schema, `release-verify` and sha256, `deployment.json`, the facts, the rung, the tag of `api` not lower | R05 |
@@ -468,6 +470,94 @@ OpenTofu, the open fork of Terraform, at an exact version, describes the infrast
 - **License:** OpenTofu and both providers — MPL 2.0, the named exceptions of R09 and R10, ShellCheck — GPL-3.0, the named exception of the 2026-11-09 amendment to R09 (R12 spec), and actionlint — MIT.
 - **Not checked:** the first pull request of Dependabot `opentofu` — whether it rebuilds the lock file for all platforms, as its code promises. The first `apply` created the resources of the parts T13–T16 without a single refusal (T23), except the Cloud Run service and jobs of T15: they do not exist while `api_image` names no image, and the service also while `api_serving` is not set. Under `tofu` they first went through on 2026-11-12, without a refusal: the jobs with `api_image`, the service with `api_serving` (T24).
 - **Tasks:** T11 — the tool in the devcontainer and its own check in CI; T12 — the root module; T13–T16 — its parts; T17 — `bootstrap.sh`; T23 — its run and the first `apply`.
+
+### 3.7. The operator's bucket
+
+The private Cloud Storage bucket of R125 spec: the measurement organizer and the eval-set organizer get the files of the samples page and the scans of their forms into it by an upload link. Beside it is a bucket of its own for the scans of the parents' consent forms that `api` puts there from `app` (R116, R124–R126, R136 spec). What was decided and why is R28, with the 2026-11-13 amendment to R13; the sources are sources 7.2 and 10.1–10.6. There is no code yet (Д11): T46 makes the buckets in `bootstrap.sh`, T47 gives `api` its variables, T54 is the organizer's tool, and T49 rolls it out and checks it on the project.
+
+**Who makes them.** `tofu/bootstrap.sh`, with the operator's rights, as the pools and the custom roles (R13): the two buckets and their settings, the lifecycle rules, the custom roles, the upload service accounts and the whole IAM policy of each bucket. The module grants nothing in them and only names the scans' bucket to `api` (T47). A rerun of the script brings the settings, the rules and the policies back where they have drifted, as for `infra-config`.
+
+**What CI can do all the same** (R28; row В33):
+- `roles/firebase.admin` of `infra-config` holds `storage.buckets.*` and `storage.objects.*` on the project (sources 10.6): CI reads, writes and erases any object of either bucket, and can change its settings, rules and policy;
+- through `roles/run.admin` and `roles/iam.serviceAccountUser` CI can run a Cloud Run job as any service account of the project — `api-run`, an upload service account;
+- a change of a bucket's settings or policy is Admin Activity in `_Required`; a read of an object is Data Access, which is off, so no log shows it.
+
+"Without CI" of R125 spec therefore does not hold. CI's door is the environment `production-config`, where only `main` runs, after a review (R13, R18).
+
+**The values.**
+- the buckets' names — `operator_bucket` and `consent_forms_bucket` in `tofu/production.auto.tfvars`, `<project>-operator` and `<project>-consent-forms` for `novatrail`: the script and the module read them from the same place;
+- the addresses of the people — from the environment, never from a file, each from a variable of its own: the measurement organizer `BOOTSTRAP_MEASURE_ORGANIZER`, the eval-set organizer `BOOTSTRAP_EVAL_SET_ORGANIZER`, the operator `BOOTSTRAP_OPERATOR`. A variable that is not set is a refusal before the first call of `gcloud`: a rerun from a shell that lacks one would otherwise take a person's access away. The value `none` means no binding for that person. The alerts' `TF_VAR_operator_email` is not reused: it may be a list, not a Google account. Today all three are the author (R139 spec).
+
+**The settings** of both buckets (sources 10.2, 10.3):
+
+| Setting | Value | Why |
+|---|---|---|
+| place | `us-east4`, a region, class Standard | R04; R125 spec |
+| access | uniform bucket-level access | IAM conditions on names require it; no ACLs |
+| public access prevention | `enforced` | nobody makes an object public, by mistake or otherwise |
+| soft delete | off, duration 0 | an erased file is gone at once, as R126 spec says of a file that failed the check, and the periods are not a week longer |
+| object versions | off | an old version would be a copy outside every period |
+| CORS | none | the upload is an HTML form, a navigation, not a script's request |
+
+**The prefixes.** In `<project>-operator`, a prefix per purpose, and in it a prefix per kind; an upload lands under a folder of the session, a random ID that the organizer's tool gives, and each file under a random name that the page fixes — the name of the adult's file is not used, as it may hold a name. Each organizer lists the whole bucket (sources 10.2), so no name holds a person's name or a writer code.
+
+| Prefix | What lies there | Whose |
+|---|---|---|
+| `measure/samples/<session>/` | the files of a measurement session (R124 spec) | measurement organizer |
+| `measure/forms/<session>/` | the scan of the measurement form | measurement organizer |
+| `measure/records/` | the organizer's record of a session | measurement organizer |
+| `measure/reports/` | the runner's reports that name the samples (R95 spec) | measurement organizer |
+| `child/samples/<session>/`, `child/forms/<session>/`, `child/records/`, `child/reports/` | the same for children's samples, with the parent's form and the band of grades in the record (R124, R125 spec) | measurement organizer |
+| `eval-set/samples/<session>/` | the volunteer's files before they enter `modules` (R126 spec) | eval-set organizer |
+| `eval-set/forms/<session>/` | the scan of the volunteer's form and, beside it, the record of the form | eval-set organizer |
+| `eval-set/contributed-forms/<session>/` | a form by which a sample was contributed, moved here with its record | eval-set organizer |
+
+`<project>-consent-forms` has one prefix, `consent-forms/`: the scans, `<consent ID>-<random suffix>` (sources 10.5), which only the operator lists.
+
+**Who has access** — each binding on its bucket, under an IAM condition `resource.name.startsWith('projects/_/buckets/<bucket>/objects/<prefix>')` where it has one:
+
+| Bucket | Who | Role | Condition |
+|---|---|---|---|
+| operator | measurement organizer | `roles/storage.objectUser` — read, create, erase, update, rewrite | `measure/` or `child/` |
+| operator | eval-set organizer | `roles/storage.objectUser` | `eval-set/` |
+| operator | both organizers | the custom role `operatorBucketLister` — `storage.objects.list` | none: listing has no condition by name |
+| operator | `upload-measure` | the custom role `bucketUploader` — `storage.objects.create` | `measure/samples/`, `measure/forms/`, `child/samples/` or `child/forms/` |
+| operator | `upload-eval-set` | `bucketUploader` | `eval-set/samples/` or `eval-set/forms/` |
+| consent forms | operator | `roles/storage.objectViewer` — read and list | none |
+| consent forms | `api-run` | the custom role `consentFormsWriter` — `storage.objects.create` and `storage.objects.delete` | `consent-forms/` |
+
+Beyond the buckets: the measurement organizer holds `roles/iam.serviceAccountTokenCreator` on `upload-measure` alone, the eval-set organizer on `upload-eval-set` alone. The policy of each upload service account and of each bucket holds only what the script names: anything else it takes back at each run. The binding of `api-run` exists only once the module has made `api-run`; without it the script makes the rest and says so, and the operator runs it again after the first `apply` of a new copy. `api` needs no more: it puts each scan under a new name and erases by a name from its database, and an insert that overwrites nothing needs no `storage.objects.delete` (sources 10.2, 10.5).
+
+**The upload link** (sources 10.1). A V4 POST policy, signed by IAM's `signBlob` as the organizer's upload service account, with no key: without a key of the service account a signature is valid at most 12 hours, so the policy expires no later than 12 hours from the session, not a day as R125 and R126 spec say — row В30 of table 3 of [RUN.md](../RUN.md). The organizer's tool (T54):
+- runs where `gcloud` is signed in as the organizer — Cloud Shell or their own machine: the devcontainer has no `gcloud`;
+- gives the session its random ID and makes one self-contained HTML page with a form per file: the sample files under `<purpose>/samples/<session>/`, the scan of the form under `<purpose>/forms/<session>/`, each with its random object name, its `content-length-range` and its content type — a scan is a JPEG, a PNG or a PDF up to 10 MiB, as `api` takes, and the bounds of a sample file T54 takes from the files of the samples page. A policy carries one condition per field, so the policy of a form names its prefix by `starts-with $key`;
+- signs the policies with `gcloud iam service-accounts sign-blob --iam-account=<upload service account>`;
+- when the organizer accepts a form, writes a record or a report, sets its Custom-Time, and lists the forms that have none.
+
+The organizer gives the page to the adult, who opens it in a browser and sends the files. Since an upload service account cannot overwrite, a second sending of the same form fails instead of replacing the file. A screen of the samples page of `canvas` that takes the policy from the fragment of a link would replace the page — row В30.
+
+**The lifecycle** of `<project>-operator` (sources 10.3). Two years are at least 730 days and five years at most 1827; the link adds up to half a day to the session; Google bounds no lag of a rule's action. An `age` counts from the object's creation, and a rewrite creates the object anew, so what the organizer may rewrite is erased by its Custom-Time:
+
+| Prefixes | Rule | Custom-Time set by the organizer | Period it keeps |
+|---|---|---|---|
+| `measure/samples/`, `child/samples/` | `age` 728 | — | 2 years from the session (R124, R125 spec); nobody rewrites a sample |
+| `measure/records/`, `child/records/`, `measure/reports/`, `child/reports/` | `daysSinceCustomTime` 728 | the session of the record, or of the earliest sample the report names | erased with the samples (R124 spec) |
+| `measure/forms/`, `child/forms/` | `daysSinceCustomTime` 1827 | the session plus 730 days, of the last session under the form; moved forward by a new session; on a withdrawal the form is rewritten with the day of the erasure | 5 years after its samples are erased (R124, R125 spec) |
+| `eval-set/forms/` | `age` 364, and `daysSinceCustomTime` 364 | the signature, on the record beside the form | 12 months from the signature, when no sample was contributed (R126 spec) |
+| `eval-set/contributed-forms/` | none | — | as long as a sample is published (R126 spec) |
+| `eval-set/samples/` | none | — | not set by R126 spec — row В32 |
+
+A Custom-Time cannot decrease, but a rewrite of the object resets it. A form without one is never erased by the rule, so the tool sets it and lists the forms without it. `<project>-consent-forms` has no rule: the period of a scan is the consent and 5 years, and `sweep` erases it (R116, R136 spec).
+
+**Logs.** Data Access audit of Cloud Storage is off and every sink excludes it (R07): an upload's entry would hold the address of the adult who sends. So no log shows who read, wrote or erased an object, and the lifecycle's erasures are not logged at all (sources 10.4). The buckets' settings and policies are Admin Activity, in `_Required`. BREACH.md, part 1, gets the buckets' rows from T46 (R27).
+
+**The price** (sources 7.2). Standard in `us-east4` — $0.023 per GiB a month, class A operations $0.005 per thousand, class B $0.0004; `us-east4` has no free tier. Scans and sample files weigh megabytes: cents a month.
+
+**What T49 checks on the project**, since the documentation does not say:
+- the policy is refused after 12 hours, and serves several uploads within them;
+- a Custom-Time in the future is accepted;
+- `DELETE` of an absent object without `storage.objects.get` answers 404, which `sweep` takes for "erased already" (Д29 `api`);
+- `api-run` and an upload service account cannot read an object, nor an organizer another's prefix or the scans.
 
 ## 4. Sources
 
