@@ -29,6 +29,7 @@ The documents are in English; the work plan, its technical debt and the archives
 - [RUN.md](RUN.md) — the work plan, in epics.
 - [DEBT.md](DEBT.md) — the technical debt, in Russian: table 4 of the work plan.
 - [SELF-HOSTING.md](SELF-HOSTING.md) — how to bring up your own copy of the platform, from an empty Google Cloud account to a copy ready to deploy, and how to run the whole platform from source on one machine (section 12).
+- [BREACH.md](BREACH.md) — what the operator does in a breach of learners' data: what counts as one, how to cut the access, where to look, whom to tell and by when.
 
 The working rules, for people and coding agents alike, are in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md). The platform's shared vocabulary, formats, contracts and decisions are in [spec](https://github.com/altnovatrail/spec/tree/v0.16.3), checked out here as a git submodule at `v0.16.3`: clone this repository with `git clone --recurse-submodules`.
 
