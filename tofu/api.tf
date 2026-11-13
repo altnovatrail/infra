@@ -50,6 +50,15 @@ locals {
   # Every secret of api a volume may name, by its id.
   api_secrets = merge(google_secret_manager_secret.api_job, google_secret_manager_secret.api_service)
 
+  # The store of the scans of the parents' consent forms: the bucket bootstrap.sh makes, and api's
+  # prefix in it, under which bootstrap.sh grants api's service account the right to create and
+  # erase objects (R28). api takes the prefix only with its slash at the end (README api).
+  consent_forms_prefix = "consent-forms/"
+  consent_forms = {
+    API_CONSENT_FORMS_BUCKET = var.consent_forms_bucket
+    API_CONSENT_FORMS_PREFIX = local.consent_forms_prefix
+  }
+
   # The origin app is served at, the one api answers CORS for: the default site, named after the
   # project (R06).
   app_origin = "https://${google_firebase_hosting_site.app.site_id}.web.app"
@@ -147,6 +156,16 @@ resource "google_cloud_run_v2_service" "api" {
         value = local.app_origin
       }
 
+      # Where serve puts a parent's scan of a consent form, and erases it (R28).
+      dynamic "env" {
+        for_each = local.consent_forms
+
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
       # The pooler's connection strings, each in its variable from the latest version of its secret,
       # resolved when an instance starts: api takes a secret from its variable or from a file, alike
       # (R26 api). Not volumes: the facts' volume stays the service's only one, the one whose version
@@ -197,7 +216,11 @@ resource "google_cloud_run_v2_service" "api" {
   # The deployment owns the image and the facts' version; this configuration owns everything
   # around them. Without these lines the two would take turns. The deployment's gcloud
   # also writes itself into the service as its client. Traffic is not described: the provider
-  # computes it when no block names it, so a move of traffic is not undone by the next apply.
+  # computes it when no block names it, so a move of traffic is not undone by the next apply. The
+  # apply sends back the traffic it read. Once a deployment has given all of it to one revision by
+  # name, a change to the template here makes a revision that takes none, and reaches the traffic
+  # with the next deployment of api, whose revision is made from this template (R15); before that,
+  # the service follows its latest revision.
   lifecycle {
     ignore_changes = [
       client,
@@ -263,11 +286,16 @@ resource "google_cloud_run_v2_job" "api" {
 
         # A job of the check checks the facts and the rung the revision will run with: the same
         # rung, and the facts at the same path (R05; the second 2026-11-08 amendment to R106 spec).
+        # The store of the scans goes to a job that opens it, and to a job of the check, which checks
+        # it as the revision will take it (R28).
         dynamic "env" {
-          for_each = each.value.deploy == "check" ? {
-            API_ADMISSION_RUNG       = local.admission_rung
-            API_ADMISSION_FACTS_FILE = local.admission_path
-          } : {}
+          for_each = merge(
+            each.value.deploy == "check" ? {
+              API_ADMISSION_RUNG       = local.admission_rung
+              API_ADMISSION_FACTS_FILE = local.admission_path
+            } : {},
+            each.value.deploy == "check" || each.value.consent_forms ? local.consent_forms : {},
+          )
 
           content {
             name  = env.key

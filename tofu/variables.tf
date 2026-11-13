@@ -171,13 +171,14 @@ variable "api_image" {
 }
 
 variable "api_jobs" {
-  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, for a job that runs by the clock its schedule in cron's form, UTC, and for a job the deployment runs its part in it: check, before the migrations; migrate; or after, once the new revision takes all traffic (R05, R15). Only commands api's release has go here."
+  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, whether it opens the store of the scans of consent forms — the bucket consent_forms_bucket and api's prefix in it —, for a job that runs by the clock its schedule in cron's form, UTC, and for a job the deployment runs its part in it: check, before the migrations; migrate; or after, once the new revision takes all traffic (R05, R15). A job of the check is told the store as the service is, whatever it says. Only commands api's release has go here."
   type = map(object({
-    args     = list(string)
-    secrets  = optional(map(string), {})
-    timeout  = optional(string, "600s")
-    schedule = optional(string)
-    deploy   = optional(string)
+    args          = list(string)
+    secrets       = optional(map(string), {})
+    timeout       = optional(string, "600s")
+    consent_forms = optional(bool, false)
+    schedule      = optional(string)
+    deploy        = optional(string)
   }))
   nullable = false
 
@@ -187,7 +188,8 @@ variable "api_jobs" {
   # databases with each deployment. sweep is the daily pass that finishes the deletions a request
   # left and deletes what is past its term: by the clock, at 09:00 UTC, night in every time zone of
   # the US, where the platform's learners are (R109 spec). A pass runs 9 minutes at most, sweep's
-  # -for, and reads what serve opens: the pooler's strings, the service's own secrets. after is the
+  # -for, and reads what serve opens: the pooler's strings, the service's own secrets, and the store of
+  # the scans of consent forms, whose scans past their term it erases. after is the
   # pass the deployment runs once the new revision takes all traffic: it closes "unchecked" what is
   # open on packages the image no longer gives (the 2026-11-08 amendment to R106 spec; R51 api). It
   # reads api's pooler's string alone, the service's own secret, and the packages at the image's
@@ -214,9 +216,10 @@ variable "api_jobs" {
       }
     }
     sweep = {
-      args     = ["sweep"]
-      schedule = "0 9 * * *"
-      timeout  = "900s"
+      args          = ["sweep"]
+      schedule      = "0 9 * * *"
+      timeout       = "900s"
+      consent_forms = true
       secrets = {
         API_DATABASE_URL         = "api-database-url"
         API_OPENFGA_DATABASE_URL = "api-openfga-database-url"
@@ -343,7 +346,7 @@ variable "operator_bucket" {
 }
 
 variable "consent_forms_bucket" {
-  description = "The bucket of the scans of the parents' consent forms, which api puts there from app under its prefix consent-forms/ (R116, R136 spec). bootstrap.sh reads it from the same file of values, makes it in the region and grants api's service account the right to create and erase objects under the prefix, once the first apply has made that account. The platform's is novatrail-consent-forms. Bucket names are global."
+  description = "The bucket of the scans of the parents' consent forms, which api puts there from app under its prefix consent-forms/ (R116, R136 spec). bootstrap.sh reads it from the same file of values, makes it in the region and grants api's service account the right to create and erase objects under the prefix, once the first apply has made that account. The configuration names it and the prefix to api's service, to the jobs of the check and to the jobs whose consent_forms is true, sweep among them. The platform's is novatrail-consent-forms. Bucket names are global."
   type        = string
 
   validation {
