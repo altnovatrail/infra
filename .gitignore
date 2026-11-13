@@ -11,3 +11,7 @@ tools/node_modules/
 
 # The credentials file google-github-actions/auth writes into the checkout in the deployment's jobs.
 gha-creds-*.json
+
+# The organizer's upload pages, which tools/organizer/organizer.mjs writes where it runs: whoever
+# holds one may upload by it until it expires (R28).
+upload-*.html

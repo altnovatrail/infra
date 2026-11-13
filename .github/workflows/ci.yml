@@ -62,9 +62,10 @@ jobs:
   # The checks of the deployment's list (R05, R14) and api's deployment (R15), in the same
   # toolchain stage: the licenses of tools/, the checks' tests on synthetic releases, the check of a
   # release's files on a real release of api, against GitHub and Sigstore, the test of api's
-  # deployment on stand-ins, and the list itself when the pull request changes what it is checked or
-  # deployed by: deploy/, the checks and the deployment, their packages, the justfile or the tag of
-  # spec. The whole history, so that the list on main is there to compare with.
+  # deployment on stand-ins, the organizer's tool's on a stand-in for gcloud (R28), and the list
+  # itself when the pull request changes what it is checked or deployed by: deploy/, the checks and
+  # the deployment, their packages, the justfile or the tag of spec. The whole history, so that the
+  # list on main is there to compare with.
   deploy:
     name: Deploy
     runs-on: ubuntu-24.04
@@ -86,6 +87,7 @@ jobs:
           spec/tools/toolchain/toolchain.sh run just deploy-app-test
           spec/tools/toolchain/toolchain.sh run just deploy-target-test
           spec/tools/toolchain/toolchain.sh run just tools-install-test
+          spec/tools/toolchain/toolchain.sh run just organizer-test
           spec/tools/toolchain/toolchain.sh run just ci-deploy-check origin/main
 
   # The deployment's tools as its jobs install them, on the runner they run on (R18): each download
