@@ -678,6 +678,40 @@ run "a_job_timeout_past_168_hours_is_refused" {
   expect_failures = [var.api_jobs]
 }
 
+# The alert on a job by the clock that did not run looks 25 hours back (R07): a job that runs
+# less often than every day, or may run longer than 3000s, would empty the window with nothing
+# missed.
+run "a_job_by_the_clock_not_every_day_is_refused" {
+  command = plan
+
+  variables {
+    api_jobs = {
+      weekly = {
+        args     = ["sweep"]
+        schedule = "0 9 * * 1"
+      }
+    }
+  }
+
+  expect_failures = [var.api_jobs]
+}
+
+run "a_job_by_the_clock_of_an_hour_is_refused" {
+  command = plan
+
+  variables {
+    api_jobs = {
+      sweep = {
+        args     = ["sweep"]
+        schedule = "0 9 * * *"
+        timeout  = "3600s"
+      }
+    }
+  }
+
+  expect_failures = [var.api_jobs]
+}
+
 run "a_cpu_cloud_run_does_not_take_is_refused" {
   command = plan
 

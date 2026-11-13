@@ -171,7 +171,7 @@ variable "api_image" {
 }
 
 variable "api_jobs" {
-  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, whether it opens the store of the scans of consent forms — the bucket consent_forms_bucket and api's prefix in it —, for a job that runs by the clock its schedule in cron's form, UTC, and for a job the deployment runs its part in it: check, before the migrations; migrate; or after, once the new revision takes all traffic (R05, R15). A job of the check is told the store as the service is, whatever it says. Only commands api's release has go here."
+  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, whether it opens the store of the scans of consent forms — the bucket consent_forms_bucket and api's prefix in it —, for a job that runs by the clock its schedule in cron's form, UTC, every day and no longer than 3000s a run, and for a job the deployment runs its part in it: check, before the migrations; migrate; or after, once the new revision takes all traffic (R05, R15). A job of the check is told the store as the service is, whatever it says. Only commands api's release has go here."
   type = map(object({
     args          = list(string)
     secrets       = optional(map(string), {})
@@ -252,6 +252,14 @@ variable "api_jobs" {
   validation {
     condition     = !contains(flatten([for job in values(var.api_jobs) : values(job.secrets)]), "api-admission-facts")
     error_message = "A job's secret is not the deployment facts' secret, api-admission-facts: that one the configuration makes, and the deployment adds its versions."
+  }
+
+  # The alert on a job by the clock that did not run looks for an execution in the last 25 hours,
+  # and an execution writes its point once it completes (alerts.tf): a job that ran less often than
+  # every day, or whose run took an hour, would leave the window empty with nothing missed.
+  validation {
+    condition     = alltrue([for job in values(var.api_jobs) : job.schedule == null || (can(regex("^\\S+ \\S+ \\* \\* \\*$", coalesce(job.schedule, "-"))) && try(tonumber(trimsuffix(job.timeout, "s")) <= 3000, false))])
+    error_message = "A job by the clock runs every day, its schedule's day of the month, month and day of the week all *, and may take 3000s at most: the alert on a run that did not happen looks 25 hours back."
   }
 
   # A job of the check gets the facts' volume, admission-facts, and API_ADMISSION_FACTS_FILE and
