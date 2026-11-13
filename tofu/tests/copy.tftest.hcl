@@ -87,6 +87,13 @@ run "a_copy_signs_in_and_publishes_under_its_own_names" {
   }
 
   assert {
+    condition = alltrue([for env in [google_cloud_run_v2_service.api[0].template[0].containers[0].env, google_cloud_run_v2_job.api["sweep"].template[0].template[0].containers[0].env, google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env] :
+      one([for e in env : e.value if e.name == "API_CONSENT_FORMS_BUCKET"]) == "acme-learning-1-consent-forms"
+    ])
+    error_message = "The copy's api, its sweep and its check are told the copy's own bucket of the scans."
+  }
+
+  assert {
     condition     = output.api_origin == "https://api-987654321098.europe-west3.run.app"
     error_message = "The copy's api is at its own deterministic address, in its own region."
   }

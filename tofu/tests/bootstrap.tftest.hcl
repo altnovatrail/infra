@@ -22,14 +22,17 @@ mock_provider "google" {
 mock_provider "google-beta" {}
 
 # The variables every run starts from are in tests/terraform.tfvars. What the script says is read
-# out of it here: the ids of its three roles, and the roles its condition lets the configuration's
-# identity grant on the project, as the script writes them; the run puts the shell's ${project},
-# ${publisher_role} and ${sign_in_role} in.
+# out of it here: the ids of its three roles, the value it reads the scans' bucket from and the
+# prefix it grants api's service account its right under there, and the roles its condition lets the
+# configuration's identity grant on the project, as the script writes them; the run puts the shell's
+# ${project}, ${publisher_role} and ${sign_in_role} in.
 
 variables {
-  bootstrap_deployer_role  = regex("(?m)^deployer_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
-  bootstrap_publisher_role = regex("(?m)^publisher_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
-  bootstrap_sign_in_role   = regex("(?m)^sign_in_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
+  bootstrap_deployer_role        = regex("(?m)^deployer_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
+  bootstrap_publisher_role       = regex("(?m)^publisher_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
+  bootstrap_sign_in_role         = regex("(?m)^sign_in_role=([A-Za-z]+)$", file("bootstrap.sh"))[0]
+  bootstrap_consent_forms_value  = regex("(?m)^consent_forms_bucket=\"\\$\\(hcl_value ([a-z_]+) \"\\$tfvars\"\\)\"$", file("bootstrap.sh"))[0]
+  bootstrap_consent_forms_prefix = regex("under \"\\$consent_forms_bucket\" ([^)[:space:]]+)\\)", file("bootstrap.sh"))[0]
   bootstrap_grantable = [
     for role in regexall("'([^']+)'", regex("hasOnly\\(\\[([^\\]]*)\\]\\)", file("bootstrap.sh"))[0]) : role[0]
   ]
@@ -129,5 +132,30 @@ run "bootstraps_api_account_is_the_modules" {
   assert {
     condition     = google_service_account.api.account_id == "${regex("(?m)^api_service_name=\"\\$\\{api_service_name:-([a-z0-9-]+)\\}\"$", file("bootstrap.sh"))[0]}-run"
     error_message = "The service account bootstrap.sh grants in the scans' bucket, by the default name of api's service, is the one the module makes."
+  }
+}
+
+# api is told the bucket bootstrap.sh makes for the scans, which both read from the same value, and
+# the prefix under which the script grants api's service account its right there: another prefix
+# would put every scan where api may not write (R28).
+run "the_scans_bucket_and_prefix_are_bootstraps" {
+  command = plan
+
+  variables {
+    api_serving = true
+    api_image   = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  }
+
+  assert {
+    condition = alltrue([for env in [google_cloud_run_v2_service.api[0].template[0].containers[0].env, google_cloud_run_v2_job.api["sweep"].template[0].template[0].containers[0].env] :
+      one([for e in env : e.value if e.name == "API_CONSENT_FORMS_BUCKET"]) == var.consent_forms_bucket &&
+      one([for e in env : e.value if e.name == "API_CONSENT_FORMS_PREFIX"]) == var.bootstrap_consent_forms_prefix
+    ])
+    error_message = "api's service and sweep are told the scans' bucket of the values and the prefix bootstrap.sh grants api's service account its right under: change both together, and run bootstrap.sh again before the merge."
+  }
+
+  assert {
+    condition     = var.bootstrap_consent_forms_value == "consent_forms_bucket"
+    error_message = "bootstrap.sh reads the scans' bucket from the value consent_forms_bucket, the one the module names to api."
   }
 }

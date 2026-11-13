@@ -188,6 +188,21 @@ run "the_service_is_made_with_the_first_image" {
   }
 
   assert {
+    condition = {
+      for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.name => e.value if startswith(e.name, "API_CONSENT_FORMS_")
+      } == {
+      API_CONSENT_FORMS_BUCKET = "novatrail-test-0-consent-forms"
+      API_CONSENT_FORMS_PREFIX = "consent-forms/"
+    }
+    error_message = "serve puts the scans of consent forms in consent_forms_bucket, under api's prefix consent-forms/, and is told no folder instead."
+  }
+
+  assert {
+    condition     = endswith(one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_CONSENT_FORMS_PREFIX"]), "/")
+    error_message = "api's prefix in the bucket of the scans ends in a slash: api refuses one that does not."
+  }
+
+  assert {
     condition     = google_cloud_run_v2_service_iam_member.public[0].member == "allUsers" && google_cloud_run_v2_service_iam_member.public[0].role == "roles/run.invoker"
     error_message = "Anyone may call api: its own checks decide."
   }
@@ -291,8 +306,10 @@ run "sweep_runs_every_day_once_the_service_exists" {
       API_DATABASE_URL_FILE         = "/secrets/api-database-url/value"
       API_OPENFGA_DATABASE_URL_FILE = "/secrets/api-openfga-database-url/value"
       API_FIREBASE_PROJECT_ID       = "novatrail-test-0"
+      API_CONSENT_FORMS_BUCKET      = "novatrail-test-0-consent-forms"
+      API_CONSENT_FORMS_PREFIX      = "consent-forms/"
     }
-    error_message = "sweep reads what serve opens: both pooler's strings, as files, and the Firebase project whose users it lists."
+    error_message = "sweep reads what serve opens: both pooler's strings, as files, the Firebase project whose users it lists, and the store of the scans, whose scans past their term it erases."
   }
 
   assert {
@@ -422,10 +439,70 @@ run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
 
   assert {
     condition = (
+      { for e in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env : e.name => e.value if startswith(e.name, "API_CONSENT_FORMS_") } ==
+      { for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.name => e.value if startswith(e.name, "API_CONSENT_FORMS_") } &&
+      length([for e in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env : e if startswith(e.name, "API_CONSENT_FORMS_")]) == 2
+    )
+    error_message = "The job of the check is told the store of the scans the service is told, which api's check checks as serve takes it, though the job does not ask for it."
+  }
+
+  assert {
+    condition     = length([for e in google_cloud_run_v2_job.api["migrate"].template[0].template[0].containers[0].env : e if startswith(e.name, "API_CONSENT_FORMS_")]) == 0
+    error_message = "A job that does not ask for the store of the scans is not told it."
+  }
+
+  assert {
+    condition = (
       !contains([for v in google_cloud_run_v2_job.api["migrate"].template[0].template[0].volumes : v.secret[0].secret], "api-admission-facts") &&
       length([for e in google_cloud_run_v2_job.api["migrate"].template[0].template[0].containers[0].env : e if startswith(e.name, "API_ADMISSION_")]) == 0
     )
     error_message = "A job of another part reads neither the facts nor the rung."
+  }
+}
+
+# The store of the scans goes to a job that asks for it, and once to a job of the check that asks for
+# it as well: a variable given twice Cloud Run refuses at the apply.
+run "the_store_of_the_scans_goes_to_the_jobs_that_open_it" {
+  command = plan
+
+  variables {
+    api_image = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_jobs = {
+      check = {
+        args          = ["check"]
+        deploy        = "check"
+        consent_forms = true
+      }
+      migrate = {
+        args   = ["migrate"]
+        deploy = "migrate"
+      }
+      daily = {
+        args          = ["daily"]
+        consent_forms = true
+      }
+      hourly = {
+        args = ["hourly"]
+      }
+    }
+  }
+
+  assert {
+    condition = alltrue([for name in ["check", "daily"] :
+      { for e in google_cloud_run_v2_job.api[name].template[0].template[0].containers[0].env : e.name => e.value if startswith(e.name, "API_CONSENT_FORMS_") } == {
+        API_CONSENT_FORMS_BUCKET = "novatrail-test-0-consent-forms"
+        API_CONSENT_FORMS_PREFIX = "consent-forms/"
+      } &&
+      length([for e in google_cloud_run_v2_job.api[name].template[0].template[0].containers[0].env : e if startswith(e.name, "API_CONSENT_FORMS_")]) == 2
+    ])
+    error_message = "A job that asks for the store of the scans is told the bucket and the prefix, each once, a job of the check among them."
+  }
+
+  assert {
+    condition = alltrue([for name in ["migrate", "hourly"] :
+      length([for e in google_cloud_run_v2_job.api[name].template[0].template[0].containers[0].env : e if startswith(e.name, "API_CONSENT_FORMS_")]) == 0
+    ])
+    error_message = "A job of another part or of the clock that does not ask for the store is not told it."
   }
 }
 
