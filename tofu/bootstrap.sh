@@ -728,7 +728,10 @@ shown() {
 # its commas would split it on the command line. Which version of the policy gcloud reads it chooses
 # itself (R13); in version 1 a binding under a condition would read as a role named
 # <role>_withcond_<hash>, not given, and taking it back by that name would fail and stop the script
-# rather than pass by it. The first run on the project shows which version it reads (T49).
+# rather than pass by it. On the project it reads a bucket's conditions as they are (T49). A member
+# is compared in any case: IAM keeps a person's address as Google spells the account, capitals and
+# all, and this script takes it in lower case, so that a run would otherwise take each person's
+# binding back and grant it again (T49). One is taken back as IAM spells it.
 #   keep_policy bucket <name> <bindings>...
 #   keep_policy account <email> <bindings>...
 keep_policy() {
@@ -743,23 +746,23 @@ keep_policy() {
     local given=$'\n' held=$'\n' cleared=$'\n' policy
     for line in "$@"; do
         IFS="$sep" read -r role holder expression _ <<< "$line"
-        given+="${role}${sep}${holder}${sep}${expression}"$'\n'
+        given+="${role}${sep}${holder,,}${sep}${expression}"$'\n'
     done
     policy="$(retry_read gcloud "${group[@]}" get-iam-policy "${at[@]}" \
         --flatten='bindings[].members' --format='value(bindings.role,bindings.members,bindings.condition.expression)')"
     while IFS=$'\t' read -r role holder held_under; do
         [[ -n "$role" ]] || continue
-        held+="${role}${sep}${holder}${sep}${held_under}"$'\n'
-        [[ "$given" == *$'\n'"${role}${sep}${holder}${sep}${held_under}"$'\n'* ]] && continue
-        [[ "$cleared" == *$'\n'"${role}${sep}${holder}"$'\n'* ]] && continue
+        held+="${role}${sep}${holder,,}${sep}${held_under}"$'\n'
+        [[ "$given" == *$'\n'"${role}${sep}${holder,,}${sep}${held_under}"$'\n'* ]] && continue
+        [[ "$cleared" == *$'\n'"${role}${sep}${holder,,}"$'\n'* ]] && continue
         retry gcloud "${group[@]}" remove-iam-policy-binding "${at[@]}" \
             --member="$holder" --role="$role" --all --quiet
-        cleared+="${role}${sep}${holder}"$'\n'
+        cleared+="${role}${sep}${holder,,}"$'\n'
         echo "    ${role} of $(shown "$holder")${held_under:+ under a condition}: not named here, taken back"
     done <<< "$policy"
     for line in "$@"; do
         IFS="$sep" read -r role holder expression title label <<< "$line"
-        if [[ "$cleared" != *$'\n'"${role}${sep}${holder}"$'\n'* && "$held" == *$'\n'"${role}${sep}${holder}${sep}${expression}"$'\n'* ]]; then
+        if [[ "$cleared" != *$'\n'"${role}${sep}${holder,,}"$'\n'* && "$held" == *$'\n'"${role}${sep}${holder,,}${sep}${expression}"$'\n'* ]]; then
             echo "    ${label}"
             continue
         fi

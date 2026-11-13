@@ -12,6 +12,9 @@
 // STUB_FAIL_ONCE the same, for the first such command alone, with an error that is not NOT_FOUND
 // STUB_CALLER   the account the stand-in runs as, which its refusals name as gcloud's do: an owner
 //               of the project, spelled with capitals, as Google keeps an account
+// STUB_CAPITALS a person granted is kept spelled as Google keeps an account, each word of the name
+//               with a capital, as IAM keeps it on the project (T49), and is the same person in
+//               any case
 //
 // A policy is printed as one read in version 3 is: a binding under a condition names its role as it
 // is and carries its expression. Which version the real gcloud reads, the first run shows (T23).
@@ -66,9 +69,13 @@ const positional = args.filter((a) => !a.startsWith("--"));
 const command = positional.slice(0, 3).join(" ");
 const [, , , first] = positional;
 
+const spelled = (member) =>
+  process.env.STUB_CAPITALS && member.startsWith("user:")
+    ? member.replace(/^user:([^@]+)/, (_, name) => `user:${name.replace(/(^|\.)([a-z])/g, (m, dot, letter) => dot + letter.toUpperCase())}`)
+    : member;
 const binding = (list, role, member, condition) => {
-  if (!list.some((b) => b.role === role && b.member === member && b.condition === condition)) {
-    list.push({ role, member, condition });
+  if (!list.some((b) => b.role === role && b.member.toLowerCase() === member.toLowerCase() && b.condition === condition)) {
+    list.push({ role, member: spelled(member), condition });
   }
 };
 // A binding on a bucket or a service account may leave its condition out, and is then bare.

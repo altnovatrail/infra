@@ -832,3 +832,29 @@ test("a person's address given with capitals is hidden in gcloud's errors all th
   assert.ok(!names(r.output, measureOrganizer), r.output);
   assert.match(r.stderr, /<address>/);
 });
+
+test("a person IAM spells with capitals is the same person: a run again takes back and grants nothing", () => {
+  const w = applied();
+  const capitals = { STUB_CAPITALS: "1" };
+  assert.equal(w.run(capitals).status, 0);
+  assert.ok(w.read().accounts[uploadMeasure].policy.some((b) => b.member === "user:Measure.Organizer@example.com"), "the stand-in spells the person with capitals");
+  const r = w.run(capitals);
+  assert.equal(r.status, 0, r.output);
+  assert.doesNotMatch(r.stdout, /taken back/);
+  const people = [operatorBucket, consentBucket, uploadMeasure, uploadEvalSet];
+  assert.ok(!w.calls().some((c) => (c.includes("add-iam-policy-binding") || c.includes("remove-iam-policy-binding")) && people.some((t) => c.includes(t))), "nothing held is taken back or granted again");
+
+  const s = w.read();
+  s.buckets[operatorBucket].policy = s.buckets[operatorBucket].policy.map((b) =>
+    b.member === "user:Measure.Organizer@example.com" && b.role === "roles/storage.objectUser" ? { ...b, condition: "true" } : b,
+  );
+  w.seed(s);
+  const drifted = w.run(capitals);
+  assert.equal(drifted.status, 0, drifted.output);
+  assert.deepEqual(
+    w.read().buckets[operatorBucket].policy.filter((b) => b.role === "roles/storage.objectUser" && b.member.toLowerCase() === `user:${measureOrganizer}`).map((b) => b.condition),
+    [under(operatorBucket, "measure/", "child/")],
+    "a condition that drifted is taken back as IAM spells the person, and granted again",
+  );
+  assert.ok(!names(drifted.output, measureOrganizer), drifted.output);
+});
