@@ -124,7 +124,8 @@ run "a_copy_lends_its_identities_to_its_own_repository_and_environments" {
 }
 
 # Nothing of the platform's own deployment reaches the copy: its name, its region, its pool and its
-# numbers appear in no resource the configuration makes, and in none of its outputs.
+# numbers appear in no resource the configuration makes, in no data source it reads, and in none of
+# its outputs.
 run "nothing_of_the_platform_reaches_a_copy" {
   command = apply
 
@@ -148,6 +149,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_billing_budget.spend),
       jsonencode(google_monitoring_alert_policy.api),
       jsonencode(google_monitoring_alert_policy.api_jobs),
+      jsonencode(google_monitoring_alert_policy.api_jobs_missed),
       jsonencode(google_monitoring_notification_channel.operator),
       jsonencode(google_project_service.enabled),
       jsonencode(google_firebase_project.this),
@@ -168,6 +170,8 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_service_account_iam_member.deployer_runs_as_api),
       jsonencode(google_secret_manager_secret.eval),
       jsonencode(google_secret_manager_secret_iam_member.eval_reads),
+      jsonencode(data.google_project.this),
+      jsonencode(data.google_firebase_web_app_config.app),
       jsonencode([output.project_id, output.region, output.hosting_site, output.hosting_url, output.app_sign_in, output.api_jobs, output.api_service_name, output.api_service_url, output.api_service_account, output.deploy_service_account, output.hosting_service_account, output.image_repository, output.log_bucket, output.admission_facts_secret, output.admission_facts_file, output.deploy_environment, output.hosting_environment, output.eval_access, output.api_origin]),
       ] : alltrue([for platform in ["novatrail", "us-east4", "344507087", "altnovatrail", "1425816333", "infra-github"] : !strcontains(text, platform)])
     ])
