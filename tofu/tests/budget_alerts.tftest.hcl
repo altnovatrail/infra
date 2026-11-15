@@ -34,6 +34,11 @@ run "the_budget_counts_this_project_by_the_month" {
   }
 
   assert {
+    condition     = google_billing_budget.spend.budget_filter[0].credit_types_treatment == "INCLUDE_SPECIFIED_CREDITS" && google_billing_budget.spend.budget_filter[0].credit_types == tolist(["FREE_TIER"])
+    error_message = "The budget takes off the free allowance's credit alone: a Free Trial's credit, a PROMOTION, would hide every charge until it ran out."
+  }
+
+  assert {
     condition     = google_billing_budget.spend.amount[0].specified_amount[0].units == "10" && google_billing_budget.spend.amount[0].specified_amount[0].currency_code == "USD"
     error_message = "The budget's amount and currency are those given."
   }

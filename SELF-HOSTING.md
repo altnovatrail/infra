@@ -29,6 +29,7 @@ You need:
   - Firebase Hosting: 10 GB stored and 360 MB a day served free ([pricing](https://firebase.google.com/pricing)).
   - Artifact Registry: 0.5 GiB free ([pricing](https://cloud.google.com/artifact-registry/pricing)).
   - The state bucket is a few kilobytes in Cloud Storage ([pricing](https://cloud.google.com/storage/pricing)). The operator's two buckets hold scans and sample files, megabytes: Standard storage in `us-east4` is $0.023 per GiB a month, and the free tier covers only `us-west1`, `us-central1` and `us-east1`, as read on 2026-11-13.
+  - Once deployed, NovaTrail's own copy, with two learners and the daily `sweep`, cost about a cent a day in Google Cloud in November 2026, and its database stayed within Neon's Free plan, about 8.5 of its 100 CU-hours a month (R25).
 - **A Google account that may create projects and link them to that billing account.**
 - **A fork of this repository on GitHub**, with Actions turned on, cloned with `--recurse-submodules`.
 - **The devcontainer.** Open the clone in VS Code and choose "Reopen in Container". It has OpenTofu, `just`, Node and the checks at the versions this repository pins.
@@ -40,7 +41,7 @@ You need:
   gcloud auth login --no-launch-browser
   ```
 
-If your billing account is a free trial, upgrade it to a paid account before the trial ends. Google says: "If you don't upgrade to a Paid billing account before 90 days pass or if you spend the $300 in free credit, then your Free Trial billing account will be closed and all of its associated projects and resources will be stopped" ([Free Trial](https://cloud.google.com/free/docs/free-cloud-features), read 2026-11-09).
+If your billing account is a free trial, upgrade it to a paid account before the trial ends. Google says: "If you don't upgrade to a Paid billing account before 90 days pass or if you spend the $300 in free credit, then your Free Trial billing account will be closed and all of its associated projects and resources will be stopped" ([Free Trial](https://cloud.google.com/free/docs/free-cloud-features), read 2026-11-09). Upgrading early costs nothing: "Your remaining credit is available for use on products and services covered by the Free Trial, but they must be consumed within the original 90 days period from your sign-up date" ([Free Trial](https://docs.cloud.google.com/free/docs/free-cloud-features), read 2026-11-15).
 
 ## 3. Your values
 
@@ -64,7 +65,7 @@ consent_forms_bucket = "acme-learning-1-consent-forms"
 
 - **`project_id`** — your new project's ID: 6 to 30 lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen. It is permanent, and it names your app's address `https://<project_id>.web.app` and its sign-in domain `<project_id>.firebaseapp.com`.
 - **`region`** — where everything regional lives: the services and jobs, the schedule of `sweep`, the images, the secrets' replicas, the logs and the traces. The platform's region is `us-east4`, chosen for its learners (R04). Yours is yours.
-- **`budget_amount`, `budget_currency`** — a monthly spend alert, in whole units of your billing account's own currency. It is an alert, not a cap. `bootstrap.sh` refuses a currency other than the account's.
+- **`budget_amount`, `budget_currency`** — a monthly spend alert, in whole units of your billing account's own currency. It is an alert, not a cap. `bootstrap.sh` refuses a currency other than the account's. It counts your charges before any credit but the free tier's, so a free trial's credit does not hide them.
 - **`workload_identity_pool_id`** — the federated pool your GitHub Actions sign in through: 4 to 32 lowercase letters, digits and hyphens, and not `github-eval`.
 - **`github_oidc_subject_prefix`** — how GitHub begins the subject of your fork's tokens. Print it with:
 
