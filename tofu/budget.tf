@@ -13,11 +13,15 @@ resource "google_billing_budget" "spend" {
   display_name    = "${var.project_id} spend"
 
   # Only this project's charges, and only what is charged: the free allowance arrives as a credit
-  # and is taken off before this is measured. The allowance is the billing account's, shared with
-  # every project on it, so this one can be charged before it has used any.
+  # of the type FREE_TIER and is taken off before this is measured. The allowance is the billing
+  # account's, shared with every project on it, so this one can be charged before it has used any.
+  # No other credit is taken off: the Free Trial's is a PROMOTION, and a budget that took it off
+  # would measure nothing until the trial's credit ran out (the 2026-11-15 amendment to R06).
   budget_filter {
-    projects        = ["projects/${data.google_project.this.number}"]
-    calendar_period = "MONTH"
+    projects               = ["projects/${data.google_project.this.number}"]
+    calendar_period        = "MONTH"
+    credit_types_treatment = "INCLUDE_SPECIFIED_CREDITS"
+    credit_types           = ["FREE_TIER"]
   }
 
   amount {
