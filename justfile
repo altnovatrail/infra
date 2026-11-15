@@ -227,7 +227,7 @@ tf-fmt:
 # What CI runs on the module: its format, an init with no backend that installs the providers by
 # the lock file and refuses one the lock file does not name, a validate, and the tests, which run
 # against mock providers and need no credential.
-tf-check: _tf-sinks _tf-grants _tf-roles _tf-test-values
+tf-check: _tf-sinks _tf-grants _tf-roles _tf-test-values _tf-copy
     tofu -chdir={{ tofu_dir }} fmt -check -recursive -diff
     tofu -chdir={{ tofu_dir }} init -backend=false -input=false -lockfile=readonly
     tofu -chdir={{ tofu_dir }} validate
@@ -245,6 +245,29 @@ _tf-sinks:
         echo "$stray" >&2
         exit 1
     fi
+
+# Every resource, data source and output of the module is in the list of the run
+# nothing_of_the_platform_reaches_a_copy of tofu/tests/copy.tftest.hcl, and the list names nothing
+# the module lacks, so that the platform's name, region and numbers reach none of a copy's resources
+# and calls (architecture 3.5): one the list leaves out would pass the check by, as the fourth alert
+# did until T51. The list is the run's lines that start with jsonencode(, so a commented entry or a
+# name in a message does not count.
+_tf-copy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    declared=$(sed -nE 's/^[[:space:]]*(resource|data|output)[[:space:]]+"([^"]+)"([[:space:]]+"([^"]+)")?.*/\1 \2 \4/p' {{ quote(tofu_dir) }}/*.tf | awk '{ print ($1 == "output" ? "output." $2 : ($1 == "data" ? "data." : "") $2 "." $3) }' | sort -u)
+    listed=$(awk '/^run "nothing_of_the_platform_reaches_a_copy"/ { inside = 1 } inside && /^[[:space:]]*jsonencode\(/ { print } inside && /^}/ { exit }' {{ quote(tofu_dir) }}/tests/copy.tftest.hcl | grep -oE '(data\.)?google_[a-z0-9_]+\.[a-z0-9_]+|output\.[a-z0-9_]+' | sort -u || true)
+    missing=$(comm -23 <(printf '%s\n' "$declared") <(printf '%s\n' "$listed"))
+    stale=$(comm -13 <(printf '%s\n' "$declared") <(printf '%s\n' "$listed"))
+    if [ -n "$missing" ]; then
+        echo "tf-check: the run nothing_of_the_platform_reaches_a_copy of tofu/tests/copy.tftest.hcl leaves out:" >&2
+        echo "$missing" >&2
+    fi
+    if [ -n "$stale" ]; then
+        echo "tf-check: the run nothing_of_the_platform_reaches_a_copy of tofu/tests/copy.tftest.hcl names what the module lacks:" >&2
+        echo "$stale" >&2
+    fi
+    [ -z "$missing" ] && [ -z "$stale" ]
 
 # Every grant on the project is in the one list of tofu/identities.tf, google_project_iam_member.grants,
 # so that the test holds each against the roles bootstrap.sh's condition lets the configuration's
@@ -309,8 +332,10 @@ _tf-roles:
 
 # Run once, by someone who may make projects and link them to the billing account, with
 # TF_VAR_billing_account set and tofu/production.auto.tfvars and tofu/backend.hcl filled in; again
-# whenever the script changes, before the merge that needs it (R13).
-# Make the project, its state bucket, the federated pool and the identity CI applies the configuration as
+# whenever the script changes, before the merge that needs it (R13). BOOTSTRAP_MEASURE_ORGANIZER,
+# BOOTSTRAP_EVAL_SET_ORGANIZER and BOOTSTRAP_OPERATOR give the people of the operator's buckets, an
+# address or none each; one not set stops the script (R28).
+# Make the project, its state bucket, the federated pool, the identity CI applies the configuration as, and the operator's buckets
 bootstrap:
     bash {{ quote(tofu_dir) }}/bootstrap.sh
 

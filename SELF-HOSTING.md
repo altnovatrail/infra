@@ -2,7 +2,7 @@
 
 This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). This guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine). An organizer who gives an upload link to the operator's bucket goes to [section 13](#13-upload-links-to-the-operators-bucket).
 
-> **Status, 2026-11-12.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. Section 12, a local run, is checked against the author's first run from source, on 2026-11-12. Section 13, the upload links, is held by tests on a stand-in for `gcloud` and has not run on a project yet.
+> **Status, 2026-11-15.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. Section 12, a local run, is checked against the author's first run from source, on 2026-11-12. Section 13, the upload links, is held by tests on a stand-in for `gcloud`, and ran on the platform's project from 2026-11-13 to 2026-11-15: a page of the tool took uploads and was refused after 12 hours, and `time`, `withdraw` and `untimed` did what this section says; no link has gone to an adult yet.
 
 ## 1. What a copy is
 
@@ -373,7 +373,7 @@ Your copy's project is not for this. The module keeps its authorized domains to 
 
 An adult who writes samples on the samples page, or a parent who signs a form, sends the files to the operator's bucket by an upload link the organizer gives (R28). The link is one HTML page, made by `tools/organizer/organizer.mjs`. Its forms post the files straight to Cloud Storage, each under a random name, so neither your server nor GitHub sees them. A page works for at most 12 hours from when it was made: Google signs it for the upload service account with no key, and such a signature lasts no longer.
 
-Run the tool as the organizer, not as the operator. Use a clone of your fork, since the tool reads your project and the operator's bucket from `tofu/production.auto.tfvars`. Run it on Linux or macOS, or in Cloud Shell, where `gcloud` and Node.js are, signed in as your own Google account: the address `bootstrap.sh` was given for you. The devcontainer has no `gcloud`. The tool needs no package of `tools/`. It runs `gcloud` by an absolute path, never by `PATH`: from where the Google Cloud CLI usually installs it, or from `ORGANIZER_GCLOUD` — `export ORGANIZER_GCLOUD="$(command -v gcloud)"` when the tool says it found none.
+Run the tool as the organizer, not as the operator. Use a clone of your fork, since the tool reads your project and the operator's bucket from `tofu/production.auto.tfvars`, or from the file `--tfvars=FILE` names. Run it on Linux or macOS, or in Cloud Shell, where `gcloud` and Node.js are, signed in as your own Google account: the address `bootstrap.sh` was given for you. The devcontainer has no `gcloud`. The tool needs no package of `tools/`. It runs `gcloud` by an absolute path, never by `PATH`: from where the Google Cloud CLI usually installs it, or from `ORGANIZER_GCLOUD` — `export ORGANIZER_GCLOUD="$(command -v gcloud)"` when the tool says it found none.
 
 **Make a link** at the session, for the purpose `measure` (an adult's measurement), `child` (children's samples) or `eval-set` (an eval set's volunteer):
 
@@ -404,7 +404,7 @@ gcloud storage cp record.json gs://<operator bucket>/measure/records/<name>.json
 node tools/organizer/organizer.mjs time measure/records/<name>.json --date=2026-11-13
 ```
 
-A new session under the same form moves its date forward with the same command. The tool refuses a date that would have the rule erase the object at once, which a year mistyped would do: the bucket keeps no erased file. A Custom-Time never moves back:
+A new session under the same form moves its date forward with the same command. The tool refuses a date that would have the rule erase the object at once, which a year mistyped would do: the bucket keeps no erased file. It refuses a date later than tomorrow by UTC too, for `--date` and `--erased` alike: a session or an erasure that has not happened has no date yet. A Custom-Time never moves back:
 
 - **A withdrawal.** You erase the samples of a code before their term. Then rewrite the form with the day you erased them, which starts its 5 years from that day. The form keeps that day, and `time` no longer moves it: a new session takes a new form.
 
