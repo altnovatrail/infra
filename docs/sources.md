@@ -196,6 +196,8 @@
 
 Whether the missing data of a condition are those of the window's sum, so that a point within the last 25 hours keeps the condition unmet, the pages do not say in so many words; the project shows it (T49).
 
+The project showed it, 2026-11-15 (T49), by the Monitoring API's `timeSeries` and `alertPolicies`: the policy `api jobs by the clock not run`, made 2026-11-13T19:10:57Z, enabled; the raw points of `completed_execution_count` of `api-sweep`, `result=succeeded`, are `1` at 2026-11-13T09:01:00Z and 2026-11-14T09:01:00Z and `0` at 09:02–09:05 of 2026-11-14, none between; the same summed over `90000s`, `ALIGN_SUM` and `REDUCE_SUM`, `1` at 2026-11-13T23:36:11Z and 2026-11-15T00:36:11Z. No incident of the policy, open or closed, and no mail, from its making to 2026-11-15 00:36 UTC: the condition reads the window's sum.
+
 ## 4. The hosting of the build of `app` and sign-in
 
 ### 4.1. Firebase Hosting
@@ -423,6 +425,8 @@ The text of the GDPR, Art. 33 and 34, could not be read the same day: EUR-Lex an
 - [Upload an object with HTML forms](https://docs.cloud.google.com/storage/docs/xml-api/post-object-forms), updated 2026-11-10: "The uploaded object replaces any existing object with the same name"; of `key` — "You can also use the ${filename} variable if a user is providing a file name"; "HTML forms do not support signed URLs";
 - [HTTP headers and query string parameters for XML API](https://docs.cloud.google.com/storage/docs/xml-api/reference-headers), updated 2026-11-10: `x-goog-content-length-range` — "A PUT request header. When used, Cloud Storage only accepts the request if the size of the request's content is within the header's specified range".
 
+What the pages do not say, and the project showed (T49): a page of the organizer's tool signed 2026-11-13 at 21:38:01 UTC as `upload-measure`, for 12 hours, took two sample files by the forms of one policy, at 21:42:13 and 21:42:14, and a scan by the form of another at 21:46:28; a sample sent by it on 2026-11-14 at 23:43:47 UTC was refused, `400`, `InvalidPolicyDocument` — "The content of the form does not meet the conditions specified in the policy document. Form expired", "Expiration: 2026-11-14T09:38:01Z, Now: 2026-11-14T23:43:47.957791Z". So a policy signed through IAM serves several uploads until its expiration and none after it.
+
 ### 10.2. Permissions and IAM conditions
 
 (architecture 3.7; R28), read 2026-11-13:
@@ -431,6 +435,8 @@ The text of the GDPR, Art. 33 and 34, could not be read the same day: EUR-Lex an
 - [Identity and Access Management](https://docs.cloud.google.com/storage/docs/access-control/iam) of Cloud Storage, updated 2026-11-10: "resource.name : Grant or deny access to buckets and objects based on the bucket or object name", `resource.name.startsWith('projects/_/buckets/ BUCKET_NAME /objects/ OBJECT_PREFIX ')`; "You must enable uniform bucket-level access on a bucket before adding conditions at the bucket level"; "Since the storage.objects.list permission is granted at the bucket level, you cannot use the resource.name condition attribute to restrict object listing access to a subset of objects in the bucket"; "IAM deny policies can only be applied to project, folder, and organization resources. They can't be applied to buckets or managed folders";
 - [Resource attributes for IAM Conditions](https://docs.cloud.google.com/iam/docs/conditions-resource-attributes), updated 2026-11-13: "For Cloud Storage, resource names contain an underscore ( _ ) rather than a project ID"; "Use the entire object name , including forward slashes";
 - [IAM roles and permissions](https://docs.cloud.google.com/iam/docs/roles-permissions/iam), updated 2026-11-13: `roles/iam.serviceAccountTokenCreator` — "Impersonate service accounts (create OAuth2 access tokens, sign blobs or JWTs, etc)", with `iam.serviceAccounts.signBlob`; "Lowest-level resources where you can grant this role: Service Account".
+
+What the project showed, 2026-11-14 (T49), by requests of the JSON API as each service account: `upload-measure` created `measure/samples/<folder>/probe.json` (`200`), and was refused its read, its metadata and the bucket's list (`403`, "does not have storage.objects.get access", "storage.objects.list"), an insert of the same name again — "does not have storage.objects.delete access" —, its delete, and an insert under `measure/records/`, `eval-set/samples/` and the scans' `consent-forms/` ("storage.objects.create"); `upload-eval-set` created under `eval-set/samples/` and was refused its read and an insert under `measure/samples/`; `api-run` created under `consent-forms/` and inserted the same name again (`200` both, as it holds `storage.objects.delete`), and was refused its read, its metadata, the list of either bucket and an insert outside the prefix. So a condition on `resource.name` holds an insert and a delete to the prefix, and an overwrite takes `storage.objects.delete` as the footnote says.
 
 ### 10.3. Lifecycle, Custom-Time, soft delete, versions and access
 
@@ -442,6 +448,8 @@ The text of the GDPR, Art. 33 and 34, could not be read the same day: EUR-Lex an
 - [Public access prevention](https://docs.cloud.google.com/storage/docs/public-access-prevention), updated 2026-11-10: "When you enforce public access prevention, no one can make data in applicable buckets public through IAM policies or ACLs"; "Public access prevention doesn't apply to the creation and sharing of Signed URLs";
 - [Uniform bucket-level access](https://docs.cloud.google.com/storage/docs/uniform-bucket-level-access), updated 2026-11-10: "access to Cloud Storage resources then is granted exclusively through IAM. Uniform bucket-level access cannot be disabled after it has been active on a bucket for 90 consecutive days";
 - [Bucket locations](https://docs.cloud.google.com/storage/docs/locations), updated 2026-11-10: the regions of North America include "US-EAST4 Northern Virginia".
+
+What the pages do not say, and the project showed, 2026-11-15 (T49): a Custom-Time in the future is taken — the organizer's tool set `2028-11-14T00:00:00Z` on a form under `measure/forms/` made at 00:26:51 UTC —, and a rewrite of that form by `gcloud storage mv` with `--custom-time` of `2026-11-15`, earlier, made the object anew, `timeCreated` 00:27:04, with the earlier Custom-Time.
 
 ### 10.4. Cloud Storage's audit logs
 
@@ -457,6 +465,8 @@ The text of the GDPR, Art. 33 and 34, could not be read the same day: EUR-Lex an
 - `internal/account/consents.go`: the object is `<consent ID>-<16 hex characters of a random suffix>`, a new one at each send; the scan is "up to 10 MiB, a photo or a PDF", `image/jpeg`, `image/png` or `application/pdf`;
 - `internal/sweep/sweep.go` and `internal/store/operator.go`: `sweep` takes the objects past their term from the table `consent_forms` and deletes each by its name — it lists nothing in the bucket;
 - `cmd/api/serve.go`, `cmd/api/sweep.go`, `cmd/api/check.go`: `serve` and `sweep` open the store, `check` only checks the variables; `internal/config/config.go` keeps only the variables a command declares.
+
+What the project showed, 2026-11-14 (T49), as `api-run`, which holds `storage.objects.create` and `storage.objects.delete` under `consent-forms/` and no `storage.objects.get`: `DELETE` of an object it had just erased, and of one never made, answered `404`, "No such object: novatrail-consent-forms/consent-forms/…", not `403`. So `sweep` takes a scan erased already for erased, as `Delete` expects.
 
 ### 10.6. Firebase Admin and Cloud Storage
 
@@ -488,6 +498,8 @@ What the pages do not say and the first run of `bootstrap.sh` on the project sho
 
 What the pages do not say, and T49 checks on the project: that Cloud Storage takes the expiration in the extended format and the credential's location `auto`; that a rewrite by `mv` with an earlier `--custom-time` is accepted; the fields `name`, `customTime`, `timeCreated` and `metadata` of `--raw`.
 
+The project showed it, 2026-11-14 and 2026-11-15 (T49): the page of sources 10.1, with `"expiration": "2026-11-14T09:38:01Z"` and the credential `upload-measure@novatrail.iam.gserviceaccount.com/20261113/auto/storage/goog4_request`, took its files, and Cloud Storage named the same expiration when it refused one after it; `gcloud storage objects list` and `describe` with `--raw --format=json` gave `name`, `contentType`, `size`, `timeCreated` — `"2026-11-13T21:42:14.262000+00:00"` —, `customTime` — `"2028-11-14T00:00:00+00:00"` — and `metadata` — `{"withdrawn": "2026-11-15"}` —, as the tool reads them; `withdraw` moved the form back from `<name>.rewrite`, which is gone after it, with the earlier Custom-Time (sources 10.3), and `time` then refused the form as withdrawn.
+
 ### 10.9. The convenience values of a new bucket and what Owner holds of a bucket
 
 (architecture 3.7; R28 and its fourth 2026-11-13 amendment; `tofu/bootstrap.sh`), read 2026-11-13:
@@ -495,3 +507,5 @@ What the pages do not say, and T49 checks on the project: that Cloud Storage tak
 - the same page: `roles/storage.legacyBucketOwner` — "Grants permission to create, overwrite, and delete objects; list objects in a bucket and read object metadata, excluding allow policies, when listing; and read and edit bucket metadata, including allow policies", among its permissions `storage.buckets.get`, `storage.buckets.getIamPolicy`, `storage.buckets.setIamPolicy`, `storage.buckets.update`, `storage.objects.create`, `storage.objects.delete` and `storage.objects.list`, and not `storage.objects.get`; `roles/storage.legacyBucketReader` — "Grants permission to list a bucket's contents and read bucket metadata, excluding allow policies"; `roles/storage.legacyObjectOwner` — "Grants permission to view and edit objects and their metadata, including ACLs", `storage.objects.get` among them; `roles/storage.legacyObjectReader` — "Grants permission to view objects and their metadata, excluding ACLs".
 
 What the page does not say, and the first run of `bootstrap.sh` on the project showed, 2026-11-13 (T49): once the binding of `projectOwner:novatrail` to `legacyBucketOwner` was taken back, the next call on the bucket as the project's owner was refused, "does not have storage.buckets.getIamPolicy access to the Google Cloud Storage bucket", and a run again was refused its `storage.buckets.update`. The refusal names the account it runs as, spelled with capitals as Google keeps it, and IAM keeps the member of a person granted by an address in lower case in that spelling, `user:` and each word of the name with a capital: a run again read it so on both upload service accounts and in both buckets. The points of sources 10.7 the same runs showed: `gcloud storage buckets describe --format='value(location)'` prints `US-EAST4`, `gcloud storage buckets list --project=novatrail --format='value(name)'` prints the names alone, one a line, and `gcloud storage buckets get-iam-policy` reads a binding under a condition as its role, with the condition's expression and title.
+
+The same, 2026-11-14 (T49): the project's owner was refused a token as `api-run` — "Permission 'iam.serviceAccounts.getAccessToken' denied" —, so Owner does not impersonate a service account without `roles/iam.serviceAccountTokenCreator` on it. A binding of that role granted to `user:<the address in lower case>` was kept in the capitals' spelling, and `gcloud iam service-accounts remove-iam-policy-binding` with the address in lower case refused: "Policy binding with the specified principal, role, and condition not found!"; with the member as `get-iam-policy` printed it, the binding was taken back.

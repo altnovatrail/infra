@@ -413,10 +413,12 @@ The project sets up no log-based metrics of its own, where the address would bec
 - `api-scheduler` called `sweep` at 09:00 UTC, the execution passed, and `completed_execution_count` wrote `succeeded`;
 - Cloud Scheduler's log of its attempts — its name and fields, in the inventory above; Cloud Scheduler has no metric of its own, and a failed call is not retried: `retryConfig` is empty (the 2026-11-13 amendment to R07).
 
+**Checked on the project (T49)**, 2026-11-15: the window of 25 hours does not open the alert on a run that did not happen between two runs — no incident, open or closed, from the policy's making on 2026-11-13 to 2026-11-15, through a morning when the last point was nearly 24 hours old (sources 3.14; the 2026-11-15 amendment to R07).
+
 **Not checked:**
 - the attributes of the traces Cloud Run writes itself: there are no traces yet (Д17);
 - what Cloud Scheduler writes for a failed attempt: none has failed yet; the alert on a run that did not happen does not read it (the third 2026-11-13 amendment to R07);
-- that the window of 25 hours does not open the alert on a run that did not happen each day, and that a missed day does: the project, after T49.
+- that a missed day opens the alert on a run that did not happen: no run was missed, and the schedule was not paused, since a day's pause would hold back the deletions `sweep` finishes (the 2026-11-15 amendment to R07).
 
 ### 3.5. Self-hosting and the local run
 
@@ -475,7 +477,7 @@ OpenTofu, the open fork of Terraform, at an exact version, describes the infrast
 
 ### 3.7. The operator's bucket
 
-The private Cloud Storage bucket of R125 spec: the measurement organizer and the eval-set organizer get the files of the samples page and the scans of their forms into it by an upload link. Beside it is a bucket of its own for the scans of the parents' consent forms that `api` puts there from `app` (R116, R124–R126, R136 spec). What was decided and why is R28, with the 2026-11-13 amendment to R13; the sources are sources 7.2 and 10.1–10.8. `tofu/bootstrap.sh` makes the buckets and their access (T46), the module names the scans' bucket and `api`'s prefix to `api` (T47), `tools/organizer/organizer.mjs` is the organizer's tool (T54), and T49 makes them on the project and checks them there (Д11).
+The private Cloud Storage bucket of R125 spec: the measurement organizer and the eval-set organizer get the files of the samples page and the scans of their forms into it by an upload link. Beside it is a bucket of its own for the scans of the parents' consent forms that `api` puts there from `app` (R116, R124–R126, R136 spec). What was decided and why is R28, with the 2026-11-13 amendment to R13; the sources are sources 7.2 and 10.1–10.8. `tofu/bootstrap.sh` makes the buckets and their access (T46), the module names the scans' bucket and `api`'s prefix to `api` (T47), `tools/organizer/organizer.mjs` is the organizer's tool (T54), and T49 made them on the project and checked them there (Д11).
 
 **Who makes them.** `tofu/bootstrap.sh`, with the operator's rights, as the pools and the custom roles (R13): the two buckets and their settings, the lifecycle rules, the custom roles, the upload service accounts and the whole IAM policy of each bucket. The module grants nothing in them and only names the scans' bucket and the prefix `consent-forms/` to the service `api`, to `sweep` and to `check`, as `API_CONSENT_FORMS_BUCKET` and `API_CONSENT_FORMS_PREFIX`; a test holds the prefix to the one of the script's condition (the 2026-11-13 amendment to R11; the second 2026-11-13 amendment to R28). A rerun of the script brings the settings, the rules and the policies back where they have drifted, as for `infra-config`.
 
@@ -568,13 +570,18 @@ A Custom-Time cannot decrease, but a rewrite of the object resets it. A form wit
 
 **The price** (sources 7.2). Standard in `us-east4` — $0.023 per GiB a month, class A operations $0.005 per thousand, class B $0.0004; `us-east4` has no free tier. Scans and sample files weigh megabytes: cents a month.
 
-**What T49 checks on the project**, since the documentation does not say:
-- the policy is refused after 12 hours, and serves several uploads within them;
-- a Custom-Time in the future is accepted;
-- `DELETE` of an absent object without `storage.objects.get` answers 404, which `sweep` takes for "erased already" (Д29 `api`);
-- `api-run` and an upload service account cannot read an object, nor an organizer another's prefix or the scans;
-- that a page of the tool uploads: Cloud Storage takes the expiration in the extended format and the credential's location `auto`, and the fields `name`, `customTime`, `timeCreated` and `metadata` of `gcloud storage objects list` and `describe` with `--raw` are the ones the tool reads; that `withdraw` sets a Custom-Time earlier than the form had (sources 10.8);
-- that `gcloud storage buckets get-iam-policy` reads a policy in version 3, with its conditions, so that a run again of the script grants nothing anew, that `gcloud storage buckets describe --format='value(location)'` prints the place the script compares with the region, and `gcloud storage buckets list --format='value(name)'` the names it finds its buckets by among the project's (sources 10.7).
+**Checked on the project (T49)**, 2026-11-14 and 2026-11-15, what the documentation does not say:
+- the buckets' settings, rules and policies are those of the tables above, and those of the upload service accounts hold the organizer's `roles/iam.serviceAccountTokenCreator` alone; the service `api`, `sweep` and `check` have `API_CONSENT_FORMS_BUCKET` and `API_CONSENT_FORMS_PREFIX`, and `sweep` ran with them on 2026-11-14;
+- a policy serves several uploads until its expiration and is refused after it, `Form expired` (sources 10.1);
+- a page of the tool uploads: Cloud Storage takes the expiration in the extended format and the credential's location `auto`; `--raw` gives the fields the tool reads; `withdraw` rewrites a form with an earlier Custom-Time (sources 10.8);
+- a Custom-Time in the future is accepted (sources 10.3);
+- `DELETE` of an absent object as `api-run`, without `storage.objects.get`, answers 404, which `sweep` takes for "erased already" (sources 10.5; Д29 `api`);
+- `api-run` and the upload service accounts read no object and list no bucket, write only under their prefixes, and an upload service account overwrites nothing (sources 10.2);
+- `gcloud storage buckets get-iam-policy` reads a policy in version 3, with its conditions, `describe` prints the place as `US-EAST4`, and `buckets list` the names alone (sources 10.7, 10.9).
+
+**Not checked on the project:**
+- that an organizer sees neither the other's prefixes nor the scans, as a person: on `novatrail` the two organizers and the operator are one Google account (R139 spec). The policy holds it — each organizer's `roles/storage.objectUser` is under their prefixes, the reading of the scans is the operator's —, and the conditions on the same prefixes held the upload service accounts;
+- that taking `bucketUploader` from an upload service account stops a page already signed (BREACH.md, part 1).
 
 ## 4. Sources
 
