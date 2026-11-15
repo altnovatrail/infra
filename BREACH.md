@@ -73,7 +73,7 @@ gcloud secrets get-iam-policy <secret>                      # each secret of sec
 gcloud iam service-accounts get-iam-policy <account>        # api-run, api-deploy, infra-config
 ```
 
-Remove what is not in `tofu/` by hand at once — `gcloud projects remove-iam-policy-binding`, or the console. If the grant is in `tofu/`, remove it there too, or the next apply puts it back. Admin Activity shows who made each grant (section 4). To stop CI from deploying meanwhile, `gh workflow disable deploy.yml`.
+Remove what is not in `tofu/` by hand at once — `gcloud projects remove-iam-policy-binding`, or the console. Give `--member` exactly as the policy prints it: Google may keep a person's address with capitals, and a removal by the address in lower case finds no binding and removes nothing (sources 10.9). If the grant is in `tofu/`, remove it there too, or the next apply puts it back. Admin Activity shows who made each grant (section 4). To stop CI from deploying meanwhile, `gh workflow disable deploy.yml`.
 
 **A person's access to a bucket of section 2 must end** — an organizer's or the operator's account was taken, or a person no longer has the role. `tofu/bootstrap.sh` holds each bucket's whole policy and the policy of each upload service account, so run it, as in [SELF-HOSTING.md, section 4](SELF-HOSTING.md#4-bootstrap), with that person's variable set to `none`: `BOOTSTRAP_MEASURE_ORGANIZER`, `BOOTSTRAP_EVAL_SET_ORGANIZER` or `BOOTSTRAP_OPERATOR`. It takes back their bindings in the buckets and their right to sign as their upload service account, and whatever else the policies hold that the script does not name. Read the policies after it:
 
