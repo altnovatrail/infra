@@ -1,8 +1,9 @@
 # infra's own recipes. spec's, the documents check among them, run from spec's justfile:
-# `just -f spec/justfile docs-check-repo`. CI runs the ci- recipes, tf-check, bootstrap-test and the
-# tests of deploy-check in the toolchain stage of .devcontainer/Dockerfile, through
-# spec/tools/toolchain/toolchain.sh (R30 spec): the jobs OpenTofu, required in the ruleset of main,
-# and Deploy.
+# `just -f spec/justfile docs-check-repo`. CI runs them through spec/tools/toolchain/toolchain.sh
+# (R30 spec): the ci- recipes of OpenTofu, ShellCheck and actionlint, tf-check and bootstrap-test in
+# the toolchain stage of .devcontainer/Dockerfile, the job OpenTofu, required in the ruleset of
+# main; the tests of deploy-check and of the deployment in the stage toolchain-core, which holds
+# none of those three tools, the job Deploy (R34).
 
 # The Dockerfile whose ARGs ci-tofu and ci-shellcheck read; their tests point it at broken copies.
 dockerfile := env("INFRA_DOCKERFILE", ".devcontainer/Dockerfile")

@@ -46,3 +46,13 @@ The times of the runs, the jobs and their steps from `actions/runs/<id>` and `ac
 
 - **The miss.** In `Toolchain image` the build took 16 s, `docker save` about 8 s and the upload 19 s; the artifact `toolchain-image` is 535,180,543 bytes at level 1, kept to 2026-11-17. `OpenTofu` and `Deploy` each logged "Cache not found", downloaded it by its ID in 11–12 s with its SHA256 digest checked, and loaded it: neither ran the Dockerfile. Neither pull request saved an entry: `actions/caches?key=toolchain` holds none of the trial's key and none of `refs/pull/87/merge` or `refs/pull/88/merge` — only the entry of `refs/heads/main` and those of pull requests 82 and 83 from before T65, which go after seven days unread.
 - **The waits.** In the trial `OpenTofu` waited 123 s and `Deploy` 75 s for a runner after `Toolchain image` ended, when the jobs of other repositories' runs held the organization's runners; on a hit the two started 12–18 s after the run, against 2–3 s in pull request 86 before T65 and 7–18 s on `main`: the wait for `Toolchain image` and a second runner, which a hit pays on every run. The run of pull request 87 took 42 s longer than that of 86, and its recipes in `OpenTofu` 28 s longer, with the same module and tests: the runners' times vary, as in measurements 2.1, and one run each does not tell T65's part from that.
+
+### 2.3. The stages `toolchain-core` and `toolchain`, T66, 2026-11-16
+
+The sizes of the three tools of R09 as the stage `toolchain` installs them, by `ls -l` of `/usr/local/bin` in the devcontainer, 2026-11-16: `tofu` 114,192,544 bytes, `shellcheck` 16,213,136 and `actionlint` 6,074,530, 136,480,210 together. The image of `toolchain` holds them beyond the core, and `toolchain-core`, which the Documents check and `Deploy` load, does not (R34).
+
+The run of CI of pull request 90, 43907985039, a miss of both entries, since the Dockerfile is new; the times from `actions/runs/<id>/jobs` of the GitHub API and the jobs' logs, read 2026-11-16:
+- **the run** — 296 s from its creation to its end, all green;
+- **`Toolchain image`** — 106 s: the core built, saved and uploaded as `toolchain-core-image`, 489,200,988 bytes at level 1, by 16:30:26, 61 s after the job's first lookup; then `toolchain` as `toolchain-image`, 535,206,283 bytes, by 16:31:04, 37 s more;
+- **Documents** — "The checks without a browser run in the stage toolchain-core.", "Cache not found" for `toolchain-core-Linux-X64-<sha256>`, its own build, 48 s;
+- **`Deploy`** — 104 s, the core by the artifact's ID after "Cache not found"; **`OpenTofu`** — 148 s, `toolchain` the same way. Neither ran the Dockerfile.

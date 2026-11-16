@@ -1,28 +1,36 @@
-# The toolchain stage of .devcontainer/Dockerfile as the image novatrail-toolchain, for the jobs of
-# ci.yml that run their recipes in it by spec/tools/toolchain/toolchain.sh (R30 spec; R32). The
-# image comes from the cache of GitHub Actions, as a file of docker save, by the key, the path and
-# the image's name that the shared Documents check of .github and spec's script give it, so that
-# they share one entry: on a hit the Dockerfile does not run, and a failure of nodejs.org, GitHub
-# or the Ubuntu snapshot fails no check (the second 2026-11-09 amendment to R31 spec; R42 .github;
-# sources 5.8, 5.9). Only a push to main saves the entry: one of a pull request serves only its own
-# re-runs, and crowds out main's.
+# A stage of .devcontainer/Dockerfile — toolchain or toolchain-core — as the image
+# novatrail-toolchain, for the jobs of ci.yml that run their recipes in it by
+# spec/tools/toolchain/toolchain.sh (R30 spec; R32). The image comes from the cache of GitHub
+# Actions, as a file of docker save, by the key, the path and the image's name that the shared
+# workflows of .github and spec's script give that stage — novatrail-<stage>.tar by the key
+# <stage>-<OS>-<architecture>-<sha256 of the Dockerfile> (R42 .github, R47 .github) —, so that a
+# stage keeps one entry for every workflow that takes it: the core's is the shared Documents
+# check's too. On a hit the Dockerfile does not run, and a failure of nodejs.org, GitHub or the
+# Ubuntu snapshot fails no check (the second 2026-11-09 amendment to R31 spec; sources 5.8, 5.9,
+# 5.10). Only a push to main saves the entry: one of a pull request serves only its own re-runs, and
+# crowds out main's.
 #
-# Two roles, as in go.yml of .github. The job toolchain, with role build, looks the entry up and,
-# on a miss, alone builds the image and hands its file to the jobs after it as an artifact of the
-# run; it needs only the Dockerfile and this file checked out. The jobs after it, with role load,
-# take the entry, or on a miss the artifact by its ID, or with neither build the image themselves,
-# and save nothing; they need the repository checked out with its spec submodule. A build, a save
-# or an upload that fails in the job toolchain fails no check: the jobs after it build the image,
-# and fail with the build when the Dockerfile is broken.
+# Two roles, as in go.yml of .github. The job toolchain, with role build, looks the entry of each
+# stage up and, on a miss, alone builds the image and hands its file to the jobs after it as an
+# artifact of the run, <stage>-image; it needs only the Dockerfile and this file checked out, and
+# calls the action once a stage, the core first, so that the build of toolchain reuses its layers.
+# The jobs after it, with role load, take the entry of their stage, or on a miss the artifact by its
+# ID, or with neither build the image themselves, and save nothing; they need the repository
+# checked out with its spec submodule. A build, a save or an upload that fails in the job toolchain
+# fails no check: the jobs after it build the image, and fail with the build when the Dockerfile is
+# broken.
 name: Toolchain image
-description: The toolchain stage from the cache, from the job that built it, or built here.
+description: A toolchain stage from the cache, from the job that built it, or built here.
 
 inputs:
   role:
     description: build — the job toolchain, which builds on a miss and hands the file on; load — a job after it.
     required: true
+  stage:
+    description: The stage of .devcontainer/Dockerfile — toolchain, or toolchain-core, Node, just, Go and buf alone.
+    required: true
   artifact:
-    description: With role load, the ID of the artifact of the job toolchain, or nothing when it uploaded none.
+    description: With role load, the ID of the artifact of the job toolchain for this stage, or nothing when it uploaded none.
     required: false
     default: ""
 
@@ -34,14 +42,19 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: The role
+    - name: The role and the stage
       shell: bash
       env:
         ROLE: ${{ inputs.role }}
+        STAGE: ${{ inputs.stage }}
       run: |
         case "$ROLE" in
             build | load) ;;
             *) echo "::error::The role of the toolchain action is build or load, not ${ROLE}."; exit 1 ;;
+        esac
+        case "$STAGE" in
+            toolchain | toolchain-core) ;;
+            *) echo "::error::The stage of the toolchain action is toolchain or toolchain-core, not ${STAGE}."; exit 1 ;;
         esac
 
     # With role build the lookup downloads nothing.
@@ -49,11 +62,11 @@ runs:
       name: Toolchain image from the cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ runner.temp }}/novatrail-toolchain.tar
-        key: toolchain-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.devcontainer/Dockerfile') }}
+        path: ${{ runner.temp }}/novatrail-${{ inputs.stage }}.tar
+        key: ${{ inputs.stage }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.devcontainer/Dockerfile') }}
         lookup-only: ${{ inputs.role == 'build' }}
 
-    # On a miss, the image as spec's toolchain.sh builds it — from the Dockerfile, without a
+    # On a miss, the image as spec's toolchain.sh builds the stage — from the Dockerfile, without a
     # context, as novatrail-toolchain — and its file by docker save, which the cache and the
     # artifact take.
     - id: build
@@ -61,12 +74,14 @@ runs:
       if: inputs.role == 'build' && steps.cache.outputs.cache-hit != 'true'
       continue-on-error: true
       shell: bash
+      env:
+        STAGE: ${{ inputs.stage }}
       run: |
-        tar=$RUNNER_TEMP/novatrail-toolchain.tar
-        docker build --target toolchain --tag novatrail-toolchain - < .devcontainer/Dockerfile
+        tar=$RUNNER_TEMP/novatrail-$STAGE.tar
+        docker build --target "$STAGE" --tag novatrail-toolchain - < .devcontainer/Dockerfile
         if ! docker save --output "$tar" novatrail-toolchain; then
             rm -f -- "$tar"
-            echo "::warning::The image of the toolchain stage could not be saved: the jobs after this one and the next run build it again."
+            echo "::warning::The image of the ${STAGE} stage could not be saved: the jobs after this one and the next run build it again."
         fi
 
     # An entry never changes, and another workflow of the run, the shared Documents check, may save
@@ -76,7 +91,7 @@ runs:
       continue-on-error: true
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ runner.temp }}/novatrail-toolchain.tar
+        path: ${{ runner.temp }}/novatrail-${{ inputs.stage }}.tar
         key: ${{ steps.cache.outputs.cache-primary-key }}
 
     # Kept a day and compressed fast, as go.yml keeps its own (R42 .github; sources 5.9).
@@ -86,8 +101,8 @@ runs:
       continue-on-error: true
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: toolchain-image
-        path: ${{ runner.temp }}/novatrail-toolchain.tar
+        name: ${{ inputs.stage }}-image
+        path: ${{ runner.temp }}/novatrail-${{ inputs.stage }}.tar
         retention-days: 1
         compression-level: 1
         overwrite: true
@@ -101,22 +116,26 @@ runs:
         artifact-ids: ${{ inputs.artifact }}
         path: ${{ runner.temp }}
 
-    # spec's script loads the file and removes it; a file that does not load it removes with a
-    # warning, and builds. With no file it is not handed the variable, so it builds and writes
-    # nothing: a job of this role saves no image.
+    # spec's script builds the stage TOOLCHAIN_STAGE names, loads the file and removes it; a file
+    # that does not load it removes with a warning, and builds. With no file it is not handed the
+    # variable, so it builds and writes nothing: a job of this role saves no image.
     - name: Toolchain image
       if: inputs.role == 'load'
       shell: bash
       env:
-        TOOLCHAIN_IMAGE_FILE: ${{ runner.temp }}/novatrail-toolchain.tar
+        TOOLCHAIN_STAGE: ${{ inputs.stage }}
+        TOOLCHAIN_IMAGE_FILE: ${{ runner.temp }}/novatrail-${{ inputs.stage }}.tar
       run: |
         if [ ! -f "$TOOLCHAIN_IMAGE_FILE" ]; then
             unset TOOLCHAIN_IMAGE_FILE
         fi
         spec/tools/toolchain/toolchain.sh build
 
-    # The image, if the job built or loaded one, is in docker now, and the recipes need the disk.
+    # The image, if the job built or loaded one, is in docker now, and the recipes, or the build of
+    # the next stage, need the disk.
     - name: Free the file of the toolchain image
       if: ${{ !cancelled() }}
       shell: bash
-      run: rm -f -- "$RUNNER_TEMP/novatrail-toolchain.tar"
+      env:
+        STAGE: ${{ inputs.stage }}
+      run: rm -f -- "$RUNNER_TEMP/novatrail-$STAGE.tar"
