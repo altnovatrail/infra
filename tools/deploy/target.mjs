@@ -177,7 +177,10 @@ const hasServing = (dir, commit) => setsVariable(dir, commit, "api_serving", (va
 // its spaces left out, so that neither moves the traffic. Their values hold no "#" (variables.tf).
 function revisionValues(dir, commit) {
   const lines = has(dir, commit, TFVARS) ? git(dir, ["show", `${commit}:${TFVARS}`]).stdout.split("\n") : [];
-  const bare = (line) => line.replace(/#.*$/, "").replaceAll(/\s/g, "");
+  const bare = (line) => {
+    const comment = line.indexOf("#");
+    return [..."\t\r "].reduce((text, space) => text.replaceAll(space, ""), comment < 0 ? line : line.slice(0, comment));
+  };
   return REVISION_VALUES.map((name) => {
     const first = tfvarsValue(lines, name);
     if (first === null) return null;
