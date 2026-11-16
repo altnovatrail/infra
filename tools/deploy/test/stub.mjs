@@ -178,8 +178,14 @@ function layer() {
         if ((fs.statSync(full).mode & 0o005) !== 0o005) fail(`stub: ${full} is not open to all`);
         walk(full);
       } else {
-        if (!(fs.statSync(full).mode & 0o004)) fail(`stub: ${full} is not read by all`);
-        files[path.relative(path.join(context, "legal"), full)] = fs.readFileSync(full, "utf8");
+        // One descriptor for the mode and the text, so both are of the same file.
+        const fd = fs.openSync(full, "r");
+        try {
+          if (!(fs.fstatSync(fd).mode & 0o004)) fail(`stub: ${full} is not read by all`);
+          files[path.relative(path.join(context, "legal"), full)] = fs.readFileSync(fd, "utf8");
+        } finally {
+          fs.closeSync(fd);
+        }
       }
     }
   };
