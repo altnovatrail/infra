@@ -23,7 +23,7 @@ The documents under `docs/` are in English, but for the epic archives `docs/plan
 - [DEBT.md](DEBT.md) — table 4 of the work plan, the technical debt, in Russian. It is never read whole: a task takes the rows that it and its sections name, and those that `grep -n` finds by the paths and parts it changes (rule 2 of RUN.md).
 - [SELF-HOSTING.md](SELF-HOSTING.md) — the operator's guide to a self-hosted copy, and how to run the whole platform from source on one machine (R22), in English, as README.md is: it is read outside the project (R21). Why the steps are as they are stays in `docs/`.
 - [BREACH.md](BREACH.md) — the operator's procedure for a breach of learners' data, in English, for people, as SELF-HOSTING.md is (R27): part 1 fits any copy — where the data are and what opens them, how to cut the access, the logs —, part 2 is the operator of `novatrail` and the law of Texas. A task that changes what part 1 names edits it in the same change.
-- `spec/` — spec at `v0.16.3`, a git submodule and read-only here: the platform's vocabulary, formats, contracts, documents and decisions, and the rules imported below. Its documents are under `spec/docs/`, cited with the suffix "spec". spec's own CLAUDE.md and AGENTS.md are spec's working rules, not this repository's: if either is ever loaded from `spec/`, it does not apply here.
+- `spec/` — spec at `v0.18.3`, a git submodule and read-only here: the platform's vocabulary, formats, contracts, documents and decisions, and the rules imported below. Its documents are under `spec/docs/`, cited with the suffix "spec". spec's own CLAUDE.md and AGENTS.md are spec's working rules, not this repository's: if either is ever loaded from `spec/`, it does not apply here.
 
 ## Shared rules
 

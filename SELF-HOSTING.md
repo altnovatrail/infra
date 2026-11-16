@@ -302,7 +302,7 @@ Follow "Run on the dev projects" in [`api`'s README](https://github.com/altnovat
 1. The configuration is the file `/home/vscode/.novatrail-dev/dev.env`, in a Docker volume of the container, outside the repository. It holds the databases' strings, the Firebase project and the service account's key, the folder of the modules' packages, admission to AI and the key of Anthropic, the folder for the scans of parents' forms, and the project's Web API key, which `just dev-check` alone reads.
 2. `just packages` lays the packages of the release of `modules` that `api` pins, v0.2.5 of format 0.4, into the folder `API_PACKAGES_DIR` names, and only into an empty one. The catalog then holds olympiad mathematics, the first app's module, and two small modules.
 3. `just dev migrate`, then `just dev countries allow US` and `just dev invite`. The country lets the owner's profile be created. The invite code, printed once, lets one owner create an account, and a deleted account needs a new one.
-4. `just dev serve` listens on port 8080 of every interface of its container. `hostname -i` in the same container gives its address on the Docker network `novatrail-api`, which `app`'s proxy needs.
+4. `just dev serve` listens on port 8080 of every interface of its container. On the Docker network `novatrail-api` the container is `api`, by the alias of its devcontainer, so `app`'s proxy reaches it at `http://api:8080`; a container made before the alias came gets it by "Rebuild Container" (`api`'s README, `main` 0a65ddb).
 
 `API_APP_ORIGIN` is `http://127.0.0.1:5173` in `api`'s README and in the author's run, while `app`'s `docs/architecture.md` leaves it unset. Either works. Behind `app`'s proxy every request comes from `app`'s own origin: unset, `api` answers no CORS, and set, it adds CORS's headers for that one origin and refuses no request (`internal/server/cors.go` of `api`).
 
@@ -328,7 +328,7 @@ Follow "Run locally with api" in [`app`'s README](https://github.com/altnovatrai
    }
    ```
 
-2. `NOVATRAIL_API=http://<api's address>:8080 just dev`, with the address `hostname -i` gave in `api`'s container. Then open `http://127.0.0.1:5173`.
+2. `just dev`, whose proxy finds `api`'s container by its name, `http://api:8080`; `NOVATRAIL_API` names another address (`app`'s README, `main` ec3285a). Then open `http://127.0.0.1:5173`.
 
 What holds the file to that shape:
 
@@ -339,7 +339,7 @@ What holds the file to that shape:
 
 ### The two containers
 
-Each devcontainer comes up on a Docker network of its own, `novatrail-api` and `novatrail-app`, and `app`'s container joins `api`'s network too, by the `runArgs` of its `devcontainer.json`. `api`'s container publishes no port. The browser talks to `app`'s origin alone, and the request to `api` goes on from `app`'s proxy, inside `app`'s container, to the address of `api`'s container on `novatrail-api`. The address may change when that container is made again, so take it again with `hostname -i`. A name for it on its network, `http://api:8080`, comes with a task of `spec` that has not run yet (row Д195 of `spec`'s RUN.md).
+Each devcontainer comes up on a Docker network of its own, `novatrail-api` and `novatrail-app`, and `app`'s container joins `api`'s network too, by the `runArgs` of its `devcontainer.json`. `api`'s container publishes no port. The browser talks to `app`'s origin alone, and the request to `api` goes on from `app`'s proxy, inside `app`'s container, to `api`'s container on `novatrail-api`, by its name there, `api`. Each devcontainer names its container by its repository, `--network-alias=<repository>` in its `runArgs` right after its own network, since Docker gives an alias on the first network alone; the name stays while the address a rebuild gives the container may change (the 2026-11-13 amendment to R21 of `spec`). One container of a repository runs at a time, since a second would take the same name.
 
 Your browser reaches `app` through a port that VS Code forwards to your machine ([Developing inside a Container](https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port), updated 2026-11-04, read 2026-11-10):
 
