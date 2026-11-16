@@ -4,7 +4,7 @@
 >
 > **Rule:** do not re-propose what was rejected without new facts. If a decision has to change, ask the author and update this file. An entry is never rewritten: an amendment with its date at the end of the entry corrects it, or a new entry replaces it, and the old one stays where it is, marked "Superseded".
 >
-> The repository was set up 2026-10-19 from the template of `spec` v0.1.0 (R21 spec), moved 2026-10-20 to `spec` v0.2.9 (R01), 2026-11-08 to v0.9.11 (R02), to v0.9.13 (R03) and to v0.9.16 (R08), 2026-11-09 to v0.12.0 (R19), 2026-11-11 to v0.15.0 (R23), and 2026-11-12 to v0.15.1 (R24) and to v0.16.3, with the documents restructured on the model of `spec` (R26), and 2026-11-16 to v0.18.3 (R30). How it comes to differ from the template over time — by the tools in the devcontainer, by the rules in RUN.md — is recorded here as a decision, as R46 canvas-api recorded the differences from its model: OpenTofu, ShellCheck and actionlint in the devcontainer — R09 with the 2026-11-09 amendments. Next number — R32.
+> The repository was set up 2026-10-19 from the template of `spec` v0.1.0 (R21 spec), moved 2026-10-20 to `spec` v0.2.9 (R01), 2026-11-08 to v0.9.11 (R02), to v0.9.13 (R03) and to v0.9.16 (R08), 2026-11-09 to v0.12.0 (R19), 2026-11-11 to v0.15.0 (R23), and 2026-11-12 to v0.15.1 (R24) and to v0.16.3, with the documents restructured on the model of `spec` (R26), and 2026-11-16 to v0.18.3 (R30). How it comes to differ from the template over time — by the tools in the devcontainer, by the rules in RUN.md — is recorded here as a decision, as R46 canvas-api recorded the differences from its model: OpenTofu, ShellCheck and actionlint in the devcontainer — R09 with the 2026-11-09 amendments. Next number — R33.
 >
 > Here entries are cited as `R03`, in other repositories as `R03 infra`. The decisions of `spec` are cited as "R18 spec", MathTrail's decisions as "R37 canvas-api", and in a list as "canvas-api: R37, R38". Each log has its own numbers.
 >
@@ -365,6 +365,8 @@ What of this concerns the texts of `spec` — R128 spec about `SignUp`, the card
 — *Rejected:* no ShellCheck, only `bash -n` and the test on a stub `gcloud`: the test catches an error of quoting or an empty variable only if its scenario touched it — the author's decision. — *Consequence:* Rebuild Container is the author's step, and until it — Д5 in table 4 of RUN.md; CI builds the stage itself.
 
 — *Second amendment 2026-11-09:* **the container differs from the container of `spec` by a third tool — actionlint v1.7.12 in the stage `toolchain`, by an `ARG` of its version and the sha256 sums of `linux_amd64` and `linux_arm64` from the release's `actionlint_1.7.12_checksums.txt`; the recipe `ci-actionlint` runs it over `.github/workflows` with the stage's ShellCheck, and the job `OpenTofu` runs the recipe and its test.** The author's decision while planning T21, 2026-11-09 (R18). The license is MIT, compatible with Apache-2.0, and the tool goes into no release. — *Why:* the deploy workflow runs only after a merge, and an error in it would otherwise first show in production; like ShellCheck, the checking tool stands where the author checks too. — *Rejected:* the image `rhysd/actionlint` by digest, as canvas-api had it — the devcontainer has no Docker, and the author could not check a workflow themselves — the author's decision. — *Consequence:* `.devcontainer/Dockerfile`, `justfile`, `.github/workflows/ci.yml`; Rebuild Container — Д6 in table 4 of [RUN.md](../RUN.md).
+
+— *Amendment 2026-11-16:* **the references to the shared workflows of `.github` are on v0.1.24, and the jobs `OpenTofu` and `Deploy` take the stage `toolchain` from the cache of GitHub Actions instead of building it in each run: R32.** The group `shared-workflows` of Dependabot is the same. The three tools and their checks are the same.
 
 
 ## The root module
@@ -1232,6 +1234,8 @@ The steps and the runs are in [architecture.md](architecture.md), section 3.2, "
 
 — *Amendment 2026-11-16:* **T62 is done (R31): the plan is in `run/` and in English, and "until T62 the plan keeps its layout and its language" above, and what changed here says of the rules of RUN.md in Russian, are its history.** R31.
 
+— *Second amendment 2026-11-16:* **T63 is done (R32): CI is on `.github` v0.1.24, and the item on Д146 spec above — "`infra` is on v0.1.21" — is its history. Row 7.25 of COORDINATION.md spec is done but for the speed of the tests, Д27 of `run/DEBT.md`.** R32.
+
 ## The work plan's files
 
 **R31. The work plan of `infra` is in the layout and the language of the template of `spec` v0.18.3: tables 2, 3 and 4 are `run/EPICS.md`, `run/QUESTIONS.md` and `run/DEBT.md`, which replaces `DEBT.md` at the root, and the open tasks outside an epic are `run/TASKS.md`; RUN.md keeps its rules, in English and terse, for the session, and the current epic; a done task's gist sentence goes to the archive with its body; the epic's description, table 1, the bodies of tasks and the archives `docs/plan/` stay in Russian. Row Д250 spec is done for `infra`.** Task T62 of epic E6, by R30; the wording of the files is the executor's.
@@ -1256,3 +1260,22 @@ The steps and the runs are in [architecture.md](architecture.md), section 3.2, "
 - rewriting the citations of `DEBT.md`, «Д… таблицы 4 RUN.md» and «Как пользоваться» in this log and the archives: an entry is not rewritten, and an archive is verbatim but for its links.
 
 — *Consequence:* `run/`; RUN.md; CLAUDE.md; README.md; [architecture.md](architecture.md), sections 3 and 3.1; [measurements.md](measurements.md), section 1; `docs/plan/E5.md`, the links; `docs/plan/E6.md`; the 2026-11-16 amendments to R26 and R30. — RUN.md, T62.
+
+## The shared workflows of `.github`
+
+**R32. CI of `infra` calls the shared workflows of `.github` v0.1.24, the latest release, each pinned by the SHA of its commit, fab102d, with the tag beside it; its own jobs `OpenTofu` and `Deploy` take the image of the stage `toolchain` from the cache of GitHub Actions through the composite action `.github/actions/toolchain`, by the key and the path the shared Documents check gives it, so that the three jobs share one entry. `deploy.yml` and the job `Deployment tools` build no image and do not change. Row Д146 spec is done for `infra`.** Task T63 of epic E6, by R30; the action and its wording are the executor's.
+- **What the release brings** (sources 5.8): from v0.1.21 to v0.1.24 `secrets.yml`, `dco.yml` and `codeql.yml` are the same and `scorecard.yml` changes one comment, so no input or permission of the callers changes, and `codeql.yml` keeps `languages: javascript-typescript`; `documents.yml` restores the file `novatrail-toolchain.tar` of `runner.temp` by the key `toolchain-<OS>-<arch>-<sha256 of .devcontainer/Dockerfile>`, has `spec/tools/toolchain/toolchain.sh build` load it or build the stage and write it, and saves it on a miss (R36 .github; the second 2026-11-09 amendment to R31 spec). The submodule at v0.18.3 has the variable `TOOLCHAIN_IMAGE_FILE`, which `toolchain.sh` reads from v0.13.0 of spec.
+- **The action** — the same four steps as spec's CI: the restore, the build with `TOOLCHAIN_IMAGE_FILE`, the save when the restore missed, and the removal of the file, which a hit has removed already and a miss leaves for the save. The key, the path and the pinned `actions/cache` v6.1.0 are those of `documents.yml` v0.1.24 and spec's `ci.yml`: an entry holds the same image whichever job saved it. On a miss each of the three jobs builds the stage, and the save of the first wins; the others' saves fail with a message, not with the job (sources 5.8). An entry of a pull request serves only its own re-runs, and the entries of `main` serve every pull request after the merge.
+- **What changed here:** `.github/workflows/ci.yml`, `codeql.yml` and `scorecard.yml` — the references; `ci.yml` — the jobs `OpenTofu` and `Deploy` call the action in place of `toolchain.sh build`; `.github/actions/toolchain/action.yml`; the rule [ci](../.claude/rules/ci.md). `.github/dependabot.yml` is the same: the group `shared-workflows`, `patterns: ["altnovatrail/.github/*"]`, takes the five references to the next release in one pull request (Д88 spec).
+- **Checked:** `just ci-actionlint` and `just ci-actionlint-test` green; the pull request's checks — RUN.md, T63, «Сделано».
+
+— *Why:* Д146 spec: until the cache, each job of the shared checks and of `infra`'s own builds the stage from the network, and a failure of nodejs.org, GitHub or the Ubuntu snapshot fails the checks (2026-11-09: `canvas`, `spec`). R30 left the move of CI to T63. One entry for the three jobs: the image is the same, and the repository's cache is 10 GB, an entry not read in seven days removed (sources 5.8). A composite action rather than the steps copied into two jobs: the next release of `.github` by row 7.13 of COORDINATION.md spec changes how the file is kept — one path and one tag, no save from a pull request, one job that builds on a miss —, and the change is then in one place.
+
+— *Rejected:*
+- v0.1.22 or v0.1.23: the latest release has the same inputs and permissions, and the orchestrator moves to the latest;
+- a key or a path of `infra`'s own for its jobs: a second entry of the same image under the same limit;
+- no save from a pull request, as row 7.13 plans for `.github`: its release is not out, and `infra` follows it by row 7.25 of COORDINATION.md spec;
+- the cache in `deploy.yml`: its jobs install their tools on the runner by `.github/actions/tools` and build no stage (R18);
+- the speed of `bootstrap-test` and `deploy-check-release-test` of row 7.25: not this task — Д27 of `run/DEBT.md`.
+
+— *Consequence:* the 2026-11-16 amendment to R09 and the second 2026-11-16 amendment to R30; Д27. — RUN.md, T63; `.github/`; [architecture.md](architecture.md), section 1; sources 5.8.
