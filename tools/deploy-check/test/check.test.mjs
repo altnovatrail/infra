@@ -444,6 +444,15 @@ test("a copy's folder of legal texts is checked by legal-check-dir, and none is 
   assert.ok(!linked.ok, linked.output);
   assert.match(linked.stderr, /production\/legal holds what is neither a file nor a folder: production\/legal\/texts\/privacy-policy\/2\.md/);
 
+  fs.rmSync(path.join(legal, "texts", "privacy-policy", "2.md"));
+  if (process.getuid() !== 0) {
+    fs.chmodSync(path.join(legal, "texts"), 0o000);
+    const closed = await w.check({ legalChecker: ["/bin/false"] });
+    fs.chmodSync(path.join(legal, "texts"), 0o755);
+    assert.ok(!closed.ok, closed.output);
+    assert.match(closed.stderr, /production\/legal cannot be read: EACCES/);
+  }
+
   const file = world();
   fs.writeFileSync(path.join(file.deploy, "production", "legal"), "texts\n");
   const notFolder = await file.check({ legalChecker: ["/bin/false"] });

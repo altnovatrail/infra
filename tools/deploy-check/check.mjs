@@ -16,8 +16,11 @@
 //   5. production/facts.json, by the facts a deployment declares in spec's admission schemas, with
 //      every provider and fact of the dictionary of spec's admission table, at the tag of the
 //      submodule: an early sign, since api checks the file again with its own table (R25 api);
-//   6. the rung full;
-//   7. api's tag no lower than in the list at <ref>, the main a pull request merges into; with no
+//   6. a self-hosted copy's production/legal, if there is one: nothing but files and folders, and
+//      spec's legal-check-dir at the tag of the submodule — an early sign too, since api checks the
+//      folder again by its own part legal/ (R33);
+//   7. the rung full;
+//   8. api's tag no lower than in the list at <ref>, the main a pull request merges into; with no
 //      list there, nothing to hold it to.
 // A list that fails its schema is refused there; every other check runs, each says what it found,
 // and any refusal fails the run. With no production.json there is nothing to check yet, and it says
@@ -435,7 +438,11 @@ export function legalFolder(deployDir, command = [JUST, "-f", path.join(SPEC, "j
     if (stat.isDirectory()) for (const entry of fs.readdirSync(dir).sort()) walk(path.join(dir, entry));
     else if (!stat.isFile()) odd.push(path.relative(deployDir, dir));
   };
-  walk(at);
+  try {
+    walk(at);
+  } catch (error) {
+    throw new Refusal(`${folder} cannot be read: ${error.message}`);
+  }
   if (!fs.lstatSync(at).isDirectory()) throw new Refusal(`${folder} is not a folder`);
   if (odd.length) throw new Refusal(`${folder} holds what is neither a file nor a folder: ${odd.join(", ")}`);
   const run = spawnSync(command[0], [...command.slice(1), folder], { encoding: "utf8", cwd: deployDir });

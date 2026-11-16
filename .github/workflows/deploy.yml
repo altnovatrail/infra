@@ -47,7 +47,7 @@ on:
         type: boolean
         default: false
       facts:
-        description: "a new version of the deployment facts for api's revision"
+        description: "a new version of the deployment facts, and a copy's legal texts, for api's revision"
         type: boolean
         default: false
       app:

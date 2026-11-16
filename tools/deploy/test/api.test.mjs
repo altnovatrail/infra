@@ -427,15 +427,8 @@ test("a copy's release runs on the copy's project, region and registry, every co
 
 // A copy's folder of legal texts, synthetic: the layout of spec's part legal/, which api checks.
 const texts = { VERSION: "3\n", "legal.yaml": "version: 3\n", "texts/privacy-policy/1.md": "# Privacy policy\n\n## Who we are\n\nAcme Learning.\n" };
-// The sha256 api.sh gives the folder: over each file's path and bytes, as sha256sum prints them.
-const sumOf = (files) =>
-  hash(
-    Object.keys(files)
-      .map((file) => `./${file}`)
-      .sort()
-      .map((file) => `${hash(files[file.slice(2)])}  ${file}\n`)
-      .join(""),
-  );
+// The tag of a release's image with a copy's texts: the release, then the folder's sha256.
+const layeredTag = (release) => new RegExp(`^${release.replaceAll(".", "\\.")}-legal-[0-9a-f]{64}$`);
 
 test("a copy's release with its legal texts: the release's image, the texts laid over it by its digest, and that image on every job and the revision", () => {
   const w = world({ legal: texts });
@@ -444,10 +437,9 @@ test("a copy's release with its legal texts: the release's image, the texts laid
   assert.deepEqual(steps(w.calls()).slice(0, 5), ["docker build", "docker push", "docker build", "docker push", "facts"]);
   const s = w.read();
   const base = s.tags.find((t) => t.tag === "v0.2.0");
-  const tag = `v0.2.0-legal-${sumOf(texts)}`;
-  const layered = s.tags.find((t) => t.tag === tag);
-  assert.ok(layered, `the image of the texts is tagged ${tag}: ${JSON.stringify(s.tags)}`);
-  assert.deepEqual(s.layers[`${image}:${tag}`], {
+  const layered = s.tags.find((t) => layeredTag("v0.2.0").test(t.tag));
+  assert.ok(layered, `the image of the texts is tagged with the release and the folder's sha256: ${JSON.stringify(s.tags)}`);
+  assert.deepEqual(s.layers[`${image}:${layered.tag}`], {
     from: `${image}@sha256:${base.digest}`,
     steps: ["COPY --chown=0:0 legal /etc/api/legal", "ENV API_LEGAL_DIR=/etc/api/legal"],
     files: texts,
@@ -479,7 +471,7 @@ test("texts that changed go by the path of the facts: the texts over the serving
   assert.equal(r.status, 0, r.output);
   assert.deepEqual(steps(w.calls()), ["docker build", "docker push", "facts", "image api-check", "execute api-check", "revision", "traffic", "image api-migrate", "image api-after", "image api-daily"]);
   const s = w.read();
-  const layered = s.tags.find((t) => t.tag === `v0.1.0-legal-${sumOf(texts)}`);
+  const layered = s.tags.find((t) => layeredTag("v0.1.0").test(t.tag));
   assert.equal(s.layers[`${image}:${layered.tag}`].from, `${image}@sha256:${"a".repeat(64)}`, "over the release that takes the traffic");
   const digest = `${image}@sha256:${layered.digest}`;
   assert.equal(s.service.revisions["api-00002"].image, digest);
@@ -488,10 +480,9 @@ test("texts that changed go by the path of the facts: the texts over the serving
 });
 
 test("texts taken away go by the path of the facts too: the release's own image again, with no build", () => {
-  const sum = sumOf(texts);
   const w = world({
     state: (s) => {
-      s.tags.push({ image, tag: `v0.1.0-legal-${sum}`, digest: "b".repeat(64) });
+      s.tags.push({ image, tag: `v0.1.0-legal-${"e".repeat(64)}`, digest: "b".repeat(64) });
       s.service.revisions["api-00001"].image = `${image}@sha256:${"b".repeat(64)}`;
     },
   });
@@ -542,5 +533,39 @@ test("a release lower than the one with texts that takes the traffic is refused:
   const r = w.run("release");
   assert.notEqual(r.status, 0, r.output);
   assert.match(r.stderr, /api v0\.1\.0 is lower than v0\.2\.0, which takes the traffic/);
+  assert.deepEqual(steps(w.calls()), []);
+});
+
+test("another folder, or an empty folder more, is another tag of the texts' image", () => {
+  const w = world({ legal: texts });
+  assert.equal(w.run("facts").status, 0);
+  const tags = () => w.read().tags.filter((t) => layeredTag("v0.1.0").test(t.tag)).map((t) => t.tag);
+  const [first] = tags();
+  fs.mkdirSync(path.join(w.dir, "deploy", "production", "legal", "texts", "terms"));
+  assert.equal(w.run("facts").status, 0);
+  fs.writeFileSync(path.join(w.dir, "deploy", "production", "legal", "VERSION"), "4\n");
+  assert.equal(w.run("facts").status, 0);
+  assert.equal(new Set(tags()).size, 3, `three folders, three tags: ${tags().join(" ")}`);
+  assert.ok(tags().includes(first));
+});
+
+test("with no texts, the facts roll the digest that takes the traffic, whatever the release's tag names now", () => {
+  const w = world({ state: (s) => (s.tags = [{ image, tag: "v0.1.0", digest: "a".repeat(64) }, { image, tag: "v0.0.9", digest: "9".repeat(64) }]) });
+  const r = w.run("facts");
+  assert.equal(r.status, 0, r.output);
+  assert.equal(w.read().service.revisions["api-00002"].image, `${image}@sha256:${"a".repeat(64)}`);
+  assert.deepEqual(steps(w.calls()), ["facts", "image api-check", "execute api-check", "revision", "traffic"]);
+});
+
+test("texts taken away from a revision whose release has lost its own tag are refused before anything runs", () => {
+  const w = world({
+    state: (s) => {
+      s.tags = [{ image, tag: `v0.1.0-legal-${"e".repeat(64)}`, digest: "b".repeat(64) }];
+      s.service.revisions["api-00001"].image = `${image}@sha256:${"b".repeat(64)}`;
+    },
+  });
+  const r = w.run("facts");
+  assert.notEqual(r.status, 0, r.output);
+  assert.match(r.stderr, /the registry holds no image of api v0\.1\.0 under its tag/);
   assert.deepEqual(steps(w.calls()), []);
 });

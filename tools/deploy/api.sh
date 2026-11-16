@@ -55,8 +55,11 @@ case "$command" in image | release | facts) ;; *) fail "the command is image, re
 list="$deploy/production.json"
 facts_file="$deploy/production/facts.json"
 legal_dir="$deploy/production/legal"
-# Where a copy's folder of legal texts lies in its image, as API_LEGAL_DIR names it there (R33).
+# Where a copy's folder of legal texts lies in its image, as API_LEGAL_DIR names it there, and the
+# steps that lay it over the release's image (R33).
 legal_path=/etc/api/legal
+legal_steps="COPY --chown=0:0 legal ${legal_path}
+ENV API_LEGAL_DIR=${legal_path}"
 [[ -f "$list" ]] || fail "the list is not there: ${list}"
 
 # One value of the outputs, which must be there: a value missing would aim a step at nothing.
@@ -148,18 +151,24 @@ registry_tags() {
     jq -r '.[] | [(.tag | split("/") | last), (.version | split("/") | last)] | @tsv' <<< "$listed"
 }
 
-# The release the image of that digest is tagged with in the registry: one exact tag, as the
-# deployment gives each image, or a refusal (R15).
-release_of() {
+# The tag the image of that digest has in the registry: one, as the deployment gives each image, or
+# a refusal (R15).
+tag_of() {
     local digest="$1" all tags
     all="$(registry_tags)" || fail "the registry's tags of ${image_name} cannot be read"
     tags="$(awk -F '\t' -v digest="${digest##*@}" '$2 == digest { print $1 }' <<< "$all")"
     [[ -n "$tags" ]] || fail "the image ${digest} that takes the traffic has no tag in the registry, so its release cannot be told"
     [[ "$(wc -l <<< "$tags")" -eq 1 ]] || fail "the image ${digest} that takes the traffic has more than one tag: $(tr '\n' ' ' <<< "$tags")"
-    # An image with a copy's texts is tagged with its release and the folder's sha256 (R33).
-    [[ "$tags" =~ ^(.+)-legal-[0-9a-f]{64}$ ]] && tags="${BASH_REMATCH[1]}"
-    numbers "$tags" > /dev/null
     printf '%s\n' "$tags"
+}
+
+# The release of an image's tag: the tag itself, or, for an image with a copy's texts, the tag before
+# -legal- and the folder's sha256 (R33); an exact tag of a release, or a refusal.
+release_in() {
+    local tag="$1"
+    [[ "$tag" =~ ^(.+)-legal-[0-9a-f]{64}$ ]] && tag="${BASH_REMATCH[1]}"
+    numbers "$tag" > /dev/null
+    printf '%s\n' "$tag"
 }
 
 # The image under a tag of the registry, by digest, or nothing when the registry holds no such tag.
@@ -211,16 +220,21 @@ build_image() {
     push "$release"
 }
 
-# The sha256 of the copy's folder of legal texts, over the path and the bytes of each of its files,
-# or nothing when there is no folder. What is neither a file nor a folder is refused: a link would lay
-# into the image what the review of the folder did not see.
+# The sha256 of the copy's folder of legal texts, over the steps that lay it, the path of each of its
+# folders and the path and the bytes of each of its files, or nothing when there is no folder: another
+# folder, or another way of laying it, is another tag. What is neither a file nor a folder is refused:
+# a link would lay into the image what the review of the folder did not see.
 legal_sum() {
     local odd
     [[ -e "$legal_dir" || -L "$legal_dir" ]] || return 0
     [[ -d "$legal_dir" && ! -L "$legal_dir" ]] || fail "${legal_dir} is not a folder"
     odd="$(cd "$legal_dir" && find . ! -type f ! -type d)"
     [[ -z "$odd" ]] || fail "${legal_dir} holds what is neither a file nor a folder: $(tr '\n' ' ' <<< "$odd")"
-    (cd "$legal_dir" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum) | sha256sum | cut -d ' ' -f 1
+    {
+        printf '%s\n' "$legal_steps"
+        (cd "$legal_dir" && find . -type d | LC_ALL=C sort)
+        (cd "$legal_dir" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum)
+    } | sha256sum | cut -d ' ' -f 1
 }
 
 # The image the revision and the jobs run, from $image, the image of the release $1: that image itself
@@ -230,10 +244,9 @@ legal_sum() {
 # release's image by its digest, for the same platform, under the tag <release>-legal-<sha256 of the
 # folder>, and one the registry holds under that tag already is the one taken, as for the release's.
 with_texts() {
-    local of="$1" sum tag existing
-    sum="$(legal_sum)"
-    [[ -n "$sum" ]] || return 0
-    tag="${of}-legal-${sum}"
+    local of="$1" tag existing
+    [[ -n "$legal" ]] || return 0
+    tag="${of}-legal-${legal}"
     existing="$(tagged "$tag")"
     if [[ -n "$existing" ]]; then
         image="$existing"
@@ -244,7 +257,7 @@ with_texts() {
     mkdir -p "$work/texts"
     cp -R "$legal_dir" "$work/texts/legal"
     chmod -R u=rwX,go=rX "$work/texts/legal"
-    printf 'FROM %s\nCOPY --chown=0:0 legal %s\nENV API_LEGAL_DIR=%s\n' "$image" "$legal_path" "$legal_path" > "$work/texts.Dockerfile"
+    printf 'FROM %s\n%s\n' "$image" "$legal_steps" > "$work/texts.Dockerfile"
     gcloud auth configure-docker "${repository%%/*}" --quiet > /dev/null
     docker build --platform=linux/amd64 -f "$work/texts.Dockerfile" -t "${image_name}:${tag}" "$work/texts"
     push "$tag"
@@ -307,8 +320,8 @@ roll() {
 }
 
 numbers "$release" > /dev/null
-# A folder of texts that is not one is refused before anything runs, not after the build.
-legal_sum > /dev/null
+# The sum of the copy's texts, read once: a folder that is not one is refused before anything runs.
+legal="$(legal_sum)"
 
 # The jobs by their part, read once: a list read wrong would run no job and go on.
 jq -e 'type == "object" and all(.[]; (.job | type) == "string" and (.deploy == null or (.deploy | IN("check", "migrate", "after"))))' <<< "$jobs" > /dev/null ||
@@ -334,7 +347,7 @@ case "$command" in
         described="$(describe_service)"
         if [[ -n "$described" ]]; then
             serving_image="$(serving_digest "$described")"
-            serving="$(release_of "$serving_image")"
+            serving="$(release_in "$(tag_of "$serving_image")")"
             if lower "$release" "$serving"; then
                 fail "api ${release} is lower than ${serving}, which takes the traffic: api goes forward only (R05)"
             fi
@@ -367,10 +380,15 @@ case "$command" in
         described="$(describe_service)"
         [[ -n "$described" ]] || fail "there is no service ${service} to give the facts to"
         serving_image="$(serving_digest "$described")"
-        serving="$(release_of "$serving_image")"
-        # The release's own image, under its tag, and the copy's texts over it as the folder now is.
-        image="$(tagged "$serving")"
-        [[ -n "$image" ]] || fail "the registry holds no image of api ${serving} under its tag, which the image that takes the traffic is of"
+        serving_tag="$(tag_of "$serving_image")"
+        serving="$(release_in "$serving_tag")"
+        # The release's own image — the one that takes the traffic, or, under a copy's texts, the one
+        # its tag names — and the copy's texts over it as the folder now is.
+        image="$serving_image"
+        if [[ "$serving_tag" != "$serving" ]]; then
+            image="$(tagged "$serving")"
+            [[ -n "$image" ]] || fail "the registry holds no image of api ${serving} under its tag, which the image with the texts that takes the traffic was laid over"
+        fi
         with_texts "$serving"
         version="$(add_facts)"
         set_image "$version" "${check_jobs[@]}"
