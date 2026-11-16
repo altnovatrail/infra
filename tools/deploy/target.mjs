@@ -18,7 +18,8 @@
 // none, and the run applies the configuration alone. Until tofu/production.auto.tfvars names
 // api_image, api has no jobs to run a release with (R11), and a changed api is its image alone; until
 // it sets api_serving = true, api has no service, and a changed app waits for the run that sets it,
-// which delivers app (R05).
+// which delivers app (R05). The part facts is facts.json and, for a self-hosted copy, its folder of
+// legal texts, deploy/production/legal/: either changed goes by api.sh's path of the facts (R33).
 //
 // A run started by hand delivers the parts it names, among image, api, facts and app, and none when
 // it names none: --by-hand=<parts>, apart by commas, or, in the workflow, GITHUB_EVENT_NAME
@@ -55,6 +56,7 @@ const PARTS = ["image", "api", "facts", "app"];
 const SETUP = ["tofu/ci.env", "tofu/production.auto.tfvars", "tofu/backend.hcl"];
 const LIST = "deploy/production.json";
 const FACTS = "deploy/production/facts.json";
+const LEGAL = "deploy/production/legal";
 const WORKFLOW = "deploy.yml";
 const CONFIG_JOB = "Configuration";
 const TFVARS = "tofu/production.auto.tfvars";
@@ -100,6 +102,13 @@ async function github(url, token, what = "the last run that delivered", { missin
   if (response.status === 404 && missing) throw new Refusal(missing);
   if (!response.ok) throw new Refusal(`GitHub answered ${response.status} for ${what}: ${(await response.text()).slice(0, 300)}`);
   return response.json();
+}
+
+// The git object of a path at a commit — a folder's tree, a file's blob —, or null when it is not there:
+// two commits hold the same folder when they name the same tree.
+function objectAt(dir, commit, file) {
+  const found = git(dir, ["rev-parse", "--verify", "--quiet", `${commit}:${file}`], { allowFailure: true });
+  return found.status === 0 ? found.stdout.trim() : null;
 }
 
 // The GitHub environments the configuration lends its identities to — its own, api's deployment's
@@ -187,7 +196,7 @@ export function decide({ dir, commit, tip, base, byHand = null }) {
   const facts = jsonAt(dir, commit, FACTS);
   const changed = {
     api: !before || !isDeepStrictEqual(before.api, list.api),
-    facts: !before || !isDeepStrictEqual(jsonAt(dir, known, FACTS), facts),
+    facts: !before || !isDeepStrictEqual(jsonAt(dir, known, FACTS), facts) || objectAt(dir, known, LEGAL) !== objectAt(dir, commit, LEGAL),
     app: !before || !isDeepStrictEqual(before.app, list.app),
   };
   if (!known) lines.push("no run has delivered the list yet: every part of it");

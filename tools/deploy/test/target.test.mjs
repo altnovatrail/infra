@@ -106,6 +106,8 @@ test("against the last run that delivered, each part changes alone, and the rest
     ["app", { "deploy/production.json": list("v0.1.5", "v0.1.1") }, { api: false, facts: false, app: true }],
     ["nothing of the list: the configuration alone", { "tofu/main.tf": "# changed" }, { api: false, facts: false, app: false }],
     ["the list's layout alone, the same values", { "deploy/production.json": JSON.stringify(list()) }, { api: false, facts: false, app: false }],
+    // A self-hosted copy's folder of legal texts goes by the path of the facts (R33).
+    ["a copy's legal texts, put in", { "deploy/production/legal/VERSION": "3\n" }, { api: false, facts: true, app: false }],
   ];
   for (const [name, change, want] of cases) {
     await t.test(name, () => {
@@ -340,4 +342,15 @@ test("the workflow: every job after target asks again on a retry, signs in only 
     assert.ok(ref.startsWith("./") || /@[0-9a-f]{40}$/.test(ref), `${ref} is pinned by its commit`);
   }
   assert.doesNotMatch(text, /persist-credentials: true/);
+});
+
+test("a copy's legal texts changed or taken away are the facts' part, and the same folder is no change", () => {
+  const r = repository();
+  const delivered = r.commit({ ...setUp, "deploy/production.json": list(), "deploy/production/facts.json": facts, "deploy/production/legal/VERSION": "3\n", "deploy/production/legal/texts/privacy-policy/1.md": "# Policy\n" });
+  const same = decideAt(r, r.commit({ README: "next" }), delivered);
+  assert.deepEqual([same.api, same.facts, same.app], [false, false, false], same.lines.join("\n"));
+  const changed = decideAt(r, r.commit({ "deploy/production/legal/texts/privacy-policy/1.md": "# Policy, version 1\n" }), delivered);
+  assert.deepEqual([changed.api, changed.facts, changed.app], [false, true, false], changed.lines.join("\n"));
+  const gone = decideAt(r, r.commit({ "deploy/production/legal/VERSION": null, "deploy/production/legal/texts/privacy-policy/1.md": null }), delivered);
+  assert.deepEqual([gone.api, gone.facts, gone.app], [false, true, false], gone.lines.join("\n"));
 });

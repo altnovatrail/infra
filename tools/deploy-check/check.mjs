@@ -419,10 +419,36 @@ function factsHoldToTheTable(factsFile) {
   if (unknown.length) throw new Refusal(`production/facts.json names what spec's admission table does not: ${unknown.join(", ")}`);
 }
 
+// A self-hosted copy's folder of legal texts, production/legal, by spec's recipe legal-check-dir, as
+// the part's text has a copy check it (the second 2026-11-09 amendment to R115 spec), or, for the
+// tests, a command that stands in for it with the same argument; the deployment lays the folder over
+// api's image, where API_LEGAL_DIR names it (R33). What is neither a file nor a folder is refused
+// first: a link would lay into the image what the review did not see. With no folder api serves the
+// texts of its tag of spec, as the platform's does, and there is nothing to check.
+export function legalFolder(deployDir, command = [JUST, "-f", path.join(SPEC, "justfile"), "legal-check-dir"]) {
+  const folder = path.join("production", "legal");
+  const at = path.join(deployDir, folder);
+  if (!fs.lstatSync(at, { throwIfNoEntry: false })) return `${folder} is not there: api serves the texts of its tag of spec`;
+  const odd = [];
+  const walk = (dir) => {
+    const stat = fs.lstatSync(dir);
+    if (stat.isDirectory()) for (const entry of fs.readdirSync(dir).sort()) walk(path.join(dir, entry));
+    else if (!stat.isFile()) odd.push(path.relative(deployDir, dir));
+  };
+  walk(at);
+  if (!fs.lstatSync(at).isDirectory()) throw new Refusal(`${folder} is not a folder`);
+  if (odd.length) throw new Refusal(`${folder} holds what is neither a file nor a folder: ${odd.join(", ")}`);
+  const run = spawnSync(command[0], [...command.slice(1), folder], { encoding: "utf8", cwd: deployDir });
+  if (run.error) throw new Refusal(`${command[0]} cannot be run: ${run.error.message}`);
+  if (run.status !== 0) throw new Refusal(`legal-check-dir refused ${folder}: ${(run.stderr + run.stdout).trim()}`);
+  return `${folder} holds to spec's part legal/: ${run.stdout.trim().split("\n").at(-1)}`;
+}
+
 // Each check in turn, every one of them run whatever an earlier one found: its line when it passes,
 // its refusal when it does not. A check that stands on a file an earlier one refused says it is not
 // run. `stand-ins` are the tests' alone: `releases`, a folder to read the releases from instead of
-// GitHub, and `verifier`, a command to run instead of release-verify; main.mjs never gives them.
+// GitHub, `verifier`, a command to run instead of release-verify, and `legalChecker`, one instead of
+// legal-check-dir; main.mjs never gives them.
 export async function run(deployDir, base, standIns = {}) {
   const listFile = path.join(deployDir, "production.json");
   if (!fs.existsSync(listFile)) {
@@ -511,6 +537,7 @@ export async function run(deployDir, base, standIns = {}) {
       buildCsp(build, deploymentFile);
     });
     await step("production/facts.json declares facts of spec's admission table", () => factsHoldToTheTable(path.join(deployDir, "production", "facts.json")));
+    await step("production/legal holds to spec's part legal/", () => legalFolder(deployDir, standIns.legalChecker));
     await step("the rung is full", () => {
       if (list.admission.rung !== "full") throw new Refusal(`the rung is ${list.admission.rung}, and a deployment ships full alone (R25 api)`);
     });

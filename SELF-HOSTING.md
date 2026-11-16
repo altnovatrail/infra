@@ -11,7 +11,7 @@ A copy runs the same releases of `api` and `app` as the platform. They are downl
 - `tofu/production.auto.tfvars` holds your project, region, budget, pool and repository.
 - `tofu/backend.hcl` holds the bucket that keeps the configuration's state.
 - `tofu/ci.env` holds the two lines `bootstrap.sh` prints.
-- The `deploy/` directory holds your list of releases, your `/deployment.json` and your deployment facts.
+- The `deploy/` directory holds your list of releases, your `/deployment.json`, your deployment facts and, if you have them, your own legal texts.
 
 The full table of what a copy sets and what every copy shares is in [docs/architecture.md](docs/architecture.md), section 3.5. Nothing of the platform's own deployment reaches a copy: no project, region, pool or repository number. `tofu/tests/copy.tftest.hcl` and the copy tests of `tofu/tests/bootstrap.test.mjs` and `tools/deploy/test/` hold that. The name NovaTrail does reach a copy, on purpose: it is the display name of the project `bootstrap.sh` makes, and Hosting's versions carry the label `deployment-tool: novatrail-infra`.
 
@@ -190,6 +190,7 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
 
   `spec`'s schema at the submodule's tag and the schema in the build of `app` must both accept it.
 - **`deploy/production/facts.json`** — the deployment facts your copy declares for `api`'s admission to AI, by provider and fact, each to the age categories it holds for. For example, `{"openai": {"data_processing_agreement": ["adult"]}}`. The providers and facts it may name, and its form, are `spec`'s admission table (`spec/admission/admission-table.json` and `$defs/declared_facts` in `spec/admission/schemas/answer-vector.schema.json`). A copy declares only what is true of its own contracts with AI providers. The platform's facts are not yours.
+- **`deploy/production/legal/`** — your own legal texts, if your copy has them: the privacy policy, the terms and the consents your `api` gives your learners in place of the platform's (R115 spec). The folder holds `VERSION`, `legal.yaml` and `texts/` alone, in the layout of `spec`'s part `legal/` (`spec/legal/README.md`, sections 3 and 8), with a privacy policy whose section "Who we are" names you, and nothing but files and folders: a link is refused. Check it with `just -f spec/justfile legal-check-dir deploy/production/legal`. The pull request's check `Deploy` runs the same whenever it checks the list. The deployment lays the folder over `api`'s image at `/etc/api/legal` and names that path in `API_LEGAL_DIR` (R33). `api`'s job `check` refuses a folder that breaks the part's rules before the migrations, and so does its service before a revision takes traffic. Without the folder, `api` gives the platform's texts, the texts of its tag of `spec`. `api` gives the texts to anyone, with no token: they hold no learner's data and no secret.
 - **The databases.** `api` keeps its data in two Postgres databases, its own and OpenFGA's. The platform's are on Neon (R03 api). You add four connection strings yourself, as the values of secrets the configuration makes, with `gcloud secrets versions add`:
   - the direct ones, for the migrations: `api-migrate-database-url` and `api-migrate-openfga-database-url`;
   - the pooler's, for the service, for `sweep` and, `api-database-url` alone, for `after`: `api-database-url` and `api-openfga-database-url`. The service reads them at its start and does not start without them.
@@ -217,7 +218,7 @@ Run `just deploy-check` before you open the pull request. It downloads the relea
 
 ## 9. Deploying
 
-After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. `api` goes in steps, because its jobs and its service are made with their first image (R11), and `app` goes after `api`'s service, which its `/deployment.json` names (R05):
+After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. Your legal texts go with the facts: a change of `deploy/production/legal/` alone runs the check of the configuration and a new revision on the release that takes the traffic, with the texts laid over its image anew, and builds no release and runs no migration. `api` goes in steps, because its jobs and its service are made with their first image (R11), and `app` goes after `api`'s service, which its `/deployment.json` names (R05):
 
 1. With no `api_image` in your values, there are no jobs and no service. When a run's list names a release of `api` that the last run that delivered did not, the run builds `api`'s image alone from that release, pushes it into your registry, holds `app` back, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…` in its job `api`. If your list keeps the release of the platform's list, your first merge built it already ([First apply](#6-first-apply)). To ask for that alone, or to print the reference of an image your registry holds already, run `Deploy` by hand with **image** chosen.
 2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made. Before this merge, add the values of the four connection strings ([Your list](#8-your-list)), and a first version of the facts, `gcloud secrets versions add api-admission-facts --project=<project_id> --data-file=deploy/production/facts.json`: the jobs mount them, the job of the check the facts. The deployment adds the version it checks and deploys anyway.
@@ -262,7 +263,7 @@ just ci-tf-outputs /tmp/outputs.json        # the outputs the deployment reads
 just deploy-check                           # the list, as a pull request would check it
 just deploy-api-image /tmp/outputs.json     # api's image, before api_image is set
 just deploy-api /tmp/outputs.json           # api's release: check, migrations, revision
-just deploy-api-facts /tmp/outputs.json     # a new version of the facts alone, checked before the revision
+just deploy-api-facts /tmp/outputs.json     # the facts and your legal texts alone, checked before the revision
 just deploy-app /tmp/outputs.json           # app's build on Hosting
 just deploy-app-check /tmp/outputs.json     # what the site answers
 ```

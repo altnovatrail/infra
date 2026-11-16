@@ -4,7 +4,8 @@
 // not know fails loudly, so that a script that drifts from what the test holds shows it.
 //
 // STUB_STATE  the JSON file: the service with its revisions and traffic, the registry's packages
-//             and tags, the jobs, their executions, the facts' versions, what docker built and pushed
+//             and tags, the jobs, their executions, the facts' versions, what docker built and pushed,
+//             and the layers of a copy's legal texts it built over a release's image
 // STUB_LOG    the log of calls
 
 import crypto from "node:crypto";
@@ -21,6 +22,7 @@ state.jobs ??= {};
 state.executions ??= [];
 state.facts ??= [];
 state.built ??= {};
+state.layers ??= {};
 
 fs.appendFileSync(process.env.STUB_LOG, JSON.stringify([program, ...args]) + "\n");
 
@@ -125,6 +127,7 @@ function gcloud() {
 function docker() {
   switch (positional[0]) {
     case "build": {
+      if (!args.includes("--build-context")) return layer();
       const at = args.indexOf("--build-context");
       const context = flag("build-context") ?? (at >= 0 ? args[at + 1] : fail("stub: no --build-context"));
       const [name, dir] = context.split("=");
@@ -156,6 +159,34 @@ function docker() {
     default:
       fail(`stub: unknown command ${args.join(" ")}`, 2);
   }
+}
+
+// The build of a copy's legal texts over the release's image: a Dockerfile FROM an image the
+// registry holds, by its digest, that copies the context's folder legal and names it; what it laid is
+// kept as the layer of its tag, each file with its text and whether all may read it.
+function layer() {
+  const dockerfile = fs.readFileSync(args[args.indexOf("-f") + 1], "utf8").trim().split("\n");
+  const from = dockerfile[0].match(/^FROM (.+)@sha256:([0-9a-f]{64})$/) ?? fail(`stub: the texts are built FROM an image by its digest, not ${dockerfile[0]}`);
+  if (!state.tags.some((t) => t.image === from[1] && t.digest === from[2])) fail(`stub: the registry holds no ${from[1]}@sha256:${from[2]}`);
+  if (flag("platform") !== "linux/amd64") fail("stub: the platform is linux/amd64, the binary's");
+  const context = args.at(-1);
+  const files = {};
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if ((fs.statSync(full).mode & 0o005) !== 0o005) fail(`stub: ${full} is not open to all`);
+        walk(full);
+      } else {
+        if (!(fs.statSync(full).mode & 0o004)) fail(`stub: ${full} is not read by all`);
+        files[path.relative(path.join(context, "legal"), full)] = fs.readFileSync(full, "utf8");
+      }
+    }
+  };
+  walk(path.join(context, "legal"));
+  const tagged = args[args.indexOf("-t") + 1];
+  state.layers[tagged] = { from: `${from[1]}@sha256:${from[2]}`, steps: dockerfile.slice(1), files };
+  state.built[tagged] = sha(JSON.stringify(state.layers[tagged]));
 }
 
 if (program === "gcloud") gcloud();
