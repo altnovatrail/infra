@@ -106,8 +106,8 @@ const unconditioned = (state) =>
 
 const expression = `api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/hostingPublisher', 'projects/${project}/roles/signInUsers'])`;
 
-// Each test has a world of its own, so they run four at a time, as many as a runner of CI has cores
-// (row 7.25 of COORDINATION.md spec; measurements 3.1 spec).
+// Each test has a world of its own, so they run four at a time, the number row 7.25 of
+// COORDINATION.md spec gives (measurements 3.1 spec).
 suite("bootstrap.sh", { concurrency: 4 }, () => {
   test("a first run makes the project, its state, the pool and the configuration's identity", async () => {
     const w = world();
@@ -678,6 +678,14 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
     assert.deepEqual(sorted(operatorHeld), sorted(operatorPolicy));
     assert.deepEqual(sorted(after.buckets[consentBucket].policy), sorted(consentPolicy));
     assert.deepEqual(after.accounts[uploadMeasure].policy, [{ role: "roles/iam.serviceAccountTokenCreator", member: `user:${measureOrganizer}`, condition: "" }]);
+    assert.deepEqual(makes(w.calls()), [], "a run again makes nothing");
+  });
+
+  test("a bucket the list names before others is found, though the list goes on after it", async () => {
+    const w = applied();
+    assert.equal((await w.run()).status, 0);
+    const r = await w.run({ STUB_LIST_PAUSE: "100" });
+    assert.equal(r.status, 0, r.output);
     assert.deepEqual(makes(w.calls()), [], "a run again makes nothing");
   });
 

@@ -229,10 +229,13 @@ switch (true) {
   case command === "storage buckets add-iam-policy-binding":
     binding(ownersHold(first, "storage.buckets.setIamPolicy").policy, flag("role"), flag("member"), conditionOrBare());
     break;
-  // The buckets of one project, by their names, as `--format=value(name)` prints them.
+  // The buckets of one project, by their names, as `--format=value(name)` prints them: one a line,
+  // each STUB_LIST_PAUSE milliseconds after the last, as a long list comes in parts.
   case command === "storage buckets list":
     for (const [url, bucket] of Object.entries(state.buckets)) {
-      if (bucket.project === projectOf()) out(url.slice("gs://".length));
+      if (bucket.project !== projectOf()) continue;
+      out(url.slice("gs://".length));
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Number(process.env.STUB_LIST_PAUSE ?? 0));
     }
     break;
   case command === "storage buckets get-iam-policy":

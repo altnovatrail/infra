@@ -802,8 +802,10 @@ under() {
 # the create of a name taken elsewhere is refused and stops the script. Its place cannot change once
 # it is made, so a bucket of the project found in another place stops the script too.
 at_bucket=""
+# grep reads the whole list, not stopping at the name: under pipefail a gcloud cut off by an early
+# exit would fail the pipeline, and the bucket found would read as none.
 data_bucket_exists() {
-    gcloud storage buckets list --project="$project" --format='value(name)' | grep -qxF "$at_bucket"
+    gcloud storage buckets list --project="$project" --format='value(name)' | grep -xF "$at_bucket" > /dev/null
 }
 make_data_bucket() {
     gcloud storage buckets create "gs://${at_bucket}" \
