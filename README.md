@@ -13,7 +13,7 @@
 
 The shared infrastructure of NovaTrail: the cloud projects, the identities that let CI deploy, the image registry, the secrets, the budgets, the domains, the logs and the hosting of the app's build, and the way to run the whole platform yourself, on your own servers or on one machine. It deploys the platform's services and the app's build by one list of exact versions and digests, building each service's image from the signed files of its release, and self-hosting takes the same list. It holds no learner's data and no code of the platform's services.
 
-A component of [NovaTrail](https://github.com/altnovatrail/spec/tree/v0.18.4), a universal open platform for adaptive learning, interactive lessons and AI tutoring. It belongs to stage 2, First slice with learners, with tutor, canvas, api, app and skill-map.
+A component of [NovaTrail](https://github.com/altnovatrail/spec/tree/v0.18.6), a universal open platform for adaptive learning, interactive lessons and AI tutoring. It belongs to stage 2, First slice with learners, with tutor, canvas, api, app and skill-map.
 
 ## Status
 
@@ -31,7 +31,7 @@ The documents and the work plan are in English; the current epic's description a
 - [SELF-HOSTING.md](SELF-HOSTING.md) — how to bring up your own copy of the platform, from an empty Google Cloud account to a copy ready to deploy, how to run the whole platform from source on one machine (section 12), and how an organizer makes an upload link to the operator's bucket (section 13).
 - [BREACH.md](BREACH.md) — what the operator does in a breach of learners' data: what counts as one, how to cut the access, where to look, whom to tell and by when.
 
-The working rules, for people and coding agents alike, are in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md). The platform's shared vocabulary, formats, contracts and decisions are in [spec](https://github.com/altnovatrail/spec/tree/v0.18.4), checked out here as a git submodule at `v0.18.4`: clone this repository with `git clone --recurse-submodules`.
+The working rules, for people and coding agents alike, are in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md). The platform's shared vocabulary, formats, contracts and decisions are in [spec](https://github.com/altnovatrail/spec/tree/v0.18.6), checked out here as a git submodule at `v0.18.6`: clone this repository with `git clone --recurse-submodules`.
 
 ## License
 
