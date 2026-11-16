@@ -19,7 +19,9 @@
 //   6. a self-hosted copy's production/legal, if there is one: nothing but files and folders, and
 //      spec's legal-check-dir at the tag of the submodule — an early sign too, since api checks the
 //      folder again by its own part legal/ (R33);
-//   7. the rung full;
+//   7. the rung the configuration tells api's service and the jobs of the check: api_admission_rung
+//      of tofu/production.auto.tfvars, or its default in tofu/variables.tf (the 2026-11-16 amendment
+//      to R05);
 //   8. api's tag no lower than in the list at <ref>, the main a pull request merges into; with no
 //      list there, nothing to hold it to.
 // A list that fails its schema is refused there; every other check runs, each says what it found,
@@ -313,9 +315,26 @@ export function serviceOrigin(root) {
   const values = textOf(path.join(root, "tofu", "production.auto.tfvars"))?.split("\n");
   const region = valueOf(values, "region");
   if (!region) throw new Refusal("tofu/production.auto.tfvars names no region, and the region of api's service is not known");
-  const name = valueOf(values, "api_service_name") ?? defaultOf(textOf(path.join(root, "tofu", "variables.tf"))?.split("\n"), "api_service_name");
+  const name = configurationValue(root, values, "api_service_name");
   if (!name) throw new Refusal("neither tofu/production.auto.tfvars nor the default in tofu/variables.tf names api_service_name, and the name of api's service is not known");
   return `https://${name}-${number}.${region}.run.app`;
+}
+
+// The string a variable of the configuration takes: the value of tofu/production.auto.tfvars — its
+// lines, when the caller has them already —, or, when they leave it out, its default in
+// tofu/variables.tf; null with neither.
+function configurationValue(root, values, name) {
+  const lines = values ?? textOf(path.join(root, "tofu", "production.auto.tfvars"))?.split("\n");
+  return valueOf(lines, name) ?? defaultOf(textOf(path.join(root, "tofu", "variables.tf"))?.split("\n"), name);
+}
+
+// The lowest admission rung the configuration tells api's service and the jobs of the check: the
+// value of tofu/production.auto.tfvars, or, when they leave it out, its default in tofu/variables.tf
+// (the 2026-11-16 amendment to R05).
+export function configurationRung(root) {
+  const rung = configurationValue(root, null, "api_admission_rung");
+  if (!rung) throw new Refusal("neither tofu/production.auto.tfvars nor the default in tofu/variables.tf names api_admission_rung, and the rung the configuration tells api is not known");
+  return rung;
 }
 
 // deployment, the parsed /deployment.json, read as spec's deployment configuration reads it, with
@@ -545,8 +564,15 @@ export async function run(deployDir, base, standIns = {}) {
     });
     await step("production/facts.json declares facts of spec's admission table", () => factsHoldToTheTable(path.join(deployDir, "production", "facts.json")));
     await step("production/legal holds to spec's part legal/", () => legalFolder(deployDir, standIns.legalChecker));
-    await step("the rung is full", () => {
-      if (list.admission.rung !== "full") throw new Refusal(`the rung is ${list.admission.rung}, and a deployment ships full alone (R25 api)`);
+    // The list names the rung, and the configuration tells it api: a pull request that changes one
+    // alone would check facts against one rung and run the revision on another.
+    await step("the rung is the configuration's", () => {
+      const rung = list.admission.rung;
+      const root = topOf(deployDir);
+      if (!root) return `the rung ${rung} is not compared with the configuration's: ${deployDir} is not in a git repository, whose tofu/ would give it`;
+      const told = configurationRung(root);
+      if (rung !== told) throw new Refusal(`the rung is ${rung}, and the configuration tells api ${told}: api_admission_rung of tofu/production.auto.tfvars, or its default in tofu/variables.tf, names the same (R05)`);
+      return `the rung ${rung} is the one the configuration tells api`;
     });
     await step("api's tag is no lower than on the base", () => {
       if (!base) return "api's tag: no base named, nothing to hold it to";

@@ -340,6 +340,44 @@ variable "api_request_timeout" {
   }
 }
 
+# Platform AI on the deployment: the lowest admission rung, the catalog's list of modules and the
+# platform's key of Anthropic, which the service and the jobs of the check are told (the 2026-11-16 amendment to R25).
+
+variable "api_admission_rung" {
+  description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author where the author alone learns, as on novatrail (R45, R79 api; R149 spec). The list's admission.rung names the same, and the list's check holds the two equal (the 2026-11-16 amendment to R05)."
+  type        = string
+  default     = "full"
+  nullable    = false
+
+  validation {
+    condition     = contains(["author", "full"], var.api_admission_rung)
+    error_message = "api_admission_rung is author or full, the rungs of tutor's rule of admission."
+  }
+}
+
+variable "api_catalog_modules" {
+  description = "The deployment's list of modules, API_CATALOG_MODULES of the service and of the jobs of the check: the IDs whose current version the catalog may give (R150 spec; R79 api). Empty, the variable is not set and the catalog gives the whole pinned index. An ID the pinned index of the release does not hold stops api check before the migrations."
+  type        = list(string)
+  default     = []
+  nullable    = false
+
+  validation {
+    condition     = alltrue([for id in var.api_catalog_modules : can(regex("^[a-z][a-z0-9]*(-[a-z0-9]+)*/[a-z][a-z0-9]*(-[a-z0-9]+)*$", id)) && length(id) <= 128 && !can(regex("(^|/)(con|prn|aux|nul|com[1-9]|lpt[1-9])(/|$)", id))]) && length(distinct(var.api_catalog_modules)) == length(var.api_catalog_modules)
+    error_message = "api_catalog_modules lists module IDs, each a module ID of spec's format, such as novatrail/olympiad-math, none twice."
+  }
+}
+
+variable "api_anthropic_key_version" {
+  description = "The version of the secret api-anthropic-key, the platform's key of Anthropic, that api's service mounts as a file, its path in API_ANTHROPIC_KEY_FILE (R46 api): an exact version, which the operator adds before the merge that names it. Unset, the service has no key, and platform AI has no route to a provider. The key itself never enters this repository."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.api_anthropic_key_version == null || can(regex("^[1-9][0-9]*$", var.api_anthropic_key_version))
+    error_message = "api_anthropic_key_version is the number of a version of the secret, such as \"1\", never latest: the revision pins the key it runs with."
+  }
+}
+
 # The operator's buckets (R28). bootstrap.sh makes both and holds all their access, with the
 # operator's rights; the configuration makes neither and grants nothing in them.
 

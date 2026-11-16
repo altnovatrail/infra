@@ -108,3 +108,28 @@ resource "google_secret_manager_secret" "eval" {
 
   depends_on = [google_project_service.enabled]
 }
+
+# The platform's key of Anthropic, which api's service reads as a file, by the exact version
+# api_anthropic_key_version names (R46 api; the 2026-11-16 amendment to R25). The operator puts the
+# value, by hand, before the merge that names its version; it never enters this repository. Made on
+# every deployment, a copy with no key among them: an empty secret opens nothing. Replicated to the
+# region alone, and never deleted: the serving revision mounts one of its versions.
+resource "google_secret_manager_secret" "anthropic_key" {
+  secret_id = "api-anthropic-key"
+
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+
+  labels = {
+    purpose = "api-provider-key"
+  }
+
+  deletion_protection = true
+
+  depends_on = [google_project_service.enabled]
+}

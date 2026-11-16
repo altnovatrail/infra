@@ -3,8 +3,9 @@
 # Which image they run is the deployment's to say, and so is the one value a deployment changes
 # beside it: the version of the facts secret that the service and the jobs of the check mount (R05;
 # the second 2026-11-08 amendment to R106 spec). The configuration sets the two only when it creates
-# the service or a job, and owns everything around them, the lowest admission rung among it: a deployment takes only full
-# (R05; R25 api), so there is nothing for the deployment to change there.
+# the service or a job, and owns everything around them: the lowest admission rung, the catalog's
+# list of modules and the version of the platform's key of Anthropic among it, each a value of the
+# deployment's file of values (the 2026-11-16 amendments to R05 and R25).
 #
 # Nothing here exists until api_image names an image in this project's registry: a Cloud Run
 # resource cannot be made without one, and before the first deployment pushes api's image there is
@@ -31,9 +32,17 @@ locals {
   # version in the module's volume, where ignore_changes leaves it.
   container_name = "api"
 
-  # The lowest admission rung: full, the only one a deployment takes (R05; R25 api). The service and
-  # the jobs of the check are told the same.
-  admission_rung = "full"
+  # The lowest admission rung, which the list's admission.rung names too, and the catalog's list of
+  # modules, unset when it is empty: the service and the jobs of the check are told the same, so that
+  # api check checks what the revision will run with (R45, R79 api; the 2026-11-16 amendment to R25).
+  admission_rung = var.api_admission_rung
+  catalog        = length(var.api_catalog_modules) > 0 ? { API_CATALOG_MODULES = join(",", var.api_catalog_modules) } : {}
+
+  # Where the service reads the platform's key of Anthropic, a file of one exact version of its
+  # secret, with the path in API_ANTHROPIC_KEY_FILE (R46 api); none when no version is named.
+  anthropic_key_dir  = "/etc/api/anthropic"
+  anthropic_key_file = "key"
+  anthropic_key      = var.api_anthropic_key_version == null ? {} : { "anthropic-key" = var.api_anthropic_key_version }
 
   # The service's secrets, by api's variable: the pooler's connection strings of its two databases,
   # which serve opens at its start (README api).
@@ -156,6 +165,26 @@ resource "google_cloud_run_v2_service" "api" {
         value = local.app_origin
       }
 
+      # Which modules the catalog may give, when the deployment names them (R150 spec).
+      dynamic "env" {
+        for_each = local.catalog
+
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      # The platform's key of Anthropic, a file of the volume below.
+      dynamic "env" {
+        for_each = local.anthropic_key
+
+        content {
+          name  = "API_ANTHROPIC_KEY_FILE"
+          value = "${local.anthropic_key_dir}/${local.anthropic_key_file}"
+        }
+      }
+
       # Where serve puts a parent's scan of a consent form, and erases it (R28).
       dynamic "env" {
         for_each = local.consent_forms
@@ -168,7 +197,7 @@ resource "google_cloud_run_v2_service" "api" {
 
       # The pooler's connection strings, each in its variable from the latest version of its secret,
       # resolved when an instance starts: api takes a secret from its variable or from a file, alike
-      # (R26 api). Not volumes: the facts' volume stays the service's only one, the one whose version
+      # (R26 api). Not volumes: the facts' volume stays the service's first, the one whose version
       # the deployment changes and the configuration leaves alone by its place.
       dynamic "env" {
         for_each = local.api_service_secrets
@@ -189,6 +218,15 @@ resource "google_cloud_run_v2_service" "api" {
         name       = "admission-facts"
         mount_path = local.admission_dir
       }
+
+      dynamic "volume_mounts" {
+        for_each = local.anthropic_key
+
+        content {
+          name       = volume_mounts.key
+          mount_path = local.anthropic_key_dir
+        }
+      }
     }
 
     # The deployment facts, a file in one version of the secret. The deployment adds each version
@@ -205,10 +243,31 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
     }
+
+    # The platform's key, after the facts: the deployment sets the facts' version by the first
+    # volume's place, and the configuration the key's, the exact version its value names, which a
+    # deployment never changes. A new key is a new version and a pull request that names it.
+    dynamic "volumes" {
+      for_each = local.anthropic_key
+
+      content {
+        name = volumes.key
+
+        secret {
+          secret = google_secret_manager_secret.anthropic_key.secret_id
+
+          items {
+            path    = local.anthropic_key_file
+            version = volumes.value
+          }
+        }
+      }
+    }
   }
 
   depends_on = [
     google_project_service.enabled,
+    google_secret_manager_secret_iam_member.api_reads_anthropic_key,
     google_secret_manager_secret_iam_member.api_reads_facts,
     google_secret_manager_secret_iam_member.api_reads_service_secrets,
   ]
@@ -284,16 +343,17 @@ resource "google_cloud_run_v2_job" "api" {
           value = var.project_id
         }
 
-        # A job of the check checks the facts and the rung the revision will run with: the same
-        # rung, and the facts at the same path (R05; the second 2026-11-08 amendment to R106 spec).
+        # A job of the check checks the facts, the rung and the catalog's list the revision will run
+        # with: the same rung and list, and the facts at the same path (R05; the second 2026-11-08
+        # amendment to R106 spec). It reads no key, as api check does not (README api).
         # The store of the scans goes to a job that opens it, and to a job of the check, which checks
         # it as the revision will take it (R28).
         dynamic "env" {
           for_each = merge(
-            each.value.deploy == "check" ? {
+            each.value.deploy == "check" ? merge({
               API_ADMISSION_RUNG       = local.admission_rung
               API_ADMISSION_FACTS_FILE = local.admission_path
-            } : {},
+            }, local.catalog) : {},
             each.value.deploy == "check" || each.value.consent_forms ? local.consent_forms : {},
           )
 

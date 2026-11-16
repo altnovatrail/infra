@@ -51,6 +51,14 @@ resource "google_secret_manager_secret_iam_member" "api_reads_job_secrets" {
   member    = "serviceAccount:${google_service_account.api.email}"
 }
 
+# The platform's key of Anthropic: the service alone mounts it, but the right is on the secret, as
+# for the others.
+resource "google_secret_manager_secret_iam_member" "api_reads_anthropic_key" {
+  secret_id = google_secret_manager_secret.anthropic_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
 # How a deployment gets in: an identity with just enough rights for the steps of R05, borrowed by
 # the jobs of the environment that deploys. No service account key exists anywhere.
 resource "google_service_account" "deployer" {

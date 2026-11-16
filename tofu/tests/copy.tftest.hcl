@@ -56,7 +56,7 @@ run "a_copy_keeps_everything_regional_in_its_region" {
   }
 
   assert {
-    condition = alltrue([for s in concat([google_secret_manager_secret.admission_facts], values(google_secret_manager_secret.api_job), values(google_secret_manager_secret.api_service)) :
+    condition = alltrue([for s in concat([google_secret_manager_secret.admission_facts, google_secret_manager_secret.anthropic_key], values(google_secret_manager_secret.api_job), values(google_secret_manager_secret.api_service)) :
       s.replication[0].user_managed[0].replicas[0].location == "europe-west3"
     ])
     error_message = "Every secret is replicated to the copy's region alone."
@@ -136,6 +136,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_logging_project_sink.sinks),
       jsonencode(google_observability_project_settings.traces),
       jsonencode(google_secret_manager_secret.admission_facts),
+      jsonencode(google_secret_manager_secret.anthropic_key),
       jsonencode(google_secret_manager_secret.api_job),
       jsonencode(google_secret_manager_secret.api_service),
       jsonencode(google_cloud_run_v2_service.api),
@@ -159,6 +160,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_service_account.hosting),
       jsonencode(google_service_account.scheduler),
       jsonencode(google_artifact_registry_repository_iam_member.deployer),
+      jsonencode(google_secret_manager_secret_iam_member.api_reads_anthropic_key),
       jsonencode(google_secret_manager_secret_iam_member.api_reads_facts),
       jsonencode(google_secret_manager_secret_iam_member.api_reads_job_secrets),
       jsonencode(google_secret_manager_secret_iam_member.api_reads_service_secrets),
