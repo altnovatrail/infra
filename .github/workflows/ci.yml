@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 30
     outputs:
       core: ${{ steps.core.outputs.artifact }}
-      artifact: ${{ steps.toolchain.outputs.artifact }}
+      toolchain: ${{ steps.toolchain.outputs.artifact }}
     steps:
       # The Dockerfile, which the key hashes and the build reads, and the action: a sparse checkout
       # fetches no other file and not the spec submodule.
@@ -93,7 +93,7 @@ jobs:
         with:
           role: load
           stage: toolchain
-          artifact: ${{ needs.toolchain.outputs.artifact }}
+          artifact: ${{ needs.toolchain.outputs.toolchain }}
 
       - name: OpenTofu
         run: |

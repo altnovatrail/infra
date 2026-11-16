@@ -367,6 +367,7 @@ The project showed it, 2026-11-15 (T49), by the Monitoring API's `timeSeries` an
 - `actions/upload-artifact` at cf430e0, v7.0.2, `action.yml`: the output `artifact-id` — "A unique identifier for the artifact that was just uploaded. Empty if the artifact upload failed.";
 - `actions/download-artifact` at 9000827, v8.0.2, `src/download-artifact.ts`: by IDs it throws "None of the provided artifact IDs were found", downloads into `path` itself when `isSingleArtifactDownload || … || artifacts.length === 1`, and checks `expectedHash: artifact.digest`;
 - `needs` and `!cancelled()` — github/docs on `main`, read through the GitHub API, the files R42 .github quotes: `data/reusables/actions/jobs/section-using-jobs-in-a-workflow-needs.md`, "If a job fails or is skipped, all jobs that need it are skipped unless the jobs use a conditional expression that causes the job to continue"; `…/control-jobs-with-conditions.md`, "A job that is skipped will report its status as "Success". It will not prevent a pull request from merging, even if it is a required check"; `…/expressions.md`, "If you want to run a job or step regardless of its success or failure, use the recommended alternative: `if: ${{ !cancelled() }}`".
+
 ### 5.10. The tag `spec` v0.18.4 and the release `.github` v0.1.31: the stage `toolchain-core`
 
 (R34; T66), read 2026-11-16:
