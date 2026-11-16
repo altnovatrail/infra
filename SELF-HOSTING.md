@@ -304,7 +304,7 @@ Follow "Run on the dev projects" in [`api`'s README](https://github.com/altnovat
 3. `just dev migrate`, then `just dev countries allow US` and `just dev invite`. The country lets the owner's profile be created. The invite code, printed once, lets one owner create an account, and a deleted account needs a new one.
 4. `just dev serve` listens on port 8080 of every interface of its container. On the Docker network `novatrail-api` the container is `api`, by the alias of its devcontainer, so `app`'s proxy reaches it at `http://api:8080`; a container made before the alias came gets it by "Rebuild Container" (`api`'s README, `main` 0a65ddb).
 
-`API_APP_ORIGIN` is `http://127.0.0.1:5173` in `api`'s README and in the author's run, while `app`'s `docs/architecture.md` leaves it unset. Either works. Behind `app`'s proxy every request comes from `app`'s own origin: unset, `api` answers no CORS, and set, it adds CORS's headers for that one origin and refuses no request (`internal/server/cors.go` of `api`).
+`API_APP_ORIGIN` is `http://127.0.0.1:5173`, as `api`'s README and `app`'s `docs/architecture.md` both have it, and as the author's run set it. Left unset, it works too. Behind `app`'s proxy every request comes from `app`'s own origin: unset, `api` answers no CORS, and set, it adds CORS's headers for that one origin and refuses no request (`internal/server/cors.go` of `api`).
 
 `just dev-check` runs the whole way once by itself, with a test user, and is a quick check that the configuration holds.
 
