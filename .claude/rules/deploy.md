@@ -13,4 +13,4 @@ The deployment's list is `deploy/production.json`, by its schema `deploy/schema/
 - `just ci-licenses` checks the licenses of `tools/package-lock.json` by spec's check (R12 spec); a task that changes `tools/package.json` or the lock file ends with it green.
 - The scripts `tools/deploy/*.sh` and `tools/ci/*.sh` are checked by `just ci-shellcheck`, which CI runs in the job OpenTofu.
 
-A task that touches `deploy/` or `tools/` ends with the tests of what it touched green, and with `just deploy-check origin/main` when it touches the list or what checks it. CI runs the rest in the job Deploy, in the `toolchain` stage, where `ci-deploy-check` checks the list only when the paths it names change.
+A task that touches `deploy/` or `tools/` ends with the tests of what it touched green, and with `just deploy-check origin/main` when it touches the list or what checks it. CI runs the rest in the job Deploy, in the `toolchain-core` stage, which holds none of OpenTofu's tools (R34), where `ci-deploy-check` checks the list only when the paths it names change.

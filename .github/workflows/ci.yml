@@ -18,28 +18,32 @@ concurrency:
 jobs:
   secrets:
     name: Secrets
-    uses: altnovatrail/.github/.github/workflows/secrets.yml@8311cbfc01082e9b196c0af8d7b49192115cc84c # v0.1.30
+    uses: altnovatrail/.github/.github/workflows/secrets.yml@93c848fb51a10a245968cf730b99cc709a7748bf # v0.1.31
 
   # A pull request's commits are what it checks; a push to main has been checked as one.
   dco:
     name: DCO
     if: github.event_name == 'pull_request'
-    uses: altnovatrail/.github/.github/workflows/dco.yml@8311cbfc01082e9b196c0af8d7b49192115cc84c # v0.1.30
+    uses: altnovatrail/.github/.github/workflows/dco.yml@93c848fb51a10a245968cf730b99cc709a7748bf # v0.1.31
 
   documents:
     name: Documents
-    uses: altnovatrail/.github/.github/workflows/documents.yml@8311cbfc01082e9b196c0af8d7b49192115cc84c # v0.1.30
+    uses: altnovatrail/.github/.github/workflows/documents.yml@93c848fb51a10a245968cf730b99cc709a7748bf # v0.1.31
 
-  # The image of the toolchain stage of .devcontainer/Dockerfile, for OpenTofu and Deploy, built at
-  # most once a run (R32; R42 .github): on a hit of the cache this job only looks the entry up, and
-  # each job after it restores the file; on a miss it builds the image alone and hands its file to
-  # them as an artifact of the run, and on a push to main saves it into the cache. The shared
-  # Documents check builds its own on a miss: a called workflow does not see the jobs of this file.
+  # The images of the two stages of .devcontainer/Dockerfile infra's jobs run in, each built at most
+  # once a run (R32; R42 .github, R47 .github): toolchain-core — Node, just, Go and buf — for Deploy,
+  # and toolchain, the core with OpenTofu, ShellCheck and actionlint (R09), for OpenTofu. On a hit
+  # of the cache this job only looks the entries up, and each job after it restores its file; on a
+  # miss it builds the image alone, the core first, whose layers the build of toolchain then reuses,
+  # hands its file to them as an artifact of the run, and on a push to main saves it into the cache.
+  # The shared Documents check runs in the core too and keeps the same entry, but builds its own on
+  # a miss: a called workflow does not see the jobs of this file.
   toolchain:
     name: Toolchain image
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     outputs:
+      core: ${{ steps.core.outputs.artifact }}
       artifact: ${{ steps.toolchain.outputs.artifact }}
     steps:
       # The Dockerfile, which the key hashes and the build reads, and the action: a sparse checkout
@@ -52,19 +56,26 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
+      - id: core
+        uses: ./.github/actions/toolchain
+        with:
+          role: build
+          stage: toolchain-core
+
       - id: toolchain
         uses: ./.github/actions/toolchain
         with:
           role: build
+          stage: toolchain
 
   # infra's own check: the OpenTofu and the ShellCheck of the toolchain stage of
   # .devcontainer/Dockerfile, at the versions its ARGs name, and the tests of the recipes that check
   # them (R09), and actionlint over the workflows (R18); then the root module in tofu/ — its format, an init by the lock file, a validate and
   # its tests on mock providers (R10) — and bootstrap.sh, by ShellCheck and against a stand-in
   # gcloud (R13). spec's script runs the recipes in the stage, as the shared Documents check runs its
-  # own (R30 spec), and the stage comes from the cache it shares with that check, or from the job
-  # Toolchain image (R32). It runs whatever that job's verdict, unless the run is cancelled: a
-  # required check skipped because the job it needs failed would count as passed.
+  # own (R30 spec), and the stage comes from the cache, or from the job Toolchain image (R32). It
+  # runs whatever that job's verdict, unless the run is cancelled: a required check skipped because
+  # the job it needs failed would count as passed.
   opentofu:
     name: OpenTofu
     needs: toolchain
@@ -81,6 +92,7 @@ jobs:
       - uses: ./.github/actions/toolchain
         with:
           role: load
+          stage: toolchain
           artifact: ${{ needs.toolchain.outputs.artifact }}
 
       - name: OpenTofu
@@ -94,13 +106,15 @@ jobs:
           spec/tools/toolchain/toolchain.sh run just ci-actionlint-test
           spec/tools/toolchain/toolchain.sh run just ci-actionlint
 
-  # The checks of the deployment's list (R05, R14) and api's deployment (R15), in the same
-  # toolchain stage: the licenses of tools/, the checks' tests on synthetic releases, the check of a
+  # The checks of the deployment's list (R05, R14) and api's deployment (R15), in the stage
+  # toolchain-core, which holds the Node, just and bash they run, with the jq of the base image, and
+  # none of the three tools of OpenTofu's stage, which they do not call: the licenses of tools/, the checks' tests on synthetic releases, the check of a
   # release's files on a real release of api, against GitHub and Sigstore, the test of api's
   # deployment on stand-ins, the organizer's tool's on a stand-in for gcloud (R28), and the list
   # itself when the pull request changes what it is checked or deployed by: deploy/, the checks and
   # the deployment, their packages, the justfile or the tag of spec. The whole history, so that the
-  # list on main is there to compare with. The stage comes as in OpenTofu (R32).
+  # list on main is there to compare with. The stage comes as in OpenTofu, from the entry the shared
+  # Documents check keeps too (R32).
   # The check of a real release waits on the network, so it runs beside the tests on stand-ins, in a
   # container of its own, once deploy-check-test has installed the packages of tools/ it reads too.
   # Its output comes after theirs, even when one of them fails, and the step fails when any does.
@@ -122,7 +136,8 @@ jobs:
       - uses: ./.github/actions/toolchain
         with:
           role: load
-          artifact: ${{ needs.toolchain.outputs.artifact }}
+          stage: toolchain-core
+          artifact: ${{ needs.toolchain.outputs.core }}
 
       - name: Deploy
         run: |

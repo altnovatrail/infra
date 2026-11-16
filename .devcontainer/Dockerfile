@@ -4,18 +4,21 @@
 # detected at RUN time via dpkg instead. A host that has Docker can build this, and that is the
 # whole requirement.
 #
-# Two stages. `toolchain` holds what it takes to check the repository — its documents, and its
-# code where it has any — and is the stage the automated checks run inside. `devcontainer` adds
-# what a person needs on top of that, and devcontainer.json names it as its target. spec's own
-# file ends with a third, `orchestrator`, the devcontainer with the Docker CLI (R156 spec), which
-# `just new-repo` leaves out of a copy: in a copy `devcontainer` is the last stage, the one a
-# build with no target gives, and in spec every build names its stage. A builder that builds every
-# stage before its target builds `orchestrator` for the ordinary configuration too, and the stage
-# builds there as well, without the file only its own configuration writes.
+# Three stages. `toolchain-core` holds Node, just, Go and buf: what a release needs — its version
+# and its files — and every check that runs no browser, and a release builds it alone (R31 spec).
+# `toolchain` is the core with what the repository's tests need on top — in a copy, what its kind
+# adds at the end of the stage, such as the browsers of the kind typescript —, and is the stage
+# the automated checks run inside. `devcontainer` adds what a person needs on top of that, and
+# devcontainer.json names it as its target. spec's own file ends with a fourth, `orchestrator`,
+# the devcontainer with the Docker CLI (R156 spec), which `just new-repo` leaves out of a copy: in a
+# copy `devcontainer` is the last stage, the one a build with no target gives, and in spec every
+# build names its stage. A builder that builds every stage before its target builds `orchestrator`
+# for the ordinary configuration too, and the stage builds there as well, without the file only
+# its own configuration writes.
 
-# -- toolchain: checks the repository ----------------------------------------
+# -- toolchain-core: releases the repository, checks it without a browser -----
 
-FROM mcr.microsoft.com/devcontainers/base:3.0.13-noble@sha256:48be4adec1c1ecbe030064700aef85382f5205786a8f82937fc44a7473717eae AS toolchain
+FROM mcr.microsoft.com/devcontainers/base:3.0.13-noble@sha256:48be4adec1c1ecbe030064700aef85382f5205786a8f82937fc44a7473717eae AS toolchain-core
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
@@ -36,30 +39,11 @@ ARG GO_VERSION=1.27.4
 # with this file into the copy of every NovaTrail repository, as Go does, and stays unused in one
 # without contracts: the other repositories take the generated code from a release of spec.
 ARG BUF_VERSION=1.75.0
-# OpenTofu: infra describes the platform's infrastructure with it, as code on the model of
-# canvas-api's infra/, and its checks — tofu fmt, validate and test — run in this stage. It is the
-# one tool this repository's container has beyond spec's, and spec's template does not carry it:
-# a move to a new tag of spec keeps it (R09). It never ships, and its license, MPL 2.0, is the
-# named exception R09 makes (R12 spec).
-ARG OPENTOFU_VERSION=1.13.9
-# ShellCheck: the analyser of tofu/bootstrap.sh, the script that makes the project, its federated
-# pool and the identity the configuration is applied as, once, with the operator's own rights
-# (R13). The second tool beyond spec's container, kept the same way; it never ships, and its
-# license, GPL-3.0, is the named exception of the 2026-11-09 amendment to R09 (R12 spec).
-ARG SHELLCHECK_VERSION=0.11.0
-# actionlint: the check of the workflows, the deployment's among them, which runs only after a merge
-# and so cannot show its mistakes in the pull request (R18). The third tool beyond spec's container,
-# kept the same way; it never ships, and its license, MIT, is compatible with Apache-2.0 (the second
-# 2026-11-09 amendment to R09). It calls the ShellCheck above on the workflows' scripts.
-ARG ACTIONLINT_VERSION=1.7.12
 # The sha256 of every archive, per architecture, as its publisher lists it: SHASUMS256.txt of
 # the Node release, SHA256SUMS of the just release, the sha256 go.dev/dl lists for Go,
-# sha256.txt of the buf release, whose binary comes as it is, with no archive, and
-# tofu_<version>_SHA256SUMS of the OpenTofu release, whose own signature is checked by hand with
-# gpg each time the version is raised (R09), actionlint_<version>_checksums.txt of the actionlint
-# release, and, for ShellCheck, which publishes no list of sums,
-# the digest GitHub gives each asset of the release, checked against the archive itself. A sum written here keeps a download from being
-# swapped once it has been read (R34 spec), and is raised together with its version.
+# sha256.txt of the buf release, whose binary comes as it is, with no archive. A sum written here
+# keeps a download from being swapped once it has been read (R34 spec), and is raised together with
+# its version.
 ARG NODE_SHA256_AMD64=6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff
 ARG NODE_SHA256_ARM64=724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5
 ARG JUST_SHA256_AMD64=4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d
@@ -68,12 +52,6 @@ ARG GO_SHA256_AMD64=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab2
 ARG GO_SHA256_ARM64=3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92
 ARG BUF_SHA256_AMD64=fad1e38d6909bbb583a4da81d8c02a01046e2cd663bde7e337dd24277393764b
 ARG BUF_SHA256_ARM64=00eb190aa82df17f393e05b04889cc60a0b13b3259d336e21a87d5f23ab4fd26
-ARG OPENTOFU_SHA256_AMD64=b34b327cc1ef07178207b6f2cd1f5276537d3e5b7be316500f6dac50d4c0a857
-ARG OPENTOFU_SHA256_ARM64=5dc196dde75b667e4806d358310ec96742774cd0993c54c1237efee5644b69b8
-ARG SHELLCHECK_SHA256_AMD64=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
-ARG SHELLCHECK_SHA256_ARM64=68a8133197a50beb8803f8d42f9908d1af1c5540d4bb05fdfca8c1fa47decefc
-ARG ACTIONLINT_SHA256_AMD64=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-ARG ACTIONLINT_SHA256_ARM64=325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6
 
 # Every archive comes through one helper, so that every download is retried the same way and
 # checked against its sum before anything unpacks it. --retry-all-errors is the point of it: a
@@ -83,12 +61,10 @@ RUN arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
         amd64) node_arch=x64; gnu_arch=x86_64; \
             node_sha256="$NODE_SHA256_AMD64"; just_sha256="$JUST_SHA256_AMD64"; go_sha256="$GO_SHA256_AMD64"; \
-            buf_sha256="$BUF_SHA256_AMD64"; tofu_sha256="$OPENTOFU_SHA256_AMD64"; \
-            shellcheck_sha256="$SHELLCHECK_SHA256_AMD64"; actionlint_sha256="$ACTIONLINT_SHA256_AMD64" ;; \
+            buf_sha256="$BUF_SHA256_AMD64" ;; \
         arm64) node_arch=arm64; gnu_arch=aarch64; \
             node_sha256="$NODE_SHA256_ARM64"; just_sha256="$JUST_SHA256_ARM64"; go_sha256="$GO_SHA256_ARM64"; \
-            buf_sha256="$BUF_SHA256_ARM64"; tofu_sha256="$OPENTOFU_SHA256_ARM64"; \
-            shellcheck_sha256="$SHELLCHECK_SHA256_ARM64"; actionlint_sha256="$ACTIONLINT_SHA256_ARM64" ;; \
+            buf_sha256="$BUF_SHA256_ARM64" ;; \
         *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
     esac; \
     workdir="$(mktemp -d)"; \
@@ -123,6 +99,69 @@ RUN arch="$(dpkg --print-architecture)"; \
     install -m 0755 "$workdir/buf-${BUF_VERSION}-${gnu_arch}" /usr/local/bin/buf; \
     buf --version; \
     \
+    rm -rf "$workdir"
+
+# GOTOOLCHAIN=local: the Go above runs every go command, and none downloads another Go because a
+# go.mod asks for a newer one: a go.mod that does fails, which is the signal to raise GO_VERSION.
+ENV PATH="/usr/local/node/bin:/usr/local/go/bin:/home/vscode/.local/bin:${PATH}" \
+    GOTOOLCHAIN=local
+
+# -- toolchain: the core, plus what infra's own checks need ------------------
+#
+# infra's checks of its code need three tools the core lacks: OpenTofu, ShellCheck and actionlint
+# (R09). The checks every NovaTrail repository shares need none of them — infra calls the shared
+# Documents check alone, and releases nothing —, so they are here and not in the core, and the
+# shared checks run in the core, which this stage holds more than. A move to a new tag of spec
+# keeps this stage's lines, as the kinds' lines are kept at its end (R09).
+
+FROM toolchain-core AS toolchain
+
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+# OpenTofu: infra describes the platform's infrastructure with it, as code on the model of
+# canvas-api's infra/, and its checks — tofu fmt, validate and test — run in this stage. It is the
+# first tool this repository's container has beyond spec's, and spec's template does not carry it:
+# a move to a new tag of spec keeps it (R09). It never ships, and its license, MPL 2.0, is the
+# named exception R09 makes (R12 spec).
+ARG OPENTOFU_VERSION=1.13.9
+# ShellCheck: the analyser of tofu/bootstrap.sh, the script that makes the project, its federated
+# pool and the identity the configuration is applied as, once, with the operator's own rights
+# (R13). The second tool beyond spec's container, kept the same way; it never ships, and its
+# license, GPL-3.0, is the named exception of the 2026-11-09 amendment to R09 (R12 spec).
+ARG SHELLCHECK_VERSION=0.11.0
+# actionlint: the check of the workflows, the deployment's among them, which runs only after a merge
+# and so cannot show its mistakes in the pull request (R18). The third tool beyond spec's container,
+# kept the same way; it never ships, and its license, MIT, is compatible with Apache-2.0 (the second
+# 2026-11-09 amendment to R09). It calls the ShellCheck above on the workflows' scripts.
+ARG ACTIONLINT_VERSION=1.7.12
+# The sums, as in the core: tofu_<version>_SHA256SUMS of the OpenTofu release, whose own signature
+# is checked by hand with gpg each time the version is raised (R09), actionlint_<version>_checksums.txt
+# of the actionlint release, and, for ShellCheck, which publishes no list of sums, the digest GitHub
+# gives each asset of the release, checked against the archive itself. The helper below is the
+# core's, written again as the devcontainer stage writes it.
+ARG OPENTOFU_SHA256_AMD64=b34b327cc1ef07178207b6f2cd1f5276537d3e5b7be316500f6dac50d4c0a857
+ARG OPENTOFU_SHA256_ARM64=5dc196dde75b667e4806d358310ec96742774cd0993c54c1237efee5644b69b8
+ARG SHELLCHECK_SHA256_AMD64=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+ARG SHELLCHECK_SHA256_ARM64=68a8133197a50beb8803f8d42f9908d1af1c5540d4bb05fdfca8c1fa47decefc
+ARG ACTIONLINT_SHA256_AMD64=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+ARG ACTIONLINT_SHA256_ARM64=325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6
+
+RUN arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        amd64) gnu_arch=x86_64; tofu_sha256="$OPENTOFU_SHA256_AMD64"; \
+            shellcheck_sha256="$SHELLCHECK_SHA256_AMD64"; actionlint_sha256="$ACTIONLINT_SHA256_AMD64" ;; \
+        arm64) gnu_arch=aarch64; tofu_sha256="$OPENTOFU_SHA256_ARM64"; \
+            shellcheck_sha256="$SHELLCHECK_SHA256_ARM64"; actionlint_sha256="$ACTIONLINT_SHA256_ARM64" ;; \
+        *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    workdir="$(mktemp -d)"; \
+    fetch() { \
+        local url="$1" out="$2" sha256="$3"; \
+        curl -fsSL --proto "=https" --proto-redir "=https" --retry 3 --retry-all-errors \
+            -o "$out" "$url"; \
+        echo "${sha256}  ${out}" | sha256sum --check --strict -; \
+    }; \
+    \
     echo "opentofu ${OPENTOFU_VERSION}"; \
     fetch "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_${arch}.tar.gz" \
         "$workdir/tofu-${OPENTOFU_VERSION}-${arch}.tar.gz" "$tofu_sha256"; \
@@ -147,11 +186,6 @@ RUN arch="$(dpkg --print-architecture)"; \
     \
     rm -rf "$workdir"
 
-# GOTOOLCHAIN=local: the Go above runs every go command, and none downloads another Go because a
-# go.mod asks for a newer one: a go.mod that does fails, which is the signal to raise GO_VERSION.
-ENV PATH="/usr/local/node/bin:/usr/local/go/bin:/home/vscode/.local/bin:${PATH}" \
-    GOTOOLCHAIN=local
-
 # -- devcontainer: the toolchain, plus what a person works with --------------
 
 FROM toolchain AS devcontainer
@@ -167,8 +201,8 @@ ARG JUST_LSP_VERSION=0.10.0
 # Claude Code CLI. The VS Code extension in devcontainer.json must have the same version.
 ARG CLAUDE_CODE_VERSION=2.1.280
 # The sums, as above: gh_<version>_checksums.txt of the gh release, SHA256SUMS of just-lsp's.
-# The helper below is the toolchain stage's, written again rather than left in that image as a
-# script: the toolchain image is the one the checks run in, and nothing there needs it.
+# The helper below is the toolchain-core stage's, written again rather than left in that image as
+# a script: the toolchain images are the ones the checks run in, and nothing there needs it.
 ARG GH_SHA256_AMD64=9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8
 ARG GH_SHA256_ARM64=b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f
 ARG JUST_LSP_SHA256_AMD64=3c35e10e76db6cc1931495bb3abdaef02576eaeb406c217420f4fd37e1ebe22c
