@@ -64,7 +64,7 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
 |---|---|---|---|---|---|
 | [x] | T56 | Переход на `spec` v0.18.3 | я + Claude | — | — |
 | [x] | T62 | План по R153–R155 spec: таблицы в `run/`, план на английском | Claude | — | T56 |
-| [ ] | T63 | Переход CI на последний релиз `.github` (Д146 spec) | Claude | — | T62 |
+| [x] | T63 | Переход CI на последний релиз `.github` (Д146 spec) | Claude | — | T62 |
 | [ ] | T57 | Тексты `infra` по ответам `spec` на В24–В35 | Claude | — | T62 |
 | [ ] | T58 | Правило жизненного цикла на `eval-set/samples/` | я + Claude | — | T56 |
 | [ ] | T59 | Журнал чтения секретов (Д20) | я + Claude | да | T56 |
@@ -93,20 +93,6 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
 - **бакет.** Правило на `eval-set/forms/` в `tofu/bootstrap.sh` уже есть — `age` 364 и `daysSinceCustomTime` 364; на `eval-set/samples/` правила нет.
 
 **Не входит:** ключ поставщика ИИ, факты, ступень `author` и каталог — строка 6.21, вне эпика (R29); свой проект оператора для бакетов — до первого ребёнка (Д23; строка Д240 `spec`); законы об утечках других штатов — T150 `spec`; первая ссылка взрослому — после T151 `spec`; папка юридических текстов копии (Д12); свой домен — после О-16 (R06).
-
-#### T63. Переход CI на последний релиз `.github`
-
-- **Цель:** общие проверки `.github` — Secrets, DCO, Documents, CodeQL и Scorecard — на его последнем релизе, v0.1.24 или новее, с кешем образа `toolchain` (Д146 spec).
-- **Кто:** Claude. **План:** —.
-- **Почему:** третья часть перехода T56 (R30), как T68 `sim`: `infra` стоит на `.github` v0.1.21, а кеш образа пришёл в общие workflow с v0.1.22 (R36 `.github`; поправка 2026-11-09 к R31 spec). Пока его нет, каждая job общих проверок собирает образ из сети, и сбой nodejs.org, GitHub или снимка Ubuntu роняет проверки.
-- **Сделать:**
-  1. Последний релиз `.github`: `gh release list -R altnovatrail/.github`, `gh release verify <тег> -R altnovatrail/.github`; что общие workflow меняют от v0.1.21 — входы, права, кеш `toolchain` — записью `docs/sources.md`.
-  2. `.github/workflows/ci.yml`, `codeql.yml` и `scorecard.yml` — каждое `uses: altnovatrail/.github/…@<SHA> # v0.1.21` — на SHA коммита последнего тега с его именем в комментарии; входы, которые новая версия требует или меняет.
-  3. Свои job `infra` — OpenTofu, Deploy, Deployment tools — и `deploy.yml`: берут ли они образ `toolchain` из кеша через `spec/tools/toolchain/toolchain.sh` v0.18.3; если нет — так же, как общие (часть строки 7.25 COORDINATION.md `spec` об образе). Скорость тестов `bootstrap-test` и `deploy-check-release-test` из той же строки — не эта задача: строкой таблицы 4, если её нет.
-  4. `.github/dependabot.yml` — группа `shared-workflows` уже есть (Д88 spec: `infra` done) — сверить.
-  5. Решение журнала и поправка к R09 — он называет общие workflow на v0.1.21 и группу `shared-workflows`; где документы называют `.github` v0.1.21 — новый тег.
-- **Как проверить:** проверки CI pull request — зелёные, общие — с кешем образа; правило [.claude/rules/ci.md](.claude/rules/ci.md) — `just ci-actionlint` и его тест; `just -f spec/justfile docs-check-repo`; `/code-review high`, один круг.
-- **Разделы:** Д146 spec, Д88 spec; строки 7.13 и 7.25 COORDINATION.md `spec`; R30 spec, R31 spec; R09, R18, R30; правило [ci](.claude/rules/ci.md).
 
 #### T57. Тексты `infra` по ответам `spec` на В24–В35
 

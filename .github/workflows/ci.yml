@@ -18,24 +18,24 @@ concurrency:
 jobs:
   secrets:
     name: Secrets
-    uses: altnovatrail/.github/.github/workflows/secrets.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
+    uses: altnovatrail/.github/.github/workflows/secrets.yml@fab102d8bbb4659575e107ee488e072aaaa71821 # v0.1.24
 
   # A pull request's commits are what it checks; a push to main has been checked as one.
   dco:
     name: DCO
     if: github.event_name == 'pull_request'
-    uses: altnovatrail/.github/.github/workflows/dco.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
+    uses: altnovatrail/.github/.github/workflows/dco.yml@fab102d8bbb4659575e107ee488e072aaaa71821 # v0.1.24
 
   documents:
     name: Documents
-    uses: altnovatrail/.github/.github/workflows/documents.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
+    uses: altnovatrail/.github/.github/workflows/documents.yml@fab102d8bbb4659575e107ee488e072aaaa71821 # v0.1.24
 
   # infra's own check: the OpenTofu and the ShellCheck of the toolchain stage of
   # .devcontainer/Dockerfile, at the versions its ARGs name, and the tests of the recipes that check
   # them (R09), and actionlint over the workflows (R18); then the root module in tofu/ — its format, an init by the lock file, a validate and
   # its tests on mock providers (R10) — and bootstrap.sh, by ShellCheck and against a stand-in
-  # gcloud (R13). spec's script builds the stage and runs the recipes in it, as the shared Documents
-  # check runs its own (R30 spec).
+  # gcloud (R13). spec's script runs the recipes in the stage, as the shared Documents check runs its
+  # own (R30 spec), and the stage comes from the cache it shares with that check (R32).
   opentofu:
     name: OpenTofu
     runs-on: ubuntu-24.04
@@ -47,9 +47,10 @@ jobs:
           submodules: true
           persist-credentials: false
 
+      - uses: ./.github/actions/toolchain
+
       - name: OpenTofu
         run: |
-          spec/tools/toolchain/toolchain.sh build
           spec/tools/toolchain/toolchain.sh run just ci-tofu-test
           spec/tools/toolchain/toolchain.sh run just ci-tofu
           spec/tools/toolchain/toolchain.sh run just tf-check
@@ -65,7 +66,7 @@ jobs:
   # deployment on stand-ins, the organizer's tool's on a stand-in for gcloud (R28), and the list
   # itself when the pull request changes what it is checked or deployed by: deploy/, the checks and
   # the deployment, their packages, the justfile or the tag of spec. The whole history, so that the
-  # list on main is there to compare with.
+  # list on main is there to compare with. The stage comes from the cache, as in OpenTofu (R32).
   deploy:
     name: Deploy
     runs-on: ubuntu-24.04
@@ -77,9 +78,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - uses: ./.github/actions/toolchain
+
       - name: Deploy
         run: |
-          spec/tools/toolchain/toolchain.sh build
           spec/tools/toolchain/toolchain.sh run just ci-licenses
           spec/tools/toolchain/toolchain.sh run just deploy-check-test
           spec/tools/toolchain/toolchain.sh run just deploy-check-release-test
