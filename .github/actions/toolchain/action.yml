@@ -19,7 +19,8 @@ runs:
         key: toolchain-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.devcontainer/Dockerfile') }}
 
     # spec's script loads the file and removes it, or builds the stage and writes the file.
-    - name: Toolchain image
+    - id: image
+      name: Toolchain image
       shell: bash
       env:
         TOOLCHAIN_IMAGE_FILE: ${{ runner.temp }}/novatrail-toolchain.tar
@@ -28,13 +29,13 @@ runs:
     # Only on a miss: an entry never changes. A file that docker save could not write, or an entry
     # another job of the run saved first, only warns (sources 5.8).
     - name: Toolchain image to the cache
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: steps.image.outcome == 'success' && steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.temp }}/novatrail-toolchain.tar
         key: ${{ steps.cache.outputs.cache-primary-key }}
 
-    # The image is in docker now, and the recipes need the disk.
+    # The image, if the build gave one, is in docker now, and the recipes need the disk.
     - name: Free the file of the toolchain image
       if: ${{ !cancelled() }}
       shell: bash
