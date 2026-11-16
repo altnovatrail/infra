@@ -18,26 +18,57 @@ concurrency:
 jobs:
   secrets:
     name: Secrets
-    uses: altnovatrail/.github/.github/workflows/secrets.yml@fab102d8bbb4659575e107ee488e072aaaa71821 # v0.1.24
+    uses: altnovatrail/.github/.github/workflows/secrets.yml@8311cbfc01082e9b196c0af8d7b49192115cc84c # v0.1.30
 
   # A pull request's commits are what it checks; a push to main has been checked as one.
   dco:
     name: DCO
     if: github.event_name == 'pull_request'
-    uses: altnovatrail/.github/.github/workflows/dco.yml@fab102d8bbb4659575e107ee488e072aaaa71821 # v0.1.24
+    uses: altnovatrail/.github/.github/workflows/dco.yml@8311cbfc01082e9b196c0af8d7b49192115cc84c # v0.1.30
 
   documents:
     name: Documents
-    uses: altnovatrail/.github/.github/workflows/documents.yml@fab102d8bbb4659575e107ee488e072aaaa71821 # v0.1.24
+    uses: altnovatrail/.github/.github/workflows/documents.yml@8311cbfc01082e9b196c0af8d7b49192115cc84c # v0.1.30
+
+  # The image of the toolchain stage of .devcontainer/Dockerfile, for OpenTofu and Deploy, built at
+  # most once a run (R32; R42 .github): on a hit of the cache this job only looks the entry up, and
+  # each job after it restores the file; on a miss it builds the image alone and hands its file to
+  # them as an artifact of the run, and on a push to main saves it into the cache. The shared
+  # Documents check builds its own on a miss: a called workflow does not see the jobs of this file.
+  toolchain:
+    name: Toolchain image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      artifact: ${{ steps.toolchain.outputs.artifact }}
+    steps:
+      # The Dockerfile, which the key hashes and the build reads, and the action: a sparse checkout
+      # fetches no other file and not the spec submodule.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .devcontainer/Dockerfile
+            .github/actions/toolchain/action.yml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - id: toolchain
+        uses: ./.github/actions/toolchain
+        with:
+          role: build
 
   # infra's own check: the OpenTofu and the ShellCheck of the toolchain stage of
   # .devcontainer/Dockerfile, at the versions its ARGs name, and the tests of the recipes that check
   # them (R09), and actionlint over the workflows (R18); then the root module in tofu/ — its format, an init by the lock file, a validate and
   # its tests on mock providers (R10) — and bootstrap.sh, by ShellCheck and against a stand-in
   # gcloud (R13). spec's script runs the recipes in the stage, as the shared Documents check runs its
-  # own (R30 spec), and the stage comes from the cache it shares with that check (R32).
+  # own (R30 spec), and the stage comes from the cache it shares with that check, or from the job
+  # Toolchain image (R32). It runs whatever that job's verdict, unless the run is cancelled: a
+  # required check skipped because the job it needs failed would count as passed.
   opentofu:
     name: OpenTofu
+    needs: toolchain
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -48,6 +79,9 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/toolchain
+        with:
+          role: load
+          artifact: ${{ needs.toolchain.outputs.artifact }}
 
       - name: OpenTofu
         run: |
@@ -66,7 +100,7 @@ jobs:
   # deployment on stand-ins, the organizer's tool's on a stand-in for gcloud (R28), and the list
   # itself when the pull request changes what it is checked or deployed by: deploy/, the checks and
   # the deployment, their packages, the justfile or the tag of spec. The whole history, so that the
-  # list on main is there to compare with. The stage comes from the cache, as in OpenTofu (R32).
+  # list on main is there to compare with. The stage comes as in OpenTofu (R32).
   # The check of a real release waits on the network, so it runs beside the tests on stand-ins, in a
   # container of its own, once deploy-check-test has installed the packages of tools/ it reads too.
   # Its output comes after theirs, even when one of them fails, and the step fails when any does.
@@ -74,6 +108,8 @@ jobs:
   # tools/ (row 7.25 of COORDINATION.md spec).
   deploy:
     name: Deploy
+    needs: toolchain
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -84,6 +120,9 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/toolchain
+        with:
+          role: load
+          artifact: ${{ needs.toolchain.outputs.artifact }}
 
       - name: Deploy
         run: |
