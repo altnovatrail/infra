@@ -67,6 +67,11 @@ jobs:
   # itself when the pull request changes what it is checked or deployed by: deploy/, the checks and
   # the deployment, their packages, the justfile or the tag of spec. The whole history, so that the
   # list on main is there to compare with. The stage comes from the cache, as in OpenTofu (R32).
+  # The check of a real release waits on the network, so it runs beside the tests on stand-ins, in a
+  # container of its own, once deploy-check-test has installed the packages of tools/ it reads too.
+  # Its output comes after theirs, even when one of them fails, and the step fails when any does.
+  # ci-deploy-check comes after it: both run spec's release-verify, whose first call installs spec's
+  # tools/ (row 7.25 of COORDINATION.md spec).
   deploy:
     name: Deploy
     runs-on: ubuntu-24.04
@@ -84,12 +89,20 @@ jobs:
         run: |
           spec/tools/toolchain/toolchain.sh run just ci-licenses
           spec/tools/toolchain/toolchain.sh run just deploy-check-test
-          spec/tools/toolchain/toolchain.sh run just deploy-check-release-test
-          spec/tools/toolchain/toolchain.sh run just deploy-api-test
-          spec/tools/toolchain/toolchain.sh run just deploy-app-test
-          spec/tools/toolchain/toolchain.sh run just deploy-target-test
-          spec/tools/toolchain/toolchain.sh run just tools-install-test
-          spec/tools/toolchain/toolchain.sh run just organizer-test
+          release_log="$RUNNER_TEMP/deploy-check-release-test.log"
+          spec/tools/toolchain/toolchain.sh run just deploy-check-release-test > "$release_log" 2>&1 &
+          release=$!
+          status=0
+          {
+            spec/tools/toolchain/toolchain.sh run just deploy-api-test &&
+              spec/tools/toolchain/toolchain.sh run just deploy-app-test &&
+              spec/tools/toolchain/toolchain.sh run just deploy-target-test &&
+              spec/tools/toolchain/toolchain.sh run just tools-install-test &&
+              spec/tools/toolchain/toolchain.sh run just organizer-test
+          } || status=$?
+          wait "$release" || status=$?
+          cat "$release_log"
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
           spec/tools/toolchain/toolchain.sh run just ci-deploy-check origin/main
 
   # The deployment's tools as its jobs install them, on the runner they run on (R18): each download
