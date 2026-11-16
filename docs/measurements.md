@@ -4,7 +4,7 @@
 
 ## 1. Tokens of the epics' sessions
 
-At the archive of an epic, `just -f spec/justfile tokens-report --since … --until … --row` measures the sessions of Claude Code in the epic's window, on the author's machine, by their transcripts in the folder `-workspaces-infra` (RUN.md, «Как устроен план: эпики»; measurements 1.9 spec). A window runs from the commit that archived the epic before to the start of the session that archives this one. A session that crosses a boundary is counted by its calls inside the window.
+At the archive of an epic, `just -f spec/justfile tokens-report --since … --until … --row` measures the sessions of Claude Code in the epic's window, on the author's machine, by their transcripts in the folder `-workspaces-infra` (RUN.md, Epics; measurements 1.9 spec). A window runs from the commit that archived the epic before to the start of the session that archives this one. A session that crosses a boundary is counted by its calls inside the window.
 
 | Epic | Window, UTC | Sessions | Calls, main / subagents | Context of a call, k, main / subagents | Compactions | Cost at API prices |
 |---|---|---|---|---|---|---|
