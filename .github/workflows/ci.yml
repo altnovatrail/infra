@@ -18,17 +18,17 @@ concurrency:
 jobs:
   secrets:
     name: Secrets
-    uses: altnovatrail/.github/.github/workflows/secrets.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
+    uses: altnovatrail/.github/.github/workflows/secrets.yml@11e1b0f79f771aea8b0b57d0a706365a607a6929 # v0.1.23
 
   # A pull request's commits are what it checks; a push to main has been checked as one.
   dco:
     name: DCO
     if: github.event_name == 'pull_request'
-    uses: altnovatrail/.github/.github/workflows/dco.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
+    uses: altnovatrail/.github/.github/workflows/dco.yml@11e1b0f79f771aea8b0b57d0a706365a607a6929 # v0.1.23
 
   documents:
     name: Documents
-    uses: altnovatrail/.github/.github/workflows/documents.yml@706f4067a66c91b0442033f82a7924eeb8b60497 # v0.1.21
+    uses: altnovatrail/.github/.github/workflows/documents.yml@11e1b0f79f771aea8b0b57d0a706365a607a6929 # v0.1.23
 
   # infra's own check: the OpenTofu and the ShellCheck of the toolchain stage of
   # .devcontainer/Dockerfile, at the versions its ARGs name, and the tests of the recipes that check
