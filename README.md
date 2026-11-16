@@ -21,13 +21,13 @@ Detailed, built and deployed. The first epic of [RUN.md](RUN.md) decided what th
 
 ## Documents
 
-The documents are in English; the work plan, its technical debt and the archives of its epics are in Russian.
+The documents and the work plan are in English; the current epic's description and table of tasks, the bodies of the plan's tasks and the archives of its epics are in Russian.
 
 - [docs/architecture.md](docs/architecture.md) — the component: what it does and does not do, its data and links, and what is still to decide.
 - [docs/decisions.md](docs/decisions.md) — the decision log: what was decided, why, and what was rejected.
 - [docs/sources.md](docs/sources.md) — the external facts the documents rest on, each with its source, its date and its quote.
 - [RUN.md](RUN.md) — the work plan, in epics.
-- [DEBT.md](DEBT.md) — the technical debt, in Russian: table 4 of the work plan.
+- `run/` — the plan's other tables: [the epics for later](run/EPICS.md), [the open questions](run/QUESTIONS.md), [the technical debt](run/DEBT.md) and [the tasks outside an epic](run/TASKS.md).
 - [SELF-HOSTING.md](SELF-HOSTING.md) — how to bring up your own copy of the platform, from an empty Google Cloud account to a copy ready to deploy, how to run the whole platform from source on one machine (section 12), and how an organizer makes an upload link to the operator's bucket (section 13).
 - [BREACH.md](BREACH.md) — what the operator does in a breach of learners' data: what counts as one, how to cut the access, where to look, whom to tell and by when.
 
