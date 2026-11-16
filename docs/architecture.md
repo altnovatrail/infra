@@ -563,7 +563,7 @@ The organizer gives the page to the adult, who opens it in a browser and sends t
 | `measure/forms/`, `child/forms/` | `daysSinceCustomTime` 1827 | the session plus 730 days, of the last session under the form; moved forward by a new session; on a withdrawal the form is rewritten with the day of the erasure | 5 years after its samples are erased (R124, R125 spec) |
 | `eval-set/forms/` | `age` 364, and `daysSinceCustomTime` 364: two rules, and either erases | the signature, on the record beside the form | 12 months from the signature, when no sample was contributed (R126 spec) |
 | `eval-set/contributed-forms/` | none | — | as long as a sample is published (R126 spec) |
-| `eval-set/samples/` | none yet: T58 makes it | — | until it enters `modules`, and no later than its form or 12 months from the upload, whichever comes first (the 2026-11-13 and 2026-11-15 amendments to R126 spec) |
+| `eval-set/samples/` | none yet: T58 makes it | — | until the organizer enters it into `modules` and erases its copy, or erases it at once when it fails the check; one not entered — with its form or 12 months from the upload, whichever comes first, the rule T58's (R126 spec, its 2026-11-13 and 2026-11-15 amendments) |
 
 A Custom-Time cannot decrease, but a rewrite of the object resets it. A form without one is never erased by the rule, so the tool sets it and lists the forms without it. `<project>-consent-forms` has no rule: the period of a scan is the consent and 5 years, and `sweep` erases it (R116, R136 spec).
 

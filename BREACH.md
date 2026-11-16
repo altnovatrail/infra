@@ -12,8 +12,7 @@ It has two parts:
 - in the closing task of every epic of `infra` (RUN.md);
 - after every breach;
 - before a new group of learners: the first child, a new country (`api countries allow`), the first learner from the EU, the EEA or the United Kingdom;
-- before the platform has 250 learners, since the attorney general's threshold counts Texas residents and the platform does not know a learner's state (section 9);
-- by R152 spec, in which spec read the breach laws of all the states on 2026-11-15 (section 10).
+- before the platform has 250 learners, since the attorney general's threshold counts Texas residents and the platform does not know a learner's state (section 9).
 
 A task of `infra` that changes what part 1 names keeps part 1 true in the same change: a place of learners' data, a secret, a right, a log.
 
@@ -107,7 +106,7 @@ An upload page that reached the wrong person can only add files, and its policy 
 
 ### 5. Decide what was reached
 
-Write down which rows of section 2 were reached, over which period, and which accounts. When nothing narrows it, every account was reached. Write down the date on which you determined that the breach occurred: the deadlines of part 2 run from it.
+Write down which rows of section 2 were reached, over which period, and which accounts. When nothing narrows it, every account was reached. Write down the date on which the breach was discovered and the date on which you determined that it occurred: the deadlines of part 2 run from one or the other.
 
 ### 6. Reach the learners
 
@@ -115,7 +114,7 @@ There are no names on the server (privacy 3.4 spec), and `api` keeps no email (s
 
 The addresses never go into this repository, into the record or into a conversation with an AI assistant.
 
-Every learner whose data was reached, or may have been, hears of it by email (section 8). The letter says:
+Every learner whose data was reached, or may have been, hears of it by email, by the deadline and in the form part 2 names. The letter says:
 
 - what happened and when;
 - what data of theirs was reached;
@@ -130,7 +129,7 @@ The operator keeps one record per case, in a closed place of their own, never in
 - the case's number, and when it was opened;
 - how you learned of it, and when;
 - what happened, as far as you know: the rows of section 2, the period, the accounts as a count;
-- the date you determined that the breach occurred;
+- the dates the breach was discovered and determined;
 - each step of section 3, with its time;
 - the number of learners reached, and of them how many are Texas residents, as far as you know without asking (section 9);
 - the notices: to the learners — the date, the channel and how many; to the attorney general, to another state, to a processor or to the police — the date and what was sent;
@@ -139,6 +138,14 @@ The operator keeps one record per case, in a closed place of their own, never in
 - when the case was closed.
 
 ## Part 2. The operator of `novatrail`
+
+**Read this first: R152 spec.** spec has read the breach laws of all the US states from their primary sources, and decided by R152 spec (privacy 3.4 spec): the operator follows them all, by the strictest, for every learner from the US, asks nobody for their state, and reads no state's law in a breach. Sections 8–11 below do not follow that order yet: they are rewritten by it before the first child from the US and before the platform has 250 learners (row Д25 of [run/DEBT.md](run/DEBT.md)). Until then, wherever R152 spec and privacy 3.4 spec differ from sections 8–11, follow R152 spec and privacy 3.4 spec. Among what they change:
+
+- every person whose data was reached, or may have been, hears of it by one letter by email no later than the 30th day after the breach is discovered, not the 60th after it is determined, whatever the harm;
+- the letter takes California's form, "Notice of Data Breach" with its five headings, in plain language and at least 10-point type, and names the total number of people reached and no number by state;
+- each authority whose law covers what was reached and whose threshold the total number reached does not rule out is told — Maryland's before the letters, Vermont's by the 14th business day —, not only the attorney general of Texas, and an authority that asks for the number of its residents gets the total and the word that the state is not known;
+- over 500 people notified, the nationwide consumer reporting agencies are told, not over 10,000;
+- where the laws of the District of Columbia, New York or North Carolina cover what was reached, the letter goes with a substitute notice (the 2026-11-15 amendment to R152 spec).
 
 ### 8. Texas: Business and Commerce Code §521.053
 
@@ -174,13 +181,7 @@ The platform knows a learner's country, not their state, and does not ask for it
 
 ### 10. Learners from other states
 
-A resident of another state may be told under that state's law instead (§521.053(b-1)). That state's law may also bind the operator by itself, with its own deadline and its own authority. spec has read those laws, from their primary sources, and answered by R152 spec (privacy 3.4 spec): the operator follows them all, by the strictest, for every learner from the US, and reads no state's law in a breach. Sections 8 and 9 do not follow that order yet: they are rewritten by it before the first child from the US and before the platform has 250 learners (row Д25 of [run/DEBT.md](run/DEBT.md)). Until then, where R152 spec and this part differ, follow R152 spec and privacy 3.4 spec, not this part. Among what they change:
-
-- every person whose data was reached hears of it by one letter by email no later than the 30th day after the breach is discovered, not the 60th, whatever the harm;
-- each authority whose law covers what was reached and whose threshold the total number reached does not rule out is told — Maryland's before the letters, Vermont's by the 14th business day —, not only the attorney general of Texas, and an authority that asks for the number of its residents gets the total and the word that the state is not known;
-- where the laws of the District of Columbia, New York or North Carolina cover what was reached, the letter is also a substitute notice (the 2026-11-15 amendment to R152 spec).
-
-Nobody is asked for their state (R152 spec). The states of learners are never written into this repository or into the record.
+A resident of another state may be told under that state's law instead (§521.053(b-1)). That state's law may also bind the operator by itself, with its own deadline and its own authority. spec has read those laws and decided by R152 spec how the operator follows them: see the start of part 2. Nobody is asked for their state (R152 spec). The states of learners are never written into this repository or into the record.
 
 ### 11. Not yet
 
