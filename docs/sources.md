@@ -198,6 +198,15 @@ Whether the missing data of a condition are those of the window's sum, so that a
 
 The project showed it, 2026-11-15 (T49), by the Monitoring API's `timeSeries` and `alertPolicies`: the policy `api jobs by the clock not run`, made 2026-11-13T19:10:57Z, enabled; the raw points of `completed_execution_count` of `api-sweep`, `result=succeeded`, are `1` at 2026-11-13T09:01:00Z and 2026-11-14T09:01:00Z and `0` at 09:02–09:05 of 2026-11-14, none between; the same summed over `90000s`, `ALIGN_SUM` and `REDUCE_SUM`, `1` at 2026-11-13T23:36:11Z and 2026-11-15T00:36:11Z. No incident of the policy, open or closed, and no mail, from its making to 2026-11-15 00:36 UTC: the condition reads the window's sum.
 
+### 3.15. A copy's folder of legal texts and the volumes of Cloud Run
+
+(Д12; T67), read 2026-11-16; none of the Google Cloud pages gives a date:
+- [`api` v0.1.42](https://github.com/altnovatrail/api/blob/v0.1.42/README.md), the release the list rolls out, `README.md` through the GitHub API: `API_LEGAL_DIR` — "a self-hosted copy's folder of its operator's legal texts, outside any git working tree: `VERSION`, `legal.yaml` and `texts/` alone, of version 3 of spec's part `legal/`, read at the start by its rules on that day: with no privacy policy whose day has come, or a version of it without its section "Who we are", api does not start (`legal.operator`); unset, the texts of the tag of spec"; the job `check` takes "`API_ADMISSION_FACTS_FILE`, `API_ADMISSION_RUNG`" alone;
+- the part `legal/` of `spec` v0.18.3, as a measure of a folder's size: 25 files under `texts/`, 384,226 bytes, and `legal.yaml`, 51,929 bytes (`find texts -type f`, `du -sb`);
+- Google Cloud, [Secret Manager quotas](https://docs.cloud.google.com/secret-manager/quotas): "Payload size | 64 KiB";
+- Google Cloud, [Configure secrets for services](https://docs.cloud.google.com/run/docs/configuring/services/secrets): "Cloud Run doesn't allow you to mount multiple secrets at the same path because two volume mounts can't be mounted at the same location";
+- Google Cloud, [Cloud Storage volume mounts](https://docs.cloud.google.com/run/docs/configuring/services/cloud-storage-volume-mounts): "Mounting the bucket as a volume in Cloud Run presents the bucket content as files in the container file system"; "You can mount your volume as read-only"; "Volume mounts require the second generation execution environment"; "Cloud Storage FUSE is not a fully POSIX-compliant file system"; a mount that takes longer than 30 seconds — "Cloud Storage FUSE will fail to mount and the Cloud Run service will fail to start".
+
 ## 4. The hosting of the build of `app` and sign-in
 
 ### 4.1. Firebase Hosting
