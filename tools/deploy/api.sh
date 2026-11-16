@@ -10,6 +10,12 @@
 # by tools/deploy-check/fetch.mjs, and the image is built as api's release says, around the binary
 # alone. The first deployment runs it before api_image names the image (T24).
 #
+# A self-hosted copy whose deploy/production/legal/ holds its operator's legal texts runs the image
+# of its release with that folder laid over it: the image FROM the release's image by its digest,
+# the folder at /etc/api/legal and API_LEGAL_DIR naming it, under the tag of the release and the
+# folder's sha256 (R33). image, release and facts all give the revision and the jobs that image; the
+# platform has no folder, and its image is the release's own.
+#
 # release runs the whole of a new release of api: a release lower than the one that takes the
 # traffic is refused; then the image; a new version of the facts' secret; the image set on every job
 # of the list, and on a job of the part check that version of the facts too, the one the revision
@@ -18,10 +24,12 @@
 # the facts, taking no traffic until it is ready, and then all of it; and last the jobs of the part
 # after. Before the configuration makes the service there is none to roll, and it says so.
 #
-# facts takes a new version of the facts alone: the jobs of the part check on the image that takes
-# the traffic, with that version, and then a new revision on that image, by its digest, with it. No
-# build, no migration and no release-verify, since the release's files have not changed; facts that
-# api's check refuses stop before any revision (R05).
+# facts takes a new version of the facts, and the copy's folder of texts as it now is: the jobs of
+# the part check on the image of the release that takes the traffic, with the folder laid over it
+# again when it changed or none when it went, and with that version, and then a new revision on that
+# image, by its digest, with it. No build of the release, no migration and no release-verify, since
+# the release's files have not changed; facts or texts that api's check refuses stop before any
+# revision (R05; R33).
 #
 # What it works on comes from the configuration's outputs, as `tofu output -json` prints them after
 # the apply of the same commit: the project, the region, the registry, the service, the jobs with
@@ -46,6 +54,12 @@ case "$command" in image | release | facts) ;; *) fail "the command is image, re
 [[ -f "$outputs" ]] || fail "the configuration's outputs are not there: ${outputs}"
 list="$deploy/production.json"
 facts_file="$deploy/production/facts.json"
+legal_dir="$deploy/production/legal"
+# Where a copy's folder of legal texts lies in its image, as API_LEGAL_DIR names it there, and the
+# steps that lay it over the release's image (R33).
+legal_path=/etc/api/legal
+legal_steps="COPY --chown=0:0 legal ${legal_path}
+ENV API_LEGAL_DIR=${legal_path}"
 [[ -f "$list" ]] || fail "the list is not there: ${list}"
 
 # One value of the outputs, which must be there: a value missing would aim a step at nothing.
@@ -137,16 +151,41 @@ registry_tags() {
     jq -r '.[] | [(.tag | split("/") | last), (.version | split("/") | last)] | @tsv' <<< "$listed"
 }
 
-# The release the image of that digest is tagged with in the registry: one exact tag, as the
-# deployment gives each image, or a refusal (R15).
-release_of() {
+# The tag the image of that digest has in the registry: one, as the deployment gives each image, or
+# a refusal (R15).
+tag_of() {
     local digest="$1" all tags
     all="$(registry_tags)" || fail "the registry's tags of ${image_name} cannot be read"
     tags="$(awk -F '\t' -v digest="${digest##*@}" '$2 == digest { print $1 }' <<< "$all")"
     [[ -n "$tags" ]] || fail "the image ${digest} that takes the traffic has no tag in the registry, so its release cannot be told"
     [[ "$(wc -l <<< "$tags")" -eq 1 ]] || fail "the image ${digest} that takes the traffic has more than one tag: $(tr '\n' ' ' <<< "$tags")"
-    numbers "$tags" > /dev/null
     printf '%s\n' "$tags"
+}
+
+# The release of an image's tag: the tag itself, or, for an image with a copy's texts, the tag before
+# -legal- and the folder's sha256 (R33); an exact tag of a release, or a refusal.
+release_in() {
+    local tag="$1"
+    [[ "$tag" =~ ^(.+)-legal-[0-9a-f]{64}$ ]] && tag="${BASH_REMATCH[1]}"
+    numbers "$tag" > /dev/null
+    printf '%s\n' "$tag"
+}
+
+# The image under a tag of the registry, by digest, or nothing when the registry holds no such tag.
+tagged() {
+    local all digest
+    all="$(registry_tags)" || fail "the registry's tags of ${image_name} cannot be read"
+    digest="$(awk -F '\t' -v tag="$1" '$1 == tag { print $2 }' <<< "$all")"
+    [[ -z "$digest" ]] || printf '%s\n' "${image_name}@${digest}"
+}
+
+# The push of a tag built here, and its digest, the one the push reports, as the image.
+push() {
+    local pushed digest
+    pushed="$(docker push "${image_name}:$1")"
+    digest="$(grep -oE 'digest: sha256:[0-9a-f]{64}' <<< "$pushed" | tail -1)" || fail "the push of ${image_name}:$1 reported no digest"
+    image="${image_name}@${digest#digest: }"
+    echo "    ${image}"
 }
 
 # The image of the list's release, by digest. One the registry holds under the release's tag already,
@@ -155,11 +194,10 @@ release_of() {
 # downloaded and verified again, and the image is built around the binary alone, for linux/amd64,
 # the binary's platform and Cloud Run's, and pushed; its digest is the one the push reports.
 build_image() {
-    local all existing name binary_sha256 dockerfile_sha256 binary dockerfile pushed digest
-    all="$(registry_tags)" || fail "the registry's tags of ${image_name} cannot be read"
-    existing="$(awk -F '\t' -v tag="$release" '$1 == tag { print $2 }' <<< "$all")"
+    local existing name binary_sha256 dockerfile_sha256 binary dockerfile
+    existing="$(tagged "$release")"
     if [[ -n "$existing" ]]; then
-        image="${image_name}@${existing}"
+        image="$existing"
         echo "==> the image of api ${release} is in the registry already: ${image}"
         return
     fi
@@ -179,10 +217,50 @@ build_image() {
     gcloud auth configure-docker "${repository%%/*}" --quiet > /dev/null
     docker build --platform=linux/amd64 --target release --build-context "binary=$work/binary" \
         -f "$dockerfile" -t "${image_name}:${release}" "$work/context"
-    pushed="$(docker push "${image_name}:${release}")"
-    digest="$(grep -oE 'digest: sha256:[0-9a-f]{64}' <<< "$pushed" | tail -1)" || fail "the push of ${image_name}:${release} reported no digest"
-    image="${image_name}@${digest#digest: }"
-    echo "    ${image}"
+    push "$release"
+}
+
+# The sha256 of the copy's folder of legal texts, over the steps that lay it, the path of each of its
+# folders and the path and the bytes of each of its files, or nothing when there is no folder: another
+# folder, or another way of laying it, is another tag. What is neither a file nor a folder is refused:
+# a link would lay into the image what the review of the folder did not see.
+legal_sum() {
+    local odd
+    [[ -e "$legal_dir" || -L "$legal_dir" ]] || return 0
+    [[ -d "$legal_dir" && ! -L "$legal_dir" ]] || fail "${legal_dir} is not a folder"
+    odd="$(cd "$legal_dir" && find . ! -type f ! -type d)"
+    [[ -z "$odd" ]] || fail "${legal_dir} holds what is neither a file nor a folder: $(tr '\n' ' ' <<< "$odd")"
+    {
+        printf '%s\n' "$legal_steps"
+        (cd "$legal_dir" && find . -type d | LC_ALL=C sort)
+        (cd "$legal_dir" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum)
+    } | sha256sum | cut -d ' ' -f 1
+}
+
+# The image the revision and the jobs run, from $image, the image of the release $1: that image itself
+# when the copy has no folder of legal texts, as the platform has none; otherwise that image with the
+# folder laid over it at $legal_path, owned by root and read by all, and API_LEGAL_DIR naming it, which
+# api's check and serve read and refuse by the rules of spec's part legal/ (R33). It is built FROM the
+# release's image by its digest, for the same platform, under the tag <release>-legal-<sha256 of the
+# folder>, and one the registry holds under that tag already is the one taken, as for the release's.
+with_texts() {
+    local of="$1" tag existing
+    [[ -n "$legal" ]] || return 0
+    tag="${of}-legal-${legal}"
+    existing="$(tagged "$tag")"
+    if [[ -n "$existing" ]]; then
+        image="$existing"
+        echo "==> the image of api ${of} with the copy's legal texts is in the registry already: ${image}"
+        return
+    fi
+    echo "==> the image ${image_name}:${tag}, with the copy's legal texts"
+    mkdir -p "$work/texts"
+    cp -R "$legal_dir" "$work/texts/legal"
+    chmod -R u=rwX,go=rX "$work/texts/legal"
+    printf 'FROM %s\n%s\n' "$image" "$legal_steps" > "$work/texts.Dockerfile"
+    gcloud auth configure-docker "${repository%%/*}" --quiet > /dev/null
+    docker build --platform=linux/amd64 -f "$work/texts.Dockerfile" -t "${image_name}:${tag}" "$work/texts"
+    push "$tag"
 }
 
 # A new version of the facts' secret, from the list's facts.json: its number.
@@ -242,6 +320,8 @@ roll() {
 }
 
 numbers "$release" > /dev/null
+# The sum of the copy's texts, read once: a folder that is not one is refused before anything runs.
+legal="$(legal_sum)"
 
 # The jobs by their part, read once: a list read wrong would run no job and go on.
 jq -e 'type == "object" and all(.[]; (.job | type) == "string" and (.deploy == null or (.deploy | IN("check", "migrate", "after"))))' <<< "$jobs" > /dev/null ||
@@ -257,6 +337,7 @@ mapfile -t clock_jobs < <(jobs_of clock)
 case "$command" in
     image)
         build_image
+        with_texts "$release"
         echo "IMAGE=${image}"
         ;;
 
@@ -266,7 +347,7 @@ case "$command" in
         described="$(describe_service)"
         if [[ -n "$described" ]]; then
             serving_image="$(serving_digest "$described")"
-            serving="$(release_of "$serving_image")"
+            serving="$(release_in "$(tag_of "$serving_image")")"
             if lower "$release" "$serving"; then
                 fail "api ${release} is lower than ${serving}, which takes the traffic: api goes forward only (R05)"
             fi
@@ -275,6 +356,7 @@ case "$command" in
             echo "==> no service ${service} yet: the jobs alone, and the revision once the configuration makes it"
         fi
         build_image
+        with_texts "$release"
         version="$(add_facts)"
         # Before the migrations only the jobs that run before them get the new image: a job of the
         # clock or of after would run the new release against a database not migrated yet, were the
@@ -297,11 +379,25 @@ case "$command" in
         ((${#check_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part check, and new facts do not go without api's check of them (R05)"
         described="$(describe_service)"
         [[ -n "$described" ]] || fail "there is no service ${service} to give the facts to"
-        image="$(serving_digest "$described")"
+        serving_image="$(serving_digest "$described")"
+        serving_tag="$(tag_of "$serving_image")"
+        serving="$(release_in "$serving_tag")"
+        # The release's own image — the one that takes the traffic, or, under a copy's texts, the one
+        # its tag names — and the copy's texts over it as the folder now is.
+        image="$serving_image"
+        if [[ "$serving_tag" != "$serving" ]]; then
+            image="$(tagged "$serving")"
+            [[ -n "$image" ]] || fail "the registry holds no image of api ${serving} under its tag, which the image with the texts that takes the traffic was laid over"
+        fi
+        with_texts "$serving"
         version="$(add_facts)"
         set_image "$version" "${check_jobs[@]}"
         run_jobs check "${check_jobs[@]}"
         roll "$version"
+        # Texts that changed change the image: the other jobs then run the revision's image too.
+        if [[ "$image" != "$serving_image" ]]; then
+            set_image "${migrate_jobs[@]}" "${after_jobs[@]}" "${clock_jobs[@]}"
+        fi
         echo "deploy-api: the facts of version ${version}, on ${image}"
         ;;
 esac

@@ -137,12 +137,18 @@ function world({ tag = "v0.2.0", baseTag = "v0.1.0", schema = deploymentSchema, 
   const verify = path.join(dir, "verify");
   fs.writeFileSync(verify, 'case "$4" in *"$1"*) echo "release-verify: the bundle does not hold $4" >&2; exit 1;; esac\necho "verified $2 $3 $4"\n');
 
+  // The stand-in for legal-check-dir: run from the deploy folder with the copy's folder as it names
+  // it, it refuses a folder that holds a file named refused, as legal-check-dir would a file the
+  // part's layout does not have.
+  const legalCheck = path.join(dir, "legal-check");
+  fs.writeFileSync(legalCheck, '[ -f "$1/VERSION" ] || { echo "not run from the deploy folder: $(pwd) $1" >&2; exit 2; }\nif [ -e "$1/refused" ]; then echo "$1/refused:0: no file of a copy\'s folder" >&2; echo "legal-check-dir: 1 error" >&2; exit 1; fi\necho "legal-check-dir: ok — $1, version 3"\n');
+
   return {
     deploy,
     // What run() found: a pass, with its lines, or a failure, with every refusal as one text.
-    async check({ base = "main", refuse = "//" } = {}) {
+    async check({ base = "main", refuse = "//", legalChecker = ["/bin/sh", legalCheck] } = {}) {
       try {
-        const { lines, refusals } = await run(deploy, base, { releases, verifier: ["/bin/sh", verify, refuse] });
+        const { lines, refusals } = await run(deploy, base, { releases, verifier: ["/bin/sh", verify, refuse], legalChecker });
         return { ok: refusals.length === 0, stdout: lines.join("\n"), stderr: refusals.join("\n"), output: [...lines, ...refusals].join("\n") };
       } catch (error) {
         if (!(error instanceof Refusal)) throw error;
@@ -409,4 +415,47 @@ test("release-verify runs by the just the recipe names, which on a runner of Dep
   assert.deepEqual(args.slice(0, 1), ["-f"]);
   assert.match(args[1], /spec\/justfile$/);
   assert.deepEqual(args.slice(2), ["release-verify", "api", "v0.2.0", "/nowhere/api_v0.2.0_linux_amd64"]);
+});
+
+// A self-hosted copy's folder of legal texts (R33): checked by legal-check-dir, and refused with a
+// link in it before that runs.
+test("a copy's folder of legal texts is checked by legal-check-dir, and none is nothing to check", async () => {
+  const none = await world().check();
+  assert.ok(none.ok, none.output);
+  assert.match(none.stdout, /production\/legal is not there: api serves the texts of its tag of spec/);
+
+  const w = world();
+  const legal = path.join(w.deploy, "production", "legal");
+  fs.mkdirSync(path.join(legal, "texts", "privacy-policy"), { recursive: true });
+  fs.writeFileSync(path.join(legal, "VERSION"), "3\n");
+  fs.writeFileSync(path.join(legal, "texts", "privacy-policy", "1.md"), "# Privacy policy\n");
+  const passed = await w.check();
+  assert.ok(passed.ok, passed.output);
+  assert.match(passed.stdout, /production\/legal holds to spec's part legal\/: legal-check-dir: ok — production\/legal, version 3/);
+
+  fs.writeFileSync(path.join(legal, "refused"), "x");
+  const refused = await w.check();
+  assert.ok(!refused.ok, refused.output);
+  assert.match(refused.stderr, /legal-check-dir refused production\/legal: production\/legal\/refused:0: no file of a copy's folder/);
+  fs.rmSync(path.join(legal, "refused"));
+
+  fs.symlinkSync("/etc/passwd", path.join(legal, "texts", "privacy-policy", "2.md"));
+  const linked = await w.check({ legalChecker: ["/bin/false"] });
+  assert.ok(!linked.ok, linked.output);
+  assert.match(linked.stderr, /production\/legal holds what is neither a file nor a folder: production\/legal\/texts\/privacy-policy\/2\.md/);
+
+  fs.rmSync(path.join(legal, "texts", "privacy-policy", "2.md"));
+  if (process.getuid() !== 0) {
+    fs.chmodSync(path.join(legal, "texts"), 0o000);
+    const closed = await w.check({ legalChecker: ["/bin/false"] });
+    fs.chmodSync(path.join(legal, "texts"), 0o755);
+    assert.ok(!closed.ok, closed.output);
+    assert.match(closed.stderr, /production\/legal cannot be read: EACCES/);
+  }
+
+  const file = world();
+  fs.writeFileSync(path.join(file.deploy, "production", "legal"), "texts\n");
+  const notFolder = await file.check({ legalChecker: ["/bin/false"] });
+  assert.ok(!notFolder.ok, notFolder.output);
+  assert.match(notFolder.stderr, /production\/legal is not a folder/);
 });

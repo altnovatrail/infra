@@ -362,8 +362,9 @@ ci-licenses:
 
 # The checks R05 asks of a pull request that changes the deployment's list (R14): deploy/production.json
 # by its schema, the files of its releases by release-verify and sha256, deployment.json, the facts,
-# the rung, and api's tag no lower than in the list at base. It reads the releases from GitHub and
-# Sigstore. With no list yet there is nothing to check, and it says so.
+# a copy's folder of legal texts by spec's legal-check-dir (R33), the rung, and api's tag no lower
+# than in the list at base. It reads the releases from GitHub and Sigstore. With no list yet there is
+# nothing to check, and it says so.
 # Check the deployment's list in deploy/ against the list at base
 deploy-check base="origin/main": _tools
     node tools/deploy-check/main.mjs --base {{ quote(base) }} deploy
