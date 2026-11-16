@@ -375,7 +375,9 @@ deploy-check base="origin/main": _tools
 # the tag of spec, whose admission table and release-verify the checks read, or tofu/variables.tf,
 # whose default names api's service — and otherwise nothing, so that a pull request of documents
 # downloads no release. Not tofu/ci.env or the values: a fork's first pull request changes them
-# alone, while its list is still the platform's, with the platform's address of api (R14).
+# alone, while its list is still the platform's, with the platform's address of api (R14). But a
+# change of the line of the values that names the rung does run them: the list's rung is held to
+# that line (the 2026-11-16 amendment to R05).
 ci-deploy-check base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -385,7 +387,10 @@ ci-deploy-check base="origin/main":
         exit 1
     fi
     changed=$(git diff --name-only "${base}...HEAD" -- deploy tools/deploy-check tools/deploy tools/package.json tools/package-lock.json justfile spec tofu/variables.tf)
-    if [ -z "$changed" ]; then
+    if git diff "${base}...HEAD" -- tofu/production.auto.tfvars | grep -qE '^[-+]api_admission_rung[[:space:]]*='; then
+        changed="${changed} tofu/production.auto.tfvars"
+    fi
+    if [ -z "${changed// /}" ]; then
         echo "ci-deploy-check: nothing the list is checked by changes against ${base}, and the list is not checked"
         exit 0
     fi

@@ -99,6 +99,23 @@ test("no run has delivered yet: every part of the list", () => {
   assert.match(d.lines.join("\n"), /no run has delivered the list yet/);
 });
 
+// A list of the values over lines is read to its "]", and a comment or a space moves nothing.
+test("the catalog's list over lines is read whole, and its comments and spaces are not values", async (t) => {
+  const over = (...ids) => `${tfvars}api_catalog_modules = [\n${ids.map((id) => `  "${id}",\n`).join("")}]\n`;
+  const cases = [
+    ["a module put in", over("novatrail/olympiad-math", "novatrail/check-board"), true],
+    ["a comment and spaces alone", over("novatrail/olympiad-math").replace('"novatrail/olympiad-math",', '"novatrail/olympiad-math" ,  # the math'), false],
+  ];
+  for (const [name, values, moves] of cases) {
+    await t.test(name, () => {
+      const r = repository();
+      const delivered = r.commit({ ...setUp, "tofu/production.auto.tfvars": over("novatrail/olympiad-math"), "deploy/production.json": list(), "deploy/production/facts.json": facts });
+      const d = decideAt(r, r.commit({ "tofu/production.auto.tfvars": values }), delivered);
+      assert.equal(d.facts, moves, d.lines.join("\n"));
+    });
+  }
+});
+
 test("against the last run that delivered, each part changes alone, and the rest stays", async (t) => {
   const cases = [
     ["api", { "deploy/production.json": list("v0.1.6") }, { api: true, facts: false, app: false }],
@@ -108,6 +125,14 @@ test("against the last run that delivered, each part changes alone, and the rest
     ["the list's layout alone, the same values", { "deploy/production.json": JSON.stringify(list()) }, { api: false, facts: false, app: false }],
     // A self-hosted copy's folder of legal texts goes by the path of the facts (R33).
     ["a copy's legal texts, put in", { "deploy/production/legal/VERSION": "3\n" }, { api: false, facts: true, app: false }],
+    // What else the revision runs with goes by the same path: the apply alone makes a revision of it
+    // that takes no traffic (the 2026-11-16 amendment to R05).
+    ["the list's rung", { "deploy/production.json": { ...list(), admission: { rung: "author" } } }, { api: false, facts: true, app: false }],
+    ["the rung of the values", { "tofu/production.auto.tfvars": `${tfvars}api_admission_rung = "author"\n` }, { api: false, facts: true, app: false }],
+    ["the catalog's list", { "tofu/production.auto.tfvars": `${tfvars}api_catalog_modules = ["novatrail/check-board"]\n` }, { api: false, facts: true, app: false }],
+    ["the key's version", { "tofu/production.auto.tfvars": `${tfvars}api_anthropic_key_version = "2"\n` }, { api: false, facts: true, app: false }],
+    ["another value of the configuration", { "tofu/production.auto.tfvars": `${tfvars}budget_amount = "6"\n` }, { api: false, facts: false, app: false }],
+    ["a module put in a list over lines", { "tofu/production.auto.tfvars": `${tfvars}api_catalog_modules = [\n  "novatrail/check-board",\n]\n` }, { api: false, facts: true, app: false }],
   ];
   for (const [name, change, want] of cases) {
     await t.test(name, () => {

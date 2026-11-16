@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildReadsSpecVersion, defaultOf, justProgram, Refusal, ROOT, run, valueOf } from "../check.mjs";
+import { buildReadsSpecVersion, configurationRung, defaultOf, justProgram, Refusal, ROOT, run, valueOf } from "../check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const main = path.join(here, "..", "main.mjs");
@@ -37,13 +37,13 @@ const deploymentSchema = {
   unevaluatedProperties: false,
 };
 
-// The files of tofu/ api's service's address is read from, synthetic: the provider bootstrap.sh
-// prints, with the project's number, the values with the region, and the default of the service's
-// name. A world's `tofu` replaces any of them, or leaves it out with null.
+// The files of tofu/ api's service's address and its rung are read from, synthetic: the provider
+// bootstrap.sh prints, with the project's number, the values with the region, and the defaults of
+// the service's name and of the rung. A world's `tofu` replaces any of them, or leaves it out with null.
 const tofuFiles = {
   "ci.env": "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/123456789012/locations/global/workloadIdentityPools/infra-github/providers/github\nGCP_CONFIG_SERVICE_ACCOUNT=infra-config@novatrail-test-0.iam.gserviceaccount.com\n",
   "production.auto.tfvars": 'project_id = "novatrail-test-0"\nregion     = "us-east4"\n',
-  "variables.tf": 'variable "region" {\n  type = string\n}\n\nvariable "api_service_name" {\n  description = "api\'s service."\n  type        = string\n  default     = "api"\n  nullable    = false\n}\n',
+  "variables.tf": 'variable "region" {\n  type = string\n}\n\nvariable "api_service_name" {\n  description = "api\'s service."\n  type        = string\n  default     = "api"\n  nullable    = false\n}\n\nvariable "api_admission_rung" {\n  type     = string\n  default  = "full"\n  nullable = false\n}\n',
 };
 
 // /deployment.json, synthetic, of spec's deployment configuration 1, its api at the address of the
@@ -179,7 +179,7 @@ test("a list that holds passes every check", async () => {
     "production/deployment.json holds to its build's deployment.schema.json",
     "the build's csp.json makes the CSP header of production/deployment.json",
     "facts of spec's admission table",
-    "the rung is full",
+    "the rung full is the one the configuration tells api",
     "api v0.2.0 is no lower than v0.1.0 at main",
   ]) {
     assert.ok(r.stdout.includes(line), `${line}\n${r.output}`);
@@ -209,6 +209,15 @@ test("api's service's address takes the name the values give over the default", 
   assert.match(r.stdout, /names api at its service's address, https:\/\/learn-123456789012\.us-east4\.run\.app/);
 });
 
+test("the rung author passes where the values tell api author", async () => {
+  const r = await world({
+    tofu: { "production.auto.tfvars": 'region = "us-east4"\napi_admission_rung = "author"\n' },
+    edit: (l) => (l.admission.rung = "author"),
+  }).check();
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /the rung author is the one the configuration tells api/);
+});
+
 test("a region inside the value of another variable is not the service's", async () => {
   const r = await world({ tofu: { "production.auto.tfvars": 'labels = {\n  region = "us-west1"\n}\nregion = "us-east4"\n' } }).check();
   assert.ok(r.ok, r.output);
@@ -221,6 +230,7 @@ test("out of a git repository, api is not compared, and the check that needs no 
   const r = await w.check({ base: null });
   assert.ok(r.ok, r.output);
   assert.match(r.stdout, /api in production\/deployment\.json is not compared with its service's address: .* is not in a git repository/);
+  assert.match(r.stdout, /the rung full is not compared with the configuration's: .* is not in a git repository/);
 });
 
 test("with no tofu/ci.env, api is not compared with an address no project gives", async () => {
@@ -248,6 +258,16 @@ test("the service's name and region are read from the lines that set them, and n
 test("the default of api_service_name in tofu/variables.tf is read, and is a name of a service", () => {
   const lines = fs.readFileSync(path.join(ROOT, "tofu", "variables.tf"), "utf8").split("\n");
   assert.match(defaultOf(lines, "api_service_name") ?? "", /^[a-z][a-z0-9-]{0,18}[a-z0-9]$/);
+});
+
+test("the default of api_admission_rung in tofu/variables.tf is read, and is full", () => {
+  const lines = fs.readFileSync(path.join(ROOT, "tofu", "variables.tf"), "utf8").split("\n");
+  assert.equal(defaultOf(lines, "api_admission_rung"), "full");
+});
+
+test("the rung of the platform's values is the platform's list's", () => {
+  const list = JSON.parse(fs.readFileSync(path.join(ROOT, "deploy", "production.json"), "utf8"));
+  assert.equal(configurationRung(ROOT), list.admission.rung);
 });
 
 test("no list, where the base has none either, is nothing to check", async () => {
@@ -310,7 +330,9 @@ test("refusals, each on its own", async (t) => {
     ["a fact spec's table does not know", { edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ openai: { signed_by_hand: ["adult"] } })) }, undefined, /names what spec's admission table does not: the fact signed_by_hand of openai/],
     ["a provider spec's table does not know", { edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ acme: { data_processing_agreement: ["adult"] } })) }, undefined, /the provider acme/],
     ["facts not of their form", { edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ openai: { data_processing_agreement: ["grown_up"] } })) }, undefined, /is not facts a deployment declares/],
-    ["the rung author", { edit: (l) => (l.admission.rung = "author") }, undefined, /the rung is author, and a deployment ships full alone/],
+    ["the rung author, where the configuration tells api full", { edit: (l) => (l.admission.rung = "author") }, undefined, /the rung is author, and the configuration tells api full/],
+    ["the rung full, where the values tell api author", { tofu: { "production.auto.tfvars": 'region = "us-east4"\napi_admission_rung = "author"\n' } }, undefined, /the rung is full, and the configuration tells api author/],
+    ["no rung in the values or as a default", { tofu: { "variables.tf": 'variable "api_service_name" {\n  default = "api"\n}\n' } }, undefined, /nor the default in tofu\/variables\.tf names api_admission_rung/],
     ["api lower than on the base", { tag: "v0.1.9", baseTag: "v0.2.0" }, undefined, /api v0\.1\.9 is lower than v0\.2\.0, the list's at main/],
     ["api lower by its minor, though higher by its patch", { tag: "v0.1.10", baseTag: "v0.2.0" }, undefined, /api v0\.1\.10 is lower than v0\.2\.0/],
     ["api lower by number, though higher as text", { tag: "v0.2.9", baseTag: "v0.2.10" }, undefined, /api v0\.2\.9 is lower than v0\.2\.10/],

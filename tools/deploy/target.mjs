@@ -19,7 +19,11 @@
 // api_image, api has no jobs to run a release with (R11), and a changed api is its image alone; until
 // it sets api_serving = true, api has no service, and a changed app waits for the run that sets it,
 // which delivers app (R05). The part facts is facts.json and, for a self-hosted copy, its folder of
-// legal texts, deploy/production/legal/: either changed goes by api.sh's path of the facts (R33).
+// legal texts, deploy/production/legal/: either changed goes by api.sh's path of the facts (R33). So
+// does what else api's revision runs with but its image: the list's rung, and the values of
+// tofu/production.auto.tfvars that tell it the rung, the catalog's list and the key's version. The
+// apply makes a revision of them that takes no traffic, and only a new revision brings them to it
+// (the 2026-11-16 amendment to R05).
 //
 // A run started by hand delivers the parts it names, among image, api, facts and app, and none when
 // it names none: --by-hand=<parts>, apart by commas, or, in the workflow, GITHUB_EVENT_NAME
@@ -60,6 +64,8 @@ const LEGAL = "deploy/production/legal";
 const WORKFLOW = "deploy.yml";
 const CONFIG_JOB = "Configuration";
 const TFVARS = "tofu/production.auto.tfvars";
+// The values of the configuration api's revision runs with beside its image and its facts.
+const REVISION_VALUES = ["api_admission_rung", "api_catalog_modules", "api_anthropic_key_version"];
 // The green runs looked through for the last that delivered: the newest of them that did.
 const LOOK = 20;
 
@@ -166,6 +172,30 @@ const hasImage = (dir, commit) => setsVariable(dir, commit, "api_image", (value)
 // The value true, or the string "true", which OpenTofu reads as the same bool.
 const hasServing = (dir, commit) => setsVariable(dir, commit, "api_serving", (value) => /^("true"|true)(\s|#|$)/.test(value));
 
+// What tofu/production.auto.tfvars at the commit sets each of REVISION_VALUES to, null for one it
+// does not set: the text after "=", over the lines a list spans until its "]", with its comments and
+// its spaces left out, so that neither moves the traffic. Their values hold no "#" (variables.tf).
+function revisionValues(dir, commit) {
+  const lines = has(dir, commit, TFVARS) ? git(dir, ["show", `${commit}:${TFVARS}`]).stdout.split("\n") : [];
+  const bare = (line) => {
+    const comment = line.indexOf("#");
+    return [..."\t\r "].reduce((text, space) => text.replaceAll(space, ""), comment < 0 ? line : line.slice(0, comment));
+  };
+  return REVISION_VALUES.map((name) => {
+    const first = tfvarsValue(lines, name);
+    if (first === null) return null;
+    let value = bare(first);
+    if (value.startsWith("[")) {
+      const at = lines.findIndex((line) => line.indexOf("=") > 0 && line.slice(0, line.indexOf("=")).trimEnd() === name);
+      for (const line of lines.slice(at + 1)) {
+        if (value.includes("]")) break;
+        value += bare(line);
+      }
+    }
+    return value;
+  });
+}
+
 function partsByHand(text) {
   const named = text.split(",").map((part) => part.trim()).filter(Boolean);
   const unknown = named.filter((part) => !PARTS.includes(part));
@@ -196,7 +226,12 @@ export function decide({ dir, commit, tip, base, byHand = null }) {
   const facts = jsonAt(dir, commit, FACTS);
   const changed = {
     api: !before || !isDeepStrictEqual(before.api, list.api),
-    facts: !before || !isDeepStrictEqual(jsonAt(dir, known, FACTS), facts) || objectAt(dir, known, LEGAL) !== objectAt(dir, commit, LEGAL),
+    facts:
+      !before ||
+      !isDeepStrictEqual(jsonAt(dir, known, FACTS), facts) ||
+      objectAt(dir, known, LEGAL) !== objectAt(dir, commit, LEGAL) ||
+      !isDeepStrictEqual(before.admission, list.admission) ||
+      !isDeepStrictEqual(revisionValues(dir, known), revisionValues(dir, commit)),
     app: !before || !isDeepStrictEqual(before.app, list.app),
   };
   if (!known) lines.push("no run has delivered the list yet: every part of it");

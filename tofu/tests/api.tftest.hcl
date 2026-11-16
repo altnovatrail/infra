@@ -137,7 +137,7 @@ run "the_service_is_made_with_the_first_image" {
 
   assert {
     condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_ADMISSION_RUNG"]) == "full"
-    error_message = "The lowest admission rung is full, the only one a deployment takes."
+    error_message = "The lowest admission rung is full by default."
   }
 
   assert {
@@ -184,7 +184,12 @@ run "the_service_is_made_with_the_first_image" {
 
   assert {
     condition     = length(google_cloud_run_v2_service.api[0].template[0].volumes) == 1
-    error_message = "The facts' volume is the service's only one: the deployment changes its version, and the configuration leaves it alone by its place."
+    error_message = "With no version of the key named, the facts' volume is the service's only one: the deployment changes its version, and the configuration leaves it alone by its place."
+  }
+
+  assert {
+    condition     = length([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e if contains(["API_CATALOG_MODULES", "API_ANTHROPIC_KEY_FILE", "API_ANTHROPIC_KEY"], e.name)]) == 0
+    error_message = "By default the service is told no list of modules, so the catalog gives the whole pinned index, and no key of a provider."
   }
 
   assert {
@@ -458,6 +463,101 @@ run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
     )
     error_message = "A job of another part reads neither the facts nor the rung."
   }
+}
+
+# Platform AI on a deployment where the author alone learns, as on novatrail (the 2026-11-16 amendment
+# to R25): the rung author and the catalog's list go to the service and to the job of the check, and
+# the key, an exact version of its secret, to the service alone, as its second volume.
+run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
+  command = plan
+
+  variables {
+    api_image                 = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_serving               = true
+    api_admission_rung        = "author"
+    api_catalog_modules       = ["novatrail/olympiad-math", "novatrail/check-board"]
+    api_anthropic_key_version = "3"
+  }
+
+  assert {
+    condition = alltrue([for env in [google_cloud_run_v2_service.api[0].template[0].containers[0].env, google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env] :
+      one([for e in env : e.value if e.name == "API_ADMISSION_RUNG"]) == "author" &&
+      one([for e in env : e.value if e.name == "API_CATALOG_MODULES"]) == "novatrail/olympiad-math,novatrail/check-board"
+    ])
+    error_message = "The service and the job of the check are told the rung author and the list of modules, by commas, in its order."
+  }
+
+  assert {
+    condition = alltrue([for name in ["migrate", "after", "sweep"] :
+      length([for e in google_cloud_run_v2_job.api[name].template[0].template[0].containers[0].env : e if contains(["API_ADMISSION_RUNG", "API_CATALOG_MODULES", "API_ANTHROPIC_KEY_FILE"], e.name)]) == 0
+    ])
+    error_message = "The jobs of the other parts are told neither the rung, nor the list, nor the key."
+  }
+
+  assert {
+    condition = (
+      length(google_cloud_run_v2_service.api[0].template[0].volumes) == 2 &&
+      google_cloud_run_v2_service.api[0].template[0].volumes[0].secret[0].secret == "api-admission-facts" &&
+      google_cloud_run_v2_service.api[0].template[0].volumes[1].secret[0].secret == "api-anthropic-key" &&
+      google_cloud_run_v2_service.api[0].template[0].volumes[1].secret[0].items[0].version == "3" &&
+      google_cloud_run_v2_service.api[0].template[0].volumes[1].secret[0].items[0].path == "key" &&
+      one([for m in google_cloud_run_v2_service.api[0].template[0].containers[0].volume_mounts : m.mount_path if m.name == google_cloud_run_v2_service.api[0].template[0].volumes[1].name]) == "/etc/api/anthropic"
+    )
+    error_message = "The key is the service's second volume, the exact version named, as the file key in /etc/api/anthropic; the facts stay first, where the deployment sets their version."
+  }
+
+  assert {
+    condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_ANTHROPIC_KEY_FILE"]) == "/etc/api/anthropic/key"
+    error_message = "API_ANTHROPIC_KEY_FILE names the file of the key's volume."
+  }
+
+  assert {
+    condition = (
+      length(google_cloud_run_v2_job.api["check"].template[0].template[0].volumes) == 1 &&
+      !contains([for e in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env : e.name], "API_ANTHROPIC_KEY_FILE")
+    )
+    error_message = "The job of the check reads no key: api check does not."
+  }
+
+  assert {
+    condition     = google_secret_manager_secret_iam_member.api_reads_anthropic_key.member == "serviceAccount:${google_service_account.api.email}" && google_secret_manager_secret_iam_member.api_reads_anthropic_key.role == "roles/secretmanager.secretAccessor"
+    error_message = "api reads the key's secret, and holds no other right on it."
+  }
+
+  assert {
+    condition     = google_secret_manager_secret.anthropic_key.secret_id == "api-anthropic-key" && google_secret_manager_secret.anthropic_key.deletion_protection && google_secret_manager_secret.anthropic_key.replication[0].user_managed[0].replicas[0].location == "us-east4"
+    error_message = "The key's secret is api-anthropic-key, in the region alone, and the configuration never deletes it."
+  }
+}
+
+run "a_rung_tutor_does_not_name_is_refused" {
+  command = plan
+
+  variables {
+    api_admission_rung = "partial"
+  }
+
+  expect_failures = [var.api_admission_rung]
+}
+
+run "a_module_named_twice_or_not_an_id_is_refused" {
+  command = plan
+
+  variables {
+    api_catalog_modules = ["novatrail/check-board", "novatrail/check-board", "Check Board", "novatrail/con"]
+  }
+
+  expect_failures = [var.api_catalog_modules]
+}
+
+run "the_key_by_latest_is_refused" {
+  command = plan
+
+  variables {
+    api_anthropic_key_version = "latest"
+  }
+
+  expect_failures = [var.api_anthropic_key_version]
 }
 
 # The store of the scans goes to a job that asks for it, and once to a job of the check that asks for
