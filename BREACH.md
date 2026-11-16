@@ -13,7 +13,7 @@ It has two parts:
 - after every breach;
 - before a new group of learners: the first child, a new country (`api countries allow`), the first learner from the EU, the EEA or the United Kingdom;
 - before the platform has 250 learners, since the attorney general's threshold counts Texas residents and the platform does not know a learner's state (section 9);
-- when spec has read the breach laws of the other states (section 10).
+- by R152 spec, in which spec read the breach laws of all the states on 2026-11-15 (section 10).
 
 A task of `infra` that changes what part 1 names keeps part 1 true in the same change: a place of learners' data, a secret, a right, a log.
 
@@ -174,15 +174,13 @@ The platform knows a learner's country, not their state, and does not ask for it
 
 ### 10. Learners from other states
 
-A resident of another state may be told under that state's law instead (§521.053(b-1)). That state's law may also bind the operator by itself, with its own deadline and its own authority. Those laws have not been read: privacy 3.4 spec read the states' laws on children's data, on privacy and on biometrics, not their laws on breaches. The question has gone to spec (row В29 of RUN.md).
+A resident of another state may be told under that state's law instead (§521.053(b-1)). That state's law may also bind the operator by itself, with its own deadline and its own authority. spec has read those laws, from their primary sources, and answered by R152 spec (privacy 3.4 spec): the operator follows them all, by the strictest, for every learner from the US, and reads no state's law in a breach. Sections 8 and 9 do not follow that order yet: they are rewritten by it before the first child from the US and before the platform has 250 learners (row Д25 of [run/DEBT.md](run/DEBT.md)). Until then, where R152 spec and this part differ, follow R152 spec and privacy 3.4 spec, not this part. Among what they change:
 
-Until spec answers, in a breach:
+- every person whose data was reached hears of it by one letter by email no later than the 30th day after the breach is discovered, not the 60th, whatever the harm;
+- each authority whose law covers what was reached and whose threshold the total number reached does not rule out is told — Maryland's before the letters, Vermont's by the 14th business day —, not only the attorney general of Texas, and an authority that asks for the number of its residents gets the total and the word that the state is not known;
+- where the laws of the District of Columbia, New York or North Carolina cover what was reached, the letter is also a substitute notice (the 2026-11-15 amendment to R152 spec).
 
-- for each learner reached whose state you already know, without asking them (section 9), read that state's breach law from its primary source the same day;
-- keep the shorter of the deadlines;
-- for a learner whose state you do not know, keep the deadline of Texas, and say in the record that the state is unknown.
-
-Whether the operator may ask a learner for their state in a breach is part of the question to spec. The states of learners are never written into this repository or into the record.
+Nobody is asked for their state (R152 spec). The states of learners are never written into this repository or into the record.
 
 ### 11. Not yet
 
