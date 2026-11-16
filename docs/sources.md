@@ -403,6 +403,17 @@ The project showed it, 2026-11-15 (T49), by the Monitoring API's `timeSeries` an
 - the README of `api` v0.1.21, published 2026-11-11T21:32:00Z: `API_CONSENT_FORMS_BUCKET`, `API_CONSENT_FORMS_PREFIX` — "the operator's closed bucket of Cloud Storage the scans of parents' forms of consent go to, and api's prefix in it, ending in a slash; on a deployment alone, by the service's own account, which creates and erases objects and reads none"; `API_LEGAL_DIR` — "a self-hosted copy's folder of its operator's legal texts, outside any git working tree: `VERSION`, `legal.yaml` and `texts/` alone";
 - [go.dev/dl](https://go.dev/dl/?mode=json&include=all): the sha256 of `go1.27.4.linux-amd64.tar.gz` is `7226736c…dab24840`, and of `go1.27.4.linux-arm64.tar.gz` `33925829…aeac92`, the same as in `.devcontainer/Dockerfile` of `spec` v0.15.1.
 
+### 6.4. The `spec` tag v0.18.6
+
+(R35; T68), read 2026-11-16:
+- `gh release list -R altnovatrail/spec`: v0.18.6 of 2026-11-16T21:26:25Z is "Latest", after v0.18.5 of 18:46:39Z; `gh release verify v0.18.6 -R altnovatrail/spec` — "Resolved tag v0.18.6 to sha1:bf3dce955aec1c071e871ad930634c6ec3a62267", "✓ Release v0.18.6 verified!". `git log --oneline v0.18.4..v0.18.6` in the submodule — 14 commits, T171–T177 spec;
+- `git diff v0.18.4 v0.18.6`, of what a copy takes: `.devcontainer/devcontainer.json` — `"shutdownAction": "none"`, with the comment `Closing the window leaves the container running: the orchestrator's executor runs in it by docker exec, with no window (R156, its 2026-11-16 amendment; sources 9.4). docker stop ends it.`; the comment of the stage `toolchain` of `.devcontainer/Dockerfile` — "What the repository's tests need beyond the core: in spec, nothing; in a copy, the lines its kind adds at the end of this stage, if it adds any"; `tools/new-repo/devcontainer.mjs` puts the suffix "spec" on the citations of `devcontainer.json` too; `repo-template/files/`, `host-network.sh` and `.claude/settings.json` are the same;
+- `spec/docs/sources.md` at v0.18.6, 9.4, the Dev Containers reference read again 2026-11-16 for T175 spec: `shutdownAction` — "Indicates whether `devcontainer.json` supporting tools should stop the containers when the related tool window is closed / shut down. Values are `none`, `stopContainer` (default for image or Dockerfile), and `stopCompose` (default for Docker Compose).";
+- `spec/tools/session/session.mjs` at v0.18.6: "The orchestrator gives the run's numbers in NOVATRAIL_RUN_TASKS, and they count as one task";
+- `spec/tools/docs-check/config.mjs` at v0.18.6: `Every repository has moved (T177), so a table back in one of them is a second copy, in spec and in a repository alike. Headings are English, "Table 3." (R154)`; `budgets.json` drops `DEBT.md` from the block `repository`;
+- RULES.md at v0.18.6: table 3 is `run/QUESTIONS.md` alone; apt "comes from a snapshot of the Ubuntu archive alone — a source of its own whose URI names the snapshot's ID"; the sentence on translating a plan with a move to a tag is gone;
+- architecture 3.11 spec, the card, is the same at both tags.
+
 ## 7. Prices and payment
 
 ### 7.1. Prices and the free trial
