@@ -357,7 +357,7 @@ variable "api_admission_rung" {
 }
 
 variable "api_reading_mode" {
-  description = "How tutor reads the handwriting of a sheet and of a workbook page, API_READING_MODE of the service and of the jobs of the check: pair, the two readers of R68 spec, or single, Claude Haiku 5.5 at medium alone (R88 api; the 2026-11-17 amendment to R25). Either holds at either rung. api takes it from v0.1.58, and api check refuses another value before the migrations."
+  description = "How tutor reads the handwriting of a sheet and of a workbook page, API_READING_MODE of the service and of the jobs of the check: pair, the two readers of R68 spec, or single, Claude Haiku 5.5 at medium alone (R88 api; the second 2026-11-17 amendment to R25). Either holds at either rung. api takes it from v0.1.58, and api check refuses another value before the migrations."
   type        = string
   default     = "pair"
   nullable    = false
