@@ -31,10 +31,11 @@ api_serving = true
 
 # Platform AI for the author, and from 2026-11-28 for the other adults (R149, R150 spec; the 2026-11-16
 # and 2026-11-17 amendments to R25): the rung author, which deploy/production.json names too, the
-# catalog without "Short essays in English", and the platform's key of Anthropic, version 1 of
-# api-anthropic-key, which the operator added (T69; Д28).
+# catalog with "Short essays in English" back, at 0.2.1, its version without the reminder of names,
+# which api lays from v0.1.62 (the 2026-11-17 amendment to R150 spec; T78), and the platform's key
+# of Anthropic, version 1 of api-anthropic-key, which the operator added (T69; Д28).
 api_admission_rung        = "author"
-api_catalog_modules       = ["novatrail/olympiad-math", "novatrail/check-board"]
+api_catalog_modules       = ["novatrail/olympiad-math", "novatrail/check-board", "novatrail/english-essays"]
 api_anthropic_key_version = "1"
 
 # Handwriting read by Claude Haiku 5.5 at medium alone, not by the pair of R68 spec: the author's
