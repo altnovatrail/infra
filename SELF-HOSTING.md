@@ -429,6 +429,8 @@ A new session under the same form moves its date forward with the same command. 
   node tools/organizer/organizer.mjs contribute <session>
   ```
 
+  Erase the file's copy under `eval-set/samples/` once it is entered, and a file that fails your check at once. A file you never enter the bucket's rule erases 12 months after its upload, so never rewrite or move one: that makes the file anew and starts its 12 months again.
+
 **Check.** `untimed` lists the forms, records and reports of `measure/` and `child/` that have no Custom-Time, which no rule would ever erase:
 
 ```bash

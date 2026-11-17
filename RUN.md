@@ -104,6 +104,7 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
   3. На проекте: я запускаю `bootstrap.sh` с переменными `BOOTSTRAP_*`; `gcloud storage buckets describe gs://novatrail-operator --format='json(lifecycle_config)'` — шесть правил.
 - **Как проверить:** `just bootstrap-test`; `just tf-check`; `just -f spec/justfile docs-check-repo`; правило на проекте.
 - **Разделы:** поправка 2026-11-13 к R126 `spec`; строка Д239 `spec`; R28; [docs/architecture.md](docs/architecture.md), раздел 3.7; правило [tofu](.claude/rules/tofu.md).
+- **Ждёт автора (2026-11-17):** шаг 3 — запуск `bootstrap.sh` на проекте, строка В46 [run/QUESTIONS.md](run/QUESTIONS.md); шаги 1 и 2 — в ветке `t58-samples-lifecycle`.
 
 #### T59. Журнал чтения секретов (Д20)
 

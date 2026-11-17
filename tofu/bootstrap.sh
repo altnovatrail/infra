@@ -849,6 +849,7 @@ cat > "$work/lifecycle.json" << 'LIFECYCLE'
       { "action": { "type": "Delete" }, "condition": { "age": 728, "matchesPrefix": ["measure/samples/", "child/samples/"] } },
       { "action": { "type": "Delete" }, "condition": { "daysSinceCustomTime": 728, "matchesPrefix": ["measure/records/", "child/records/", "measure/reports/", "child/reports/"] } },
       { "action": { "type": "Delete" }, "condition": { "daysSinceCustomTime": 1827, "matchesPrefix": ["measure/forms/", "child/forms/"] } },
+      { "action": { "type": "Delete" }, "condition": { "age": 364, "matchesPrefix": ["eval-set/samples/"] } },
       { "action": { "type": "Delete" }, "condition": { "age": 364, "matchesPrefix": ["eval-set/forms/"] } },
       { "action": { "type": "Delete" }, "condition": { "daysSinceCustomTime": 364, "matchesPrefix": ["eval-set/forms/"] } }
     ]
