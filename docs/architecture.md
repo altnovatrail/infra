@@ -299,7 +299,7 @@ Firebase Hosting serves the build of `app` — the project's default site, the B
    - the SPA rewrite to `index.html` — only outside `/assets/**`; `/deployment.json` is in every version, and Hosting rewrites only a path where there is no file;
    - without `Cross-Origin-Opener-Policy: same-origin`;
 3. the release — one version: the files and the configuration together;
-4. the check after the release — the bytes of `index.html`, the headers at `/`, at an SPA path and at a file in `/assets/`, `404` for an unknown file in `/assets/`, `/deployment.json` as `app` reads it, the bytes of `/NOTICE` and `/LICENSE` against the build's files (the 2026-11-11 amendment to R17), and `Cross-Origin-Opener-Policy: same-origin` nowhere.
+4. the check after the release — the bytes of `index.html`, the headers at `/`, at an SPA path and at a file in `/assets/`, `404` for an unknown file in `/assets/`, `/deployment.json` as `app` reads it, the bytes of `/NOTICE` and `/LICENSE` against the build's files (the 2026-11-11 amendment to R17), and `Cross-Origin-Opener-Policy: same-origin` nowhere. It reads the site in rounds, 10 s apart for 120 s of waits, each read within 10 s, while Hosting's CDN still serves the build before, logs each round still wrong, and fails only when the last is (the 2026-11-17 amendment to R17); `just deploy-app-check` reads it once.
 
 Rollback — by R05, a pull request with the former block `app`; a rollback by a version in the Firebase console is not used.
 
