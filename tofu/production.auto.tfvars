@@ -28,3 +28,10 @@ api_image = "us-east4-docker.pkg.dev/novatrail/images/api@sha256:e3430c99f7069a8
 # The service of api, once the jobs ran the check of the configuration and the migrations with the
 # first image (run 43264054707). The run of this merge ships app too (R05).
 api_serving = true
+
+# Platform AI for the author alone (R149, R150 spec; the 2026-11-16 amendment to R25): the rung author,
+# which deploy/production.json names too, the catalog without "Short essays in English", and the
+# platform's key of Anthropic, version 1 of api-anthropic-key, which the operator added (T69; Д28).
+api_admission_rung        = "author"
+api_catalog_modules       = ["novatrail/olympiad-math", "novatrail/check-board"]
+api_anthropic_key_version = "1"
