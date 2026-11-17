@@ -105,6 +105,47 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
   4. Д21 и Д22 — переписать: что проверено, уходит; что осталось — с «когда».
 - **Как проверить:** записи шагов в «Сделано»; `just tf-check`, если модуль менялся; `just -f spec/justfile docs-check-repo`.
 - **Разделы:** [BREACH.md](BREACH.md), часть 1; [docs/architecture.md](docs/architecture.md), раздел 3.7; R27, R28; sources 5.7, 10.1–10.9; Д21, Д22.
+- **Выяснилось при выполнении** (2026-11-17, прогон оркестратора):
+  - письма Google о безопасности: запасной получатель категории Security — администратор организации, `roles/resourcemanager.organizationAdmin`, а у `novatrail` организации нет (Д3) — документация не называет получателя письма, и что Google делает тогда, не говорит (sources 5.7, прочитано 2026-11-17). Условие шага 2 выполнено: модуль ставит `operator_email` контактом Security, `tofu/contacts.tf`, с тестами; `infra-config` получает `roles/essentialcontacts.admin` в `bootstrap.sh` — значит, перезапуск скрипта автором до мержа (R13); вторая поправка 2026-11-17 к R27, третья — к R13;
+  - Neon, план Free: после факта не видно, кто подключался — графики числа подключений 1 день, без роли и адреса; «Active queries» и `pg_stat_activity` — только идущее сейчас; журналы Postgres с каждым подключением и журналы аудита — только на Scale (sources 3.16); [BREACH.md](BREACH.md), раздел 4, — строку, которая могла утечь, считать использованной;
+  - у исполнителя нет `gcloud` и прав: страница загрузки (Д21), список контактов и перезапуск `bootstrap.sh` — шаг автора, В53.
+- **Мой шаг** (В53): одним блоком в Cloud Shell, с ветки `t60-project-checks`, около 30 минут. Блок сам заменяет адрес автора на `<operator>` и номер счёта на `<billing>`; включает API Essential Contacts (бесплатно), печатает родителя проекта, контакты и владельцев; делает страницу `eval-set` на синтетические файлы на 2 часа; загружает форму 0, снимает `bucketUploader` с `upload-eval-set` и раз в минуту, до 11 минут, загружает следующую форму той же страницы, пока не откажет; перезапускает `bootstrap.sh`, который возвращает роль и даёт `infra-config` роль контактов; снова загружает, пока не пройдёт; печатает привязки `upload-eval-set` и стирает файлы сессии и страницу:
+
+  ```bash
+  cd ~ && rm -rf infra-t60 && git clone -q -b t60-project-checks https://github.com/altnovatrail/infra infra-t60 && cd infra-t60 && git log --oneline -1
+  me="$(gcloud config get-value account 2>/dev/null)"; mask() { sed -E -e "s/${me//./[.]}/<operator>/Ig" -e 's/[0-9A-Z]{6}-[0-9A-Z]{6}-[0-9A-Z]{6}/<billing>/g'; }
+  b=gs://novatrail-operator; sa=upload-eval-set@novatrail.iam.gserviceaccount.com; role=projects/novatrail/roles/bucketUploader
+  echo "== Д22: parent [$(gcloud projects describe novatrail --format='value(parent.type)')]"
+  gcloud services enable essentialcontacts.googleapis.com --project=novatrail 2>&1 | mask | tail -1
+  echo "contacts: [$(gcloud essential-contacts list --project=novatrail --billing-project=novatrail --format='value(notificationCategorySubscriptions)' 2>&1 | mask | paste -sd ';')]"
+  gcloud projects get-iam-policy novatrail --format=json | jq -r --arg me "user:$me" '.bindings[] | select(.role == "roles/owner" or .role == "roles/resourcemanager.organizationAdmin") | .role as $r | .members[] | $r + " " + (if ascii_downcase == ($me | ascii_downcase) then "<operator>" elif startswith("user:") then "<another person>" else . end)'
+  echo "== Д21"
+  out="$(node tools/organizer/organizer.mjs link eval-set --samples=23 --hours=2 --out=upload-t60.html 2>&1)"; echo "$out" | head -1; session="$(echo "$out" | grep -oE '^session [0-9a-f]{16}' | cut -d ' ' -f 2)"
+  cat > ~/t60-send.mjs <<'EOF'
+  import fs from "node:fs";
+  const [page, index] = process.argv.slice(2);
+  const un = (t) => t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  const [, action, body] = [...fs.readFileSync(page, "utf8").matchAll(new RegExp('<form action="([^"]+)"[^>]*>([^]*?)</form>', "g"))][Number(index)];
+  const data = new FormData();
+  for (const [, name, value] of body.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)) data.append(un(name), un(value));
+  data.append("file", new Blob([JSON.stringify({ synthetic: "T60", form: Number(index) })], { type: "application/json" }), "sample.json");
+  const res = await fetch(un(action), { method: "POST", body: data });
+  console.log(`${res.status} ${((await res.text()).match(new RegExp("<Code>([^<]+)</Code>")) ?? [])[1] ?? ""}`);
+  EOF
+  echo "before, form 0: $(node ~/t60-send.mjs upload-t60.html 0 2>&1)"
+  gcloud storage buckets remove-iam-policy-binding $b --member=serviceAccount:$sa --role=$role --all --quiet 2>&1 >/dev/null | mask; t1=$(date +%s); echo "removed $(date -u +%H:%M:%SZ)"
+  for i in $(seq 1 11); do r="$(node ~/t60-send.mjs upload-t60.html $i 2>&1)"; echo "removed +$(( $(date +%s) - t1 ))s, form $i: $r"; [ "${r%% *}" = 201 ] || break; sleep 60; done
+  export TF_VAR_billing_account="$(gcloud billing projects describe novatrail --format='value(billingAccountName)' | cut -d/ -f2)" BOOTSTRAP_MEASURE_ORGANIZER="$me" BOOTSTRAP_EVAL_SET_ORGANIZER="$me" BOOTSTRAP_OPERATOR="$me"
+  bash tofu/bootstrap.sh > ~/t60-bootstrap.log 2>&1; echo "bootstrap exit $?"; mask < ~/t60-bootstrap.log | grep -E 'essentialcontacts|bucketUploader|upload-eval-set|rror|fail|Done' | head -20; t2=$(date +%s)
+  for i in $(seq 12 22); do r="$(node ~/t60-send.mjs upload-t60.html $i 2>&1)"; echo "restored +$(( $(date +%s) - t2 ))s, form $i: $r"; [ "${r%% *}" = 201 ] && break; sleep 60; done
+  gcloud storage buckets get-iam-policy $b --format=json | jq -c --arg sa "serviceAccount:$sa" '.bindings[] | select(.members | index($sa)) | {role, condition: .condition.title}'
+  [[ "$session" =~ ^[0-9a-f]{16}$ ]] && echo "uploaded: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)" && gcloud storage rm "$b/eval-set/samples/$session/**" --quiet 2>&1 | tail -1; echo "left: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)"
+  rm -f upload-t60.html ~/t60-send.mjs ~/t60-bootstrap.log
+  ```
+- **Решено автором (2026-11-17):** В53 — «сейчас, до мержа»: автор запустил блок в Cloud Shell около 13:53 UTC, с `89f6b88` ветки `t60-project-checks`. Вывод:
+  - Д22: у проекта нет родителя — организации нет; API Essential Contacts включён; контактов нет; `roles/owner` — один, оператор; `roles/resourcemanager.organizationAdmin` — ни у кого. Значит, до `apply` документация не называла получателя письма Security; контакт создаёт `apply` мержа — проверка в «Сделано» после мержа;
+  - Д21: страница `eval-set` на 2 часа, сессия `68f2b20fec5103bd`; форма 0 до снятия — `201`; `bucketUploader` снят в 13:53:19Z, форма 1 в ту же секунду — `403 AccessDenied`; `bootstrap.sh` — exit 0, «Done.», `roles/essentialcontacts.admin` у `infra-config`, `bucketUploader of upload-eval-set, under eval-set/samples/ and eval-set/forms/: granted`; форма 12 через секунду после скрипта — `201`; привязка `upload-eval-set` — `bucketUploader` с условием `eval-set uploads`; загружено 2 файла, оба стёрты, осталось 0;
+  - строка В53 закрыта этим; вторая поправка 2026-11-17 к R28, раздел 3.7 «Checked on the project (T60)», [BREACH.md](BREACH.md), раздел 3; Д21 и Д22 переписаны.
 
 #### T61. Итог эпика
 

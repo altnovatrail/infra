@@ -153,6 +153,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_monitoring_alert_policy.api_jobs),
       jsonencode(google_monitoring_alert_policy.api_jobs_missed),
       jsonencode(google_monitoring_notification_channel.operator),
+      jsonencode(google_essential_contacts_contact.security),
       jsonencode(google_project_service.enabled),
       jsonencode(google_firebase_project.this),
       jsonencode(google_firebase_web_app.app),

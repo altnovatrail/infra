@@ -37,6 +37,8 @@ locals {
     # region, before any trace (R04, R07).
     "logging.googleapis.com",
     "observability.googleapis.com",
+    # The project's contact for Google's security notifications (R27).
+    "essentialcontacts.googleapis.com",
   ]
 }
 

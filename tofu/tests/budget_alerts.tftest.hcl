@@ -61,6 +61,33 @@ run "no_operator_makes_no_alert" {
     condition     = length(google_billing_budget.spend.all_updates_rule[0].monitoring_notification_channels) == 0 && google_billing_budget.spend.all_updates_rule[0].disable_default_iam_recipients == false
     error_message = "With no operator, the budget mails the billing account's administrators and users alone."
   }
+
+  assert {
+    condition     = length(google_essential_contacts_contact.security) == 0
+    error_message = "With no operator's address, the project gets no contact, and Google's letters go to the fallback."
+  }
+}
+
+# With an operator, Google's security notifications of the project go to the operator's address, and
+# no other category: Security's fallback is the Organization Administrator, whom a project with no
+# organization lacks, and the others fall back to the owners and the billing account's
+# administrators (R27; sources 5.7).
+run "an_operator_is_the_security_contact" {
+  command = plan
+
+  variables {
+    operator_email = "operator@example.com"
+  }
+
+  assert {
+    condition     = length(google_essential_contacts_contact.security) == 1 && google_essential_contacts_contact.security[0].email == "operator@example.com"
+    error_message = "With an operator's address, the project's security contact is that address."
+  }
+
+  assert {
+    condition     = google_essential_contacts_contact.security[0].parent == "projects/novatrail-test-0" && toset(google_essential_contacts_contact.security[0].notification_category_subscriptions) == toset(["SECURITY"])
+    error_message = "The contact is the project's own, for the category Security alone."
+  }
 }
 
 # With an operator: two alerts on api's request count, both read from Cloud Run's metrics and

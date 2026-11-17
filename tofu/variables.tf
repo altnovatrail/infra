@@ -109,7 +109,7 @@ variable "budget_currency" {
 # The alerts on Cloud Run's built-in metrics (R07).
 
 variable "operator_email" {
-  description = "The address the alerts are mailed to. Empty means no alerts. It is a person's address, so it is not written in this repository: it arrives from the environment, as TF_VAR_operator_email."
+  description = "The address the alerts are mailed to, and the project's contact for Google's security notifications. Empty means neither. It is a person's address, so it is not written in this repository: it arrives from the environment, as TF_VAR_operator_email."
   type        = string
   default     = ""
   sensitive   = true
