@@ -170,7 +170,7 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-The platform's first deployment went this way on 2026-11-12, with `api` v0.1.22 and `app` v0.1.0 (R25 in [docs/decisions.md](docs/decisions.md)), and the platform's list has named `api` v0.1.60 and `app` v0.1.19 since 2026-11-17 (R29). A new release of either goes out the same way: a pull request that changes the list, and its merge. The migrations of a release of `api` come in its binary and run in the job `migrate`, so the steps of the deployment do not change. This section says what the list is made of, and the next how the deployment goes.
+The platform's first deployment went this way on 2026-11-12, with `api` v0.1.22 and `app` v0.1.0 (R25 in [docs/decisions.md](docs/decisions.md)), and the platform's list has named `api` v0.1.60 and `app` v0.1.22 since 2026-11-17 (R29). A new release of either goes out the same way: a pull request that changes the list, and its merge. The migrations of a release of `api` come in its binary and run in the job `migrate`, so the steps of the deployment do not change. This section says what the list is made of, and the next how the deployment goes.
 
 The deployment ships what `deploy/` names. A pull request that changes it is checked before the merge, and the merge deploys what changed (R05).
 
