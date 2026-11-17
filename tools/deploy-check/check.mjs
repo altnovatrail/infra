@@ -21,7 +21,8 @@
 //      folder again by its own part legal/ (R33);
 //   7. the rung the configuration tells api's service and the jobs of the check: api_admission_rung
 //      of tofu/production.auto.tfvars, or its default in tofu/variables.tf (the 2026-11-16 amendment
-//      to R05);
+//      to R05), and the rung full wherever the facts name a category under 18 (the fifth 2026-11-17
+//      amendment to R149 spec; the third 2026-11-17 amendment to R05);
 //   8. api's tag no lower than in the list at <ref>, the main a pull request merges into; with no
 //      list there, nothing to hold it to.
 // A list that fails its schema is refused there; every other check runs, each says what it found,
@@ -441,6 +442,28 @@ function factsHoldToTheTable(factsFile) {
   if (unknown.length) throw new Refusal(`production/facts.json names what spec's admission table does not: ${unknown.join(", ")}`);
 }
 
+// The categories under 18 of spec's admission table, in its order. Facts for any of them come with
+// the rung full: tutor's list selects its entries by the deployment's rung, not by the learner's
+// category, so at the rung author the entries the author's word admitted with no eval would read a
+// child's work (the fifth 2026-11-17 amendment to R149 spec; the third 2026-11-17 amendment to R05).
+const UNDER_18 = ["under_13", "from_13_to_consent", "from_consent_to_18"];
+
+// The list's rung against the categories the facts name: any rung for an adult's facts alone, full
+// for facts that name a category under 18. What is not of the facts' form names no category here:
+// the check of the facts refuses it.
+export function rungHoldsForFacts(facts, rung) {
+  const named = new Set();
+  for (const declared of Object.values(facts ?? {})) {
+    for (const categories of Object.values(declared ?? {})) {
+      if (Array.isArray(categories)) for (const category of categories) named.add(category);
+    }
+  }
+  const minors = UNDER_18.filter((category) => named.has(category));
+  if (!minors.length) return `the facts name no category under 18, so the rung ${rung} may stand`;
+  if (rung !== "full") throw new Refusal(`production/facts.json names ${minors.join(", ")}, a category under 18, and the rung is ${rung}: facts for a learner under 18 come with the rung full (the fifth 2026-11-17 amendment to R149 spec)`);
+  return `the facts name ${minors.join(", ")}, and the rung is full`;
+}
+
 // A self-hosted copy's folder of legal texts, production/legal, by spec's recipe legal-check-dir, as
 // the part's text has a copy check it (the second 2026-11-09 amendment to R115 spec), or, for the
 // tests, a command that stands in for it with the same argument; the deployment lays the folder over
@@ -574,6 +597,7 @@ export async function run(deployDir, base, standIns = {}) {
       if (rung !== told) throw new Refusal(`the rung is ${rung}, and the configuration tells api ${told}: api_admission_rung of tofu/production.auto.tfvars, or its default in tofu/variables.tf, names the same (R05)`);
       return `the rung ${rung} is the one the configuration tells api`;
     });
+    await step("facts for a learner under 18 come with the rung full", () => rungHoldsForFacts(readJson(path.join(deployDir, "production", "facts.json"), "production/facts.json"), list.admission.rung));
     await step("api's tag is no lower than on the base", () => {
       if (!base) return "api's tag: no base named, nothing to hold it to";
       const before = baseList(base, deployDir);

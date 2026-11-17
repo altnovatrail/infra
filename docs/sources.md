@@ -435,6 +435,14 @@ Read again 2026-11-17 (T60; the second 2026-11-17 amendment to R27), the page of
 - `spec/tools/docs-check/config.mjs` at v0.18.6: `Every repository has moved (T177), so a table back in one of them is a second copy, in spec and in a repository alike. Headings are English, "Table 3." (R154)`; `budgets.json` drops `DEBT.md` from the block `repository`;
 - RULES.md at v0.18.6: table 3 is `run/QUESTIONS.md` alone; apt "comes from a snapshot of the Ubuntu archive alone — a source of its own whose URI names the snapshot's ID"; the sentence on translating a plan with a move to a tag is gone;
 - architecture 3.11 spec, the card, is the same at both tags.
+### 6.5. The `spec` tag v0.18.17
+
+(R36; T79), read 2026-11-17:
+- `gh release list -R altnovatrail/spec`: v0.18.17 of 2026-11-17T16:53:39Z is "Latest", after v0.18.16 of 16:29:45Z; `gh release verify v0.18.17 -R altnovatrail/spec` — "Resolved tag v0.18.17 to sha1:aab3a6c5f16970ac47df0a1fa002e5e2b135d143", "✓ Release v0.18.17 verified!". `git log --oneline v0.18.6..v0.18.17` in the submodule — 32 commits, T178–T189 spec;
+- `git diff --stat v0.18.6 v0.18.17`: no file of `.devcontainer/`, `repo-template/kinds/`, `deployment/`, `admission/`, `tools/release/`, `tools/toolchain/` or `tools/session/`; of the template, `repo-template/files/README.md` and `repo-template/files/RUN.md`, whose rule 10 ends "commit messages and a pull request's title and description in English and terse, for the session, never a copy of the report.";
+- RULES.md at v0.18.17, Language: "Commit messages and a pull request's title and description are in English and terse, for the session that reads them, and reports to the author are in Russian (the 2026-11-17 amendment to R14 spec).";
+- R149 spec at v0.18.17, its fifth 2026-11-17 amendment: "a deployment that declares facts for any cell under 18 — `data_processing_agreement` or `minimal_retention` for `under_13`, `from_13_to_consent` or `from_consent_to_18` — names the rung "full"", and "No code of `tutor` holds this: it is a condition of the deployment";
+- architecture 3.11 spec, the card, at v0.18.17: the item of the logs adds "the audit of Secret Manager's reads of secret versions, Data Access, which names the reader by email and IP address — the service accounts, CI, the eval jobs and the operator, never an account owner or a learner …", and the item of the deployment facts adds "the reading mode as `API_READING_MODE` — on `novatrail` `single`, one reader".
 
 ## 7. Prices and payment
 
