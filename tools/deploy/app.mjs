@@ -26,13 +26,17 @@
 //   4. deployment.json into the folder;
 //   5. a version of the folder with its configuration — the headers and the rewrite of R06 — its
 //      files uploaded, finalized and released, with the message that names the build;
-//   6. check.
-// check: what the site answers, against the list's build (R06).
+//   6. check, in rounds until the site answers as the release has it or the rounds are out.
+// check: what the site answers, against the list's build (R06), in one round.
+//
+// Each line of release and check goes to the log as it is said, so that the rounds of the check
+// are seen while it waits and a refusal comes after what was done before it, and is returned too.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as sleepFor } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import zlib from "node:zlib";
@@ -50,6 +54,19 @@ const MESSAGE = new RegExp(`^app ${BUILD}(?: keeping ${BUILD})?$`);
 const PARALLEL = 8;
 
 const gzip = promisify(zlib.gzip);
+
+// The check after a release reads the site again until it answers as the release has it: for a
+// while after a release Hosting's CDN still serves the build before — in run 43991456418 of Deploy,
+// read 19 s after the release, / was the old index.html and the new build's file of assets/ a 404,
+// and a minute later it was there (В45; T71). A round every 10 s, so that the site is read soon
+// after it turns; rounds for 120 s, twice the lag seen, and a site still wrong then is wrong. One
+// round is the first read and one 10 s after each round before, so the waits add up to 120 s. A read
+// of the site that takes over 10 s is a wrong answer of its round, which reads every path at once:
+// a round ends within READ_FOR, and the check within ROUNDS × READ_FOR + ROUNDS_FOR, 250 s.
+export const ROUND_EVERY = 10_000;
+export const ROUNDS_FOR = 120_000;
+export const ROUNDS = 1 + ROUNDS_FOR / ROUND_EVERY;
+export const READ_FOR = 10_000;
 
 // "You can send a maximum of 1000 file hashes in each API request" (Firebase, Deploy to your site
 // using the Hosting REST API).
@@ -179,16 +196,28 @@ async function released(call, site) {
   return { build: build(1), kept: found[4] ? build(4) : null };
 }
 
-export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy"), token, api = HOSTING_API, standIns = {}, fetchSite } = {}) {
+// A line said goes into the log at once and into the lines returned.
+function sayer(log) {
+  const lines = [];
+  return {
+    lines,
+    say: (line) => {
+      lines.push(line);
+      log(line);
+    },
+  };
+}
+
+export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy"), token, api = HOSTING_API, standIns = {}, fetchSite, sleep = sleepFor, log = () => {} } = {}) {
   const { site, url, origin } = siteOf(outputsFile);
   const { app, deploymentFile } = theList(deployDir);
   const call = client(api, token);
-  const lines = [];
+  const { lines, say } = sayer(log);
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-app-"));
   try {
     const { build, csp } = await theBuild(app, deploymentFile, origin, work, standIns);
     apiHolds(outputsFile, deploymentFile);
-    lines.push(`app ${app.release}: ${app.archive.name} is verified and holds a build to release`);
+    say(`app ${app.release}: ${app.archive.name} is verified and holds a build to release`);
 
     // The folder of the version: the new build, the assets of the one released, deployment.json.
     const files = new Map();
@@ -199,11 +228,11 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
       const old = unpackBuild(archive, before.archive.name, path.join(work, "old-build"));
       const kept = buildFiles(old).filter((file) => file.startsWith("assets/"));
       for (const file of kept) files.set(`/${file}`, path.join(old, file));
-      lines.push(`app ${before.release} came before: its ${kept.length} files of assets/ are kept`);
+      say(`app ${before.release} came before: its ${kept.length} files of assets/ are kept`);
     } else if (live) {
-      lines.push(`app ${app.release} is released already, with no build before it kept: none is kept now either`);
+      say(`app ${app.release} is released already, with no build before it kept: none is kept now either`);
     } else {
-      lines.push(`${site} has no release yet: this is the first, with no build before it`);
+      say(`${site} has no release yet: this is the first, with no build before it`);
     }
     for (const file of buildFiles(build)) files.set(`/${file}`, path.join(build, file));
     files.set("/deployment.json", deploymentFile);
@@ -232,71 +261,83 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
     if (required.size && !uploadUrl) throw new Refusal(`Hosting asked for ${required.size} files of ${version.name} and named nowhere to upload them`);
     for (const hash of required) if (!gzipped.has(hash)) throw new Refusal(`Hosting asked for a file of ${version.name} that is not in it: ${hash}`);
     await inParallel(required, (hash) => call("POST", `${uploadUrl}/${hash}`, { body: gzipped.get(hash), what: `the upload of ${hash}` }));
-    lines.push(`${version.name}: ${paths.length} files, ${required.size} of them uploaded`);
+    say(`${version.name}: ${paths.length} files, ${required.size} of them uploaded`);
     await call("PATCH", `${version.name}?update_mask=status`, { json: { status: "FINALIZED" }, what: `the finalizing of ${version.name}` });
     const made = await call("POST", `sites/${site}/releases?versionName=${encodeURIComponent(version.name)}`, { json: { message: releaseMessage(app, before) }, what: `the release of ${version.name}` });
-    lines.push(`${made.name ?? version.name} released: app ${app.release}`);
+    say(`${made.name ?? version.name} released: app ${app.release}`);
 
-    lines.push(...(await answers({ url, build, deploymentFile, csp, fetchSite })));
+    await answers({ url, build, deploymentFile, csp, fetchSite, rounds: ROUNDS, sleep, say });
   } finally {
     fs.rmSync(work, { recursive: true, force: true });
   }
   return lines;
 }
 
-// What the site answers, against the build (R06): index.html's bytes, with its headers, at / and
-// at a path of the SPA; a file of assets/ with its own; a 404 for a file of /assets/ that is not
-// there; deployment.json as app reads it; the build's NOTICE and LICENSE at /NOTICE and /LICENSE
-// (the 2026-11-11 amendment to R85 spec). Every answer is checked, and every one that is wrong is
-// said.
-async function answers({ url, build, deploymentFile, csp, fetchSite = fetch }) {
-  const random = crypto.randomBytes(6).toString("hex");
-  const index = fs.readFileSync(path.join(build, "index.html"));
+// What the site answers, against the build (R06), in rounds of all of it, ROUND_EVERY apart, until
+// one finds nothing wrong: refused when the last of them still does, with what it found. A round
+// that finds something wrong before the last says its number and what is wrong. Each round asks for
+// index.html's bytes, with its headers, at / and at a path of the SPA; a file of assets/ with its
+// own; a 404 for a file of /assets/ that is not there; deployment.json as app reads it; the build's
+// NOTICE and LICENSE at /NOTICE and /LICENSE (the 2026-11-11 amendment to R85 spec). The paths that
+// hold no file are new each round, so that no answer of a round before stands in for them.
+async function answers({ url, build, deploymentFile, csp, fetchSite = fetch, rounds = 1, sleep = sleepFor, say }) {
   const asset = buildFiles(build).find((file) => file.startsWith("assets/"));
-  const deployment = fs.readFileSync(deploymentFile);
-  const wrong = [];
-  const ask = async (where) => {
-    try {
-      const response = await fetchSite(`${url}${where}`, { redirect: "manual", headers: { "Cache-Control": "no-cache" } });
-      return { status: response.status, headers: response.headers, body: Buffer.from(await response.arrayBuffer()) };
-    } catch (error) {
-      wrong.push(`${where} cannot be read: ${error.message}`);
-      return null;
-    }
-  };
-  const holds = (where, got, want) => {
-    if (!got) return;
-    if (got.status !== want.status) return wrong.push(`${where} answered ${got.status}, not ${want.status}`);
-    if (want.body && !got.body.equals(want.body)) wrong.push(`${where} answered other bytes than ${want.of}`);
-    for (const [name, value] of Object.entries(want.headers ?? {})) {
-      const header = got.headers.get(name);
-      if (value instanceof RegExp ? !value.test(header ?? "") : header !== value) wrong.push(`${where} sent ${name}: ${header ?? "nothing"}, not ${value}`);
-    }
-    const opener = got.headers.get("cross-origin-opener-policy");
-    if (opener && /same-origin(?!-)/.test(opener)) wrong.push(`${where} sent Cross-Origin-Opener-Policy: ${opener}, which breaks the window of sign-in`);
-  };
-  const page = { "content-security-policy": csp, "x-content-type-options": "nosniff", "cache-control": /no-cache/, "strict-transport-security": /max-age=\d+/ };
-
-  holds("/", await ask("/"), { status: 200, body: index, of: "index.html", headers: page });
-  holds(`/lesson-${random}`, await ask(`/lesson-${random}`), { status: 200, body: index, of: "index.html", headers: page });
-  holds(`/${asset}`, await ask(`/${asset}`), { status: 200, body: fs.readFileSync(path.join(build, asset)), of: asset, headers: { "x-content-type-options": "nosniff", "cache-control": /immutable/ } });
-  holds(`/assets/gone-${random}.js`, await ask(`/assets/gone-${random}.js`), { status: 404 });
-  holds("/deployment.json", await ask("/deployment.json"), { status: 200, body: deployment, of: "production/deployment.json", headers: { "content-type": /^application\/json/, "cache-control": /no-cache/ } });
+  const page = { status: 200, body: fs.readFileSync(path.join(build, "index.html")), of: "index.html", headers: { "content-security-policy": csp, "x-content-type-options": "nosniff", "cache-control": /no-cache/, "strict-transport-security": /max-age=\d+/ } };
+  const file = { status: 200, body: fs.readFileSync(path.join(build, asset)), of: asset, headers: { "x-content-type-options": "nosniff", "cache-control": /immutable/ } };
+  const deployment = { status: 200, body: fs.readFileSync(deploymentFile), of: "production/deployment.json", headers: { "content-type": /^application\/json/, "cache-control": /no-cache/ } };
   // A path outside /assets/**, with no extension: its type is sniffed unless nosniff holds it.
-  const notices = { "x-content-type-options": "nosniff", "cache-control": /no-cache/ };
-  for (const notice of ["NOTICE", "LICENSE"]) holds(`/${notice}`, await ask(`/${notice}`), { status: 200, body: fs.readFileSync(path.join(build, notice)), of: `the build's ${notice}`, headers: notices });
-
-  if (wrong.length) throw new Refusal(`${url} does not answer as the release has it:\n  ${wrong.join("\n  ")}`);
-  return [`${url} answers as the release has it: the page at / and at a path of the SPA, ${asset}, a 404 under /assets/, deployment.json, NOTICE and LICENSE`];
+  const notice = (name) => ({ status: 200, body: fs.readFileSync(path.join(build, name)), of: `the build's ${name}`, headers: { "x-content-type-options": "nosniff", "cache-control": /no-cache/ } });
+  const notices = [["/NOTICE", notice("NOTICE")], ["/LICENSE", notice("LICENSE")]];
+  for (let round = 1; ; round++) {
+    const random = crypto.randomBytes(6).toString("hex");
+    const wrong = await wrongAnswers(url, fetchSite, [["/", page], [`/lesson-${random}`, page], [`/${asset}`, file], [`/assets/gone-${random}.js`, { status: 404 }], ["/deployment.json", deployment], ...notices]);
+    if (!wrong.length) {
+      say(`${url} answers as the release has it${round > 1 ? ` in round ${round} of ${rounds}` : ""}: the page at / and at a path of the SPA, ${asset}, a 404 under /assets/, deployment.json, NOTICE and LICENSE`);
+      return;
+    }
+    if (round >= rounds) throw new Refusal(`${url} does not answer as the release has it:\n  ${wrong.join("\n  ")}`);
+    say(`${url}, round ${round} of ${rounds}: not yet as the release has it, read again in ${ROUND_EVERY / 1000} s:\n  ${wrong.join("\n  ")}`);
+    await sleep(ROUND_EVERY);
+  }
 }
 
-export async function check({ outputsFile, deployDir = path.join(ROOT, "deploy"), standIns = {}, fetchSite } = {}) {
+// One round: every path of `wanted` read at once, each within READ_FOR, and held to what is
+// wanted of it; what is wrong, in the order of `wanted`, every answer that is wrong said.
+async function wrongAnswers(url, fetchSite, wanted) {
+  const ask = async (where) => {
+    try {
+      const response = await fetchSite(`${url}${where}`, { redirect: "manual", headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(READ_FOR) });
+      return { status: response.status, headers: response.headers, body: Buffer.from(await response.arrayBuffer()) };
+    } catch (error) {
+      return { error };
+    }
+  };
+  const got = await Promise.all(wanted.map(([where]) => ask(where)));
+  const wrong = [];
+  wanted.forEach(([where, want], at) => {
+    const { error, status, headers, body } = got[at];
+    if (error) return wrong.push(`${where} cannot be read: ${error.message}`);
+    if (status !== want.status) return wrong.push(`${where} answered ${status}, not ${want.status}`);
+    if (want.body && !body.equals(want.body)) wrong.push(`${where} answered other bytes than ${want.of}`);
+    for (const [name, value] of Object.entries(want.headers ?? {})) {
+      const header = headers.get(name);
+      if (value instanceof RegExp ? !value.test(header ?? "") : header !== value) wrong.push(`${where} sent ${name}: ${header ?? "nothing"}, not ${value}`);
+    }
+    const opener = headers.get("cross-origin-opener-policy");
+    if (opener && /same-origin(?!-)/.test(opener)) wrong.push(`${where} sent Cross-Origin-Opener-Policy: ${opener}, which breaks the window of sign-in`);
+  });
+  return wrong;
+}
+
+export async function check({ outputsFile, deployDir = path.join(ROOT, "deploy"), standIns = {}, fetchSite, log = () => {} } = {}) {
   const { url, origin } = siteOf(outputsFile);
   const { app, deploymentFile } = theList(deployDir);
+  const { lines, say } = sayer(log);
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-app-"));
   try {
     const { build, csp } = await theBuild(app, deploymentFile, origin, work, standIns);
-    return await answers({ url, build, deploymentFile, csp, fetchSite });
+    await answers({ url, build, deploymentFile, csp, fetchSite, say });
+    return lines;
   } finally {
     fs.rmSync(work, { recursive: true, force: true });
   }
@@ -307,9 +348,8 @@ const USAGE = "usage: app release|check <outputs.json> [<deploy dir>]";
 async function main(argv) {
   const [command, outputsFile, deployDir] = argv;
   if (!["release", "check"].includes(command) || !outputsFile || argv.length > 3) throw new Refusal(USAGE);
-  const options = { outputsFile: path.resolve(outputsFile), deployDir: deployDir ? path.resolve(deployDir) : undefined };
-  const lines = command === "release" ? await release({ ...options, token: process.env.HOSTING_ACCESS_TOKEN }) : await check(options);
-  for (const line of lines) console.log(line);
+  const options = { outputsFile: path.resolve(outputsFile), deployDir: deployDir ? path.resolve(deployDir) : undefined, log: (line) => console.log(line) };
+  await (command === "release" ? release({ ...options, token: process.env.HOSTING_ACCESS_TOKEN }) : check(options));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

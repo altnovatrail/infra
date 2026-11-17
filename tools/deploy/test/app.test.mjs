@@ -14,7 +14,7 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
-import { check, release, releaseMessage, servingConfig } from "../app.mjs";
+import { check, release, releaseMessage, ROUND_EVERY, ROUNDS, ROUNDS_FOR, servingConfig } from "../app.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const script = path.join(here, "..", "app.mjs");
@@ -197,11 +197,15 @@ function world({ tag = "v0.3.0", builds = { "v0.3.0": ["index-new.js"], "v0.2.0"
     deploy,
     outputsFile,
     site,
-    release: ({ breaks, token = "synthetic-token", refuse = "//" } = {}) =>
-      release({ outputsFile, deployDir: deploy, token, api: `${base}/v1beta1`, standIns: { ...standIns, verifier: ["/bin/sh", verify, refuse] }, fetchSite: site(breaks) }),
-    check: ({ breaks } = {}) => check({ outputsFile, deployDir: deploy, standIns, fetchSite: site(breaks) }),
+    release: ({ breaks, token = "synthetic-token", refuse = "//", fetchSite = site(breaks), sleep = noSleep, log } = {}) =>
+      release({ outputsFile, deployDir: deploy, token, api: `${base}/v1beta1`, standIns: { ...standIns, verifier: ["/bin/sh", verify, refuse] }, fetchSite, sleep, log }),
+    check: ({ breaks, fetchSite = site(breaks), log } = {}) => check({ outputsFile, deployDir: deploy, standIns, fetchSite, log }),
   };
 }
+
+// No test waits for the rounds of the check after a release: a site that answers wrong fails the
+// release at once, unless a test gives a sleep of its own.
+const noSleep = async () => {};
 
 // The files of the version released, by path, unzipped.
 function releasedFiles() {
@@ -467,4 +471,94 @@ test("a copy's release goes to the copy's site, every call of it", async () => {
     assert.match(call, /\/sites\/acme-learning-1\//, call);
     assert.doesNotMatch(call, /novatrail/, call);
   }
+});
+
+// The check after a release reads the site in rounds, ROUND_EVERY apart, for ROUNDS_FOR, since
+// Hosting's CDN serves the build before for a while after a release (В45; T71). The time is the
+// test's: `sleep` only counts the waits, and a round is what the stand-in site answers between two.
+test("the check after a release waits for the CDN, in rounds, and fails only once they are out", async (t) => {
+  // The site as the CDN serves it after a release, for the first `stale` rounds: the page of the
+  // build before at / and no file of the new build's assets/, as in run 43991456418 of Deploy.
+  // `reads` counts the reads of /, one a round.
+  const cdn = (w, stale) => {
+    const waits = [];
+    let reads = 0;
+    const fresh = w.site();
+    const fetchSite = async (url, options) => {
+      assert.ok(options.signal instanceof AbortSignal, "every read is bounded");
+      if (new URL(url).pathname === "/") reads++;
+      const answer = await fresh(url, options);
+      if (waits.length >= stale) return answer;
+      const where = new URL(url).pathname;
+      if (where === "/") return new Response("<!doctype html><title>app v0.2.0</title>", { status: 200, headers: answer.headers });
+      if (where === "/assets/index-new.js") return new Response("not found", { status: 404 });
+      return answer;
+    };
+    return { fetchSite, waits, reads: () => reads, sleep: async (ms) => waits.push(ms) };
+  };
+  const stillWrong = "  / answered other bytes than index.html\n  /assets/index-new.js answered 404, not 200";
+
+  await t.test("a site that turns after three rounds passes in the fourth, each round before it in the log", async () => {
+    const w = world();
+    const { fetchSite, waits, sleep } = cdn(w, 3);
+    const logged = [];
+    const lines = await w.release({ fetchSite, sleep, log: (line) => logged.push(line) });
+    assert.deepEqual(waits, [ROUND_EVERY, ROUND_EVERY, ROUND_EVERY]);
+    const rounds = logged.filter((line) => line.includes(" round "));
+    assert.equal(rounds.length, 4);
+    for (const round of [1, 2, 3]) assert.equal(rounds[round - 1], `https://novatrail-test-0.web.app, round ${round} of 13: not yet as the release has it, read again in 10 s:\n${stillWrong}`);
+    assert.match(rounds[3], /^https:\/\/novatrail-test-0\.web\.app answers as the release has it in round 4 of 13: the page at \/ /);
+    assert.equal(rounds[3], lines.at(-1));
+    assert.deepEqual(lines, logged, "every line is in the log as it is said, and returned");
+    assert.ok(logged.indexOf(logged.find((line) => / released: app v0\.3\.0$/.test(line))) < logged.indexOf(rounds[0]), "the release is said before the rounds");
+  });
+
+  await t.test("a site that never turns fails after the last round, with what it still answers wrong", async () => {
+    const w = world();
+    const { fetchSite, waits, sleep } = cdn(w, Infinity);
+    const logged = [];
+    await assert.rejects(w.release({ fetchSite, sleep, log: (line) => logged.push(line) }), (error) => {
+      assert.equal(error.message, `https://novatrail-test-0.web.app does not answer as the release has it:\n${stillWrong}`);
+      return true;
+    });
+    assert.equal(waits.length, ROUNDS - 1);
+    assert.ok(waits.every((ms) => ms === ROUND_EVERY));
+    assert.equal(waits.reduce((a, b) => a + b, 0), ROUNDS_FOR);
+    assert.equal(logged.filter((line) => line.includes(" round ")).length, ROUNDS - 1);
+    assert.match(logged.at(-1), /, round 12 of 13: not yet as the release has it/);
+    assert.ok(logged.some((line) => / released: app v0\.3\.0$/.test(line)), "what was done before the refusal is in the log");
+  });
+
+  await t.test("a site that turns in the last round passes", async () => {
+    const w = world();
+    const { fetchSite, waits, sleep } = cdn(w, ROUNDS - 1);
+    assert.match((await w.release({ fetchSite, sleep })).at(-1), /answers as the release has it in round 13 of 13: /);
+    assert.equal(waits.length, ROUNDS - 1);
+  });
+
+  await t.test("a read that fails is a wrong answer of its round, and the next round reads it again", async () => {
+    const w = world();
+    const waits = [];
+    const fresh = w.site();
+    const fetchSite = async (url, options) => {
+      if (!waits.length && new URL(url).pathname === "/deployment.json") throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      return fresh(url, options);
+    };
+    const logged = [];
+    await w.release({ fetchSite, sleep: async (ms) => waits.push(ms), log: (line) => logged.push(line) });
+    assert.equal(waits.length, 1);
+    assert.ok(logged.includes("https://novatrail-test-0.web.app, round 1 of 13: not yet as the release has it, read again in 10 s:\n  /deployment.json cannot be read: The operation was aborted due to timeout"));
+    assert.match(logged.at(-1), /in round 2 of 13: /);
+  });
+
+  await t.test("the check as a command of its own reads the site once", async () => {
+    const w = world();
+    const { fetchSite, reads } = cdn(w, Infinity);
+    const logged = [];
+    await assert.rejects(w.check({ fetchSite, log: (line) => logged.push(line) }), (error) => error.message.endsWith(stillWrong));
+    assert.equal(reads(), 1);
+    assert.deepEqual(logged, []);
+    assert.match((await w.check({ log: (line) => logged.push(line) })).at(-1), /answers as the release has it: /);
+    assert.equal(logged.length, 1);
+  });
 });
