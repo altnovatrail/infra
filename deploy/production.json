@@ -1,20 +1,20 @@
 {
   "format": 1,
   "api": {
-    "release": "v0.1.58",
+    "release": "v0.1.60",
     "binary": {
-      "name": "api_v0.1.58_linux_amd64",
-      "sha256": "9ea7b6ac65de2531e8b4482155c8b9198437786a66bc9387e5dc511a12ebf5b9"
+      "name": "api_v0.1.60_linux_amd64",
+      "sha256": "0ca2bcf7dd08f386e5dc6f3a1e669b59a12ba6a2757377e446c910221ba55ab1"
     },
     "dockerfile": {
       "sha256": "142cf5c9e5b8c9c64fdb55ed9aafaf2d7a42eb6a95bd9f4fe7ba89b649b2c90a"
     }
   },
   "app": {
-    "release": "v0.1.15",
+    "release": "v0.1.19",
     "archive": {
-      "name": "app_v0.1.15.tar.gz",
-      "sha256": "e4b14933f2b14b80390feca21442f64df2f13e51a706a3dfc3edfc658b42ef48"
+      "name": "app_v0.1.19.tar.gz",
+      "sha256": "d8cecae28c2c3010c5c626a8008e6affe938e8db8c9533f32fd6267b335557e0"
     },
     "deployment": {
       "sha256": "13e18579cf1f53c10f0bd2a3ff704fdc75e8224ba1b6a804d04e3a3cadf26cd4"
