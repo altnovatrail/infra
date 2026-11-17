@@ -46,6 +46,7 @@ run "the_apis_the_parts_need_are_on" {
       "monitoring.googleapis.com",
       "logging.googleapis.com",
       "observability.googleapis.com",
+      "essentialcontacts.googleapis.com",
     ])
     error_message = "The APIs on are not exactly those the parts stand on."
   }

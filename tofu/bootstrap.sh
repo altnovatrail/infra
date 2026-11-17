@@ -330,6 +330,7 @@ project_roles=(
     "roles/firebase.admin google_firebase_project google_firebase_hosting_site google_firebase_web_app data.google_firebase_web_app_config google_identity_platform_config"
     "roles/monitoring.notificationChannelEditor google_monitoring_notification_channel"
     "roles/monitoring.alertPolicyEditor google_monitoring_alert_policy"
+    "roles/essentialcontacts.admin google_essential_contacts_contact"
     "roles/logging.configWriter google_logging_project_bucket_config google_logging_project_sink"
     "roles/observability.editor google_observability_project_settings"
 )

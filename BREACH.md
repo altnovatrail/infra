@@ -26,7 +26,7 @@ A breach is when anyone without the right has read, copied, changed or erased a 
 
 You learn of it from:
 
-- a letter from Google about the project's security. Google sends these to the project's Essential Contacts, category Security, and without a contact to a fallback contact chosen by IAM role (sources 5.7). This repository sets no contact (R27), and nobody has checked who on the project gets that letter;
+- a letter from Google about the project's security. Google sends these to the project's Essential Contacts, category Security, and without a contact to a fallback contact chosen by IAM role: for Security, the Organization Administrator, whom a project with no organization lacks (sources 5.7). So the module makes the address of `TF_VAR_operator_email` the project's contact for Security, `tofu/contacts.tf` (R27). Without that address your copy has no such contact, and the letter may reach nobody;
 - a letter from Neon, from Firebase or from GitHub, about your account or the repository;
 - entries of Admin Activity that neither you nor CI made (section 4);
 - the alert emails of `tofu/alerts.tf`. A burst of requests or of errors is not a breach in itself, but it is a reason to look;
@@ -111,7 +111,7 @@ An upload page that reached the wrong person can only add files, and its policy 
 - **The log of `api`** — 30 days in the project's region: the method, the code, the cause of a refusal and the time of each call, without the body, the address or the UID (architecture 3.4). Look for bursts and for refusals.
 - **Policy Denied** — 30 days: who a policy refused, with their email.
 - **GitHub**: `gh run list --workflow deploy.yml` and the deployments of the environment `production`.
-- **Neon**: the console's roles and its monitoring. What Neon records about who connected, on its Free plan, nobody has checked yet.
+- **Neon**: the console's roles and its monitoring. On the Free plan nothing shows afterwards who connected (sources 3.16). The monitoring keeps 1 day of the number of connections, with no role and no address. Active queries, and `pg_stat_activity` in the SQL Editor, show only what runs now, and nothing once the compute has scaled to zero. Postgres logs each connection, but Neon exports its logs only on the Scale plan, and its audit logs come with HIPAA on Scale, by a support request. So treat a connection string that may have leaked as used: reset its role (section 3).
 - **Firebase Authentication**: the console's users, with the time each was created and last signed in (sources 4.8). An account nobody let in, or a sign-in at a strange time, is a sign.
 
 ### 5. Decide what was reached

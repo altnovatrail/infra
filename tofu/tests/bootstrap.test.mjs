@@ -208,6 +208,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
       "roles/artifactregistry.admin",
       "roles/browser",
       "roles/cloudscheduler.admin",
+      "roles/essentialcontacts.admin",
       "roles/firebase.admin",
       "roles/iam.serviceAccountAdmin",
       "roles/iam.serviceAccountUser",
