@@ -36,3 +36,8 @@ api_serving = true
 api_admission_rung        = "author"
 api_catalog_modules       = ["novatrail/olympiad-math", "novatrail/check-board"]
 api_anthropic_key_version = "1"
+
+# Handwriting read by Claude Haiku 5.5 at medium alone, not by the pair of R68 spec: the author's
+# word of 2026-11-17 (the 2026-11-17 amendment to R68 spec; R88 api;
+# the second 2026-11-17 amendment to R25; T72).
+api_reading_mode = "single"

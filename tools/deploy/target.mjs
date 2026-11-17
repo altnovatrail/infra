@@ -21,9 +21,9 @@
 // which delivers app (R05). The part facts is facts.json and, for a self-hosted copy, its folder of
 // legal texts, deploy/production/legal/: either changed goes by api.sh's path of the facts (R33). So
 // does what else api's revision runs with but its image: the list's rung, and the values of
-// tofu/production.auto.tfvars that tell it the rung, the catalog's list and the key's version. The
-// apply makes a revision of them that takes no traffic, and only a new revision brings them to it
-// (the 2026-11-16 amendment to R05).
+// tofu/production.auto.tfvars that tell it the rung, the mode of reading, the catalog's list and the
+// key's version. The apply makes a revision of them that takes no traffic, and only a new revision
+// brings them to it (the 2026-11-16 and 2026-11-17 amendments to R05).
 //
 // A run started by hand delivers the parts it names, among image, api, facts and app, and none when
 // it names none: --by-hand=<parts>, apart by commas, or, in the workflow, GITHUB_EVENT_NAME
@@ -65,7 +65,7 @@ const WORKFLOW = "deploy.yml";
 const CONFIG_JOB = "Configuration";
 const TFVARS = "tofu/production.auto.tfvars";
 // The values of the configuration api's revision runs with beside its image and its facts.
-const REVISION_VALUES = ["api_admission_rung", "api_catalog_modules", "api_anthropic_key_version"];
+const REVISION_VALUES = ["api_admission_rung", "api_reading_mode", "api_catalog_modules", "api_anthropic_key_version"];
 // The green runs looked through for the last that delivered: the newest of them that did.
 const LOOK = 20;
 
