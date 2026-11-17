@@ -1,10 +1,10 @@
 {
   "format": 1,
   "api": {
-    "release": "v0.1.57",
+    "release": "v0.1.58",
     "binary": {
-      "name": "api_v0.1.57_linux_amd64",
-      "sha256": "103057836ed5ac9e14d000af0d229a7776808c72fdd59baa65b07d439abdec5f"
+      "name": "api_v0.1.58_linux_amd64",
+      "sha256": "9ea7b6ac65de2531e8b4482155c8b9198437786a66bc9387e5dc511a12ebf5b9"
     },
     "dockerfile": {
       "sha256": "142cf5c9e5b8c9c64fdb55ed9aafaf2d7a42eb6a95bd9f4fe7ba89b649b2c90a"

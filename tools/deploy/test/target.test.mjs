@@ -131,6 +131,7 @@ test("against the last run that delivered, each part changes alone, and the rest
     ["the rung of the values", { "tofu/production.auto.tfvars": `${tfvars}api_admission_rung = "author"\n` }, { api: false, facts: true, app: false }],
     ["the catalog's list", { "tofu/production.auto.tfvars": `${tfvars}api_catalog_modules = ["novatrail/check-board"]\n` }, { api: false, facts: true, app: false }],
     ["the key's version", { "tofu/production.auto.tfvars": `${tfvars}api_anthropic_key_version = "2"\n` }, { api: false, facts: true, app: false }],
+    ["the mode of reading", { "tofu/production.auto.tfvars": `${tfvars}api_reading_mode = "single"\n` }, { api: false, facts: true, app: false }],
     ["another value of the configuration", { "tofu/production.auto.tfvars": `${tfvars}budget_amount = "6"\n` }, { api: false, facts: false, app: false }],
     ["a module put in a list over lines", { "tofu/production.auto.tfvars": `${tfvars}api_catalog_modules = [\n  "novatrail/check-board",\n]\n` }, { api: false, facts: true, app: false }],
   ];

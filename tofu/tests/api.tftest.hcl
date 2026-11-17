@@ -141,6 +141,11 @@ run "the_service_is_made_with_the_first_image" {
   }
 
   assert {
+    condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_READING_MODE"]) == "pair"
+    error_message = "Handwriting is read by the pair of readers by default."
+  }
+
+  assert {
     condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_ADMISSION_FACTS_FILE"]) == "/etc/api/admission/facts.json"
     error_message = "API_ADMISSION_FACTS_FILE names the file of the facts' volume."
   }
@@ -435,11 +440,11 @@ run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
   }
 
   assert {
-    condition = alltrue([for name in ["API_ADMISSION_RUNG", "API_ADMISSION_FACTS_FILE"] :
+    condition = alltrue([for name in ["API_ADMISSION_RUNG", "API_ADMISSION_FACTS_FILE", "API_READING_MODE"] :
       one([for e in google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env : e.value if e.name == name]) ==
       one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == name])
     ])
-    error_message = "The job of the check is told the rung and the facts' path the service is told."
+    error_message = "The job of the check is told the rung, the facts' path and the mode of reading the service is told."
   }
 
   assert {
@@ -459,15 +464,16 @@ run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
   assert {
     condition = (
       !contains([for v in google_cloud_run_v2_job.api["migrate"].template[0].template[0].volumes : v.secret[0].secret], "api-admission-facts") &&
-      length([for e in google_cloud_run_v2_job.api["migrate"].template[0].template[0].containers[0].env : e if startswith(e.name, "API_ADMISSION_")]) == 0
+      length([for e in google_cloud_run_v2_job.api["migrate"].template[0].template[0].containers[0].env : e if startswith(e.name, "API_ADMISSION_") || e.name == "API_READING_MODE"]) == 0
     )
-    error_message = "A job of another part reads neither the facts nor the rung."
+    error_message = "A job of another part reads neither the facts, nor the rung, nor the mode of reading."
   }
 }
 
-# Platform AI on a deployment at the rung author, as on novatrail (the 2026-11-16 amendment
-# to R25): the rung author and the catalog's list go to the service and to the job of the check, and
-# the key, an exact version of its secret, to the service alone, as its second volume.
+# Platform AI on a deployment at the rung author, as on novatrail (the 2026-11-16 and 2026-11-17
+# amendments to R25): the rung author, the mode single and the catalog's list go to the service and
+# to the job of the check, and the key, an exact version of its secret, to the service alone, as its
+# second volume.
 run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
   command = plan
 
@@ -475,6 +481,7 @@ run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
     api_image                 = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
     api_serving               = true
     api_admission_rung        = "author"
+    api_reading_mode          = "single"
     api_catalog_modules       = ["novatrail/olympiad-math", "novatrail/check-board"]
     api_anthropic_key_version = "3"
   }
@@ -482,9 +489,10 @@ run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
   assert {
     condition = alltrue([for env in [google_cloud_run_v2_service.api[0].template[0].containers[0].env, google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env] :
       one([for e in env : e.value if e.name == "API_ADMISSION_RUNG"]) == "author" &&
+      one([for e in env : e.value if e.name == "API_READING_MODE"]) == "single" &&
       one([for e in env : e.value if e.name == "API_CATALOG_MODULES"]) == "novatrail/olympiad-math,novatrail/check-board"
     ])
-    error_message = "The service and the job of the check are told the rung author and the list of modules, by commas, in its order."
+    error_message = "The service and the job of the check are told the rung author, the mode single and the list of modules, by commas, in its order."
   }
 
   assert {
@@ -528,6 +536,44 @@ run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
     condition     = google_secret_manager_secret.anthropic_key.secret_id == "api-anthropic-key" && google_secret_manager_secret.anthropic_key.deletion_protection && google_secret_manager_secret.anthropic_key.replication[0].user_managed[0].replicas[0].location == "us-east4"
     error_message = "The key's secret is api-anthropic-key, in the region alone, and the configuration never deletes it."
   }
+}
+
+# Handwriting read by Haiku alone (the second 2026-11-17 amendment to R25): the mode goes to the
+# service and to the job of the check at the rung full too (R88 api); at author, as on novatrail, the
+# run of the rung, the catalog and the key below checks it.
+run "the_mode_single_reaches_the_service_and_the_check" {
+  command = plan
+
+  variables {
+    api_image        = "us-east4-docker.pkg.dev/novatrail-test-0/images/api@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    api_serving      = true
+    api_reading_mode = "single"
+  }
+
+  assert {
+    condition = alltrue([for env in [google_cloud_run_v2_service.api[0].template[0].containers[0].env, google_cloud_run_v2_job.api["check"].template[0].template[0].containers[0].env] :
+      one([for e in env : e.value if e.name == "API_READING_MODE"]) == "single" &&
+      one([for e in env : e.value if e.name == "API_ADMISSION_RUNG"]) == "full"
+    ])
+    error_message = "The service and the job of the check are told the mode single, at the rung full too."
+  }
+
+  assert {
+    condition = alltrue([for name in ["migrate", "after", "sweep"] :
+      !contains([for e in google_cloud_run_v2_job.api[name].template[0].template[0].containers[0].env : e.name], "API_READING_MODE")
+    ])
+    error_message = "The jobs of the other parts read no handwriting and are not told the mode."
+  }
+}
+
+run "a_mode_of_reading_api_does_not_code_is_refused" {
+  command = plan
+
+  variables {
+    api_reading_mode = "haiku"
+  }
+
+  expect_failures = [var.api_reading_mode]
 }
 
 run "a_rung_tutor_does_not_name_is_refused" {

@@ -340,8 +340,9 @@ variable "api_request_timeout" {
   }
 }
 
-# Platform AI on the deployment: the lowest admission rung, the catalog's list of modules and the
-# platform's key of Anthropic, which the service and the jobs of the check are told (the 2026-11-16 amendment to R25).
+# Platform AI on the deployment: the lowest admission rung, the mode of reading, the catalog's list
+# of modules and the platform's key of Anthropic, which the service and the jobs of the check are
+# told (the 2026-11-16 and 2026-11-17 amendments to R25).
 
 variable "api_admission_rung" {
   description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so, as on novatrail (R45, R79 api; R149 spec). The list's admission.rung names the same, and the list's check holds the two equal (the 2026-11-16 amendment to R05)."
@@ -352,6 +353,18 @@ variable "api_admission_rung" {
   validation {
     condition     = contains(["author", "full"], var.api_admission_rung)
     error_message = "api_admission_rung is author or full, the rungs of tutor's rule of admission."
+  }
+}
+
+variable "api_reading_mode" {
+  description = "How tutor reads the handwriting of a sheet and of a workbook page, API_READING_MODE of the service and of the jobs of the check: pair, the two readers of R68 spec, or single, Claude Haiku 5.5 at medium alone (R88 api; the 2026-11-17 amendment to R25). Either holds at either rung. api takes it from v0.1.58, and api check refuses another value before the migrations."
+  type        = string
+  default     = "pair"
+  nullable    = false
+
+  validation {
+    condition     = contains(["pair", "single"], var.api_reading_mode)
+    error_message = "api_reading_mode is pair or single, the modes of reading api codes."
   }
 }
 

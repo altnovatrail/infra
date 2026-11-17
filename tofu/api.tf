@@ -3,9 +3,10 @@
 # Which image they run is the deployment's to say, and so is the one value a deployment changes
 # beside it: the version of the facts secret that the service and the jobs of the check mount (R05;
 # the second 2026-11-08 amendment to R106 spec). The configuration sets the two only when it creates
-# the service or a job, and owns everything around them: the lowest admission rung, the catalog's
-# list of modules and the version of the platform's key of Anthropic among it, each a value of the
-# deployment's file of values (the 2026-11-16 amendments to R05 and R25).
+# the service or a job, and owns everything around them: the lowest admission rung, the mode of
+# reading, the catalog's list of modules and the version of the platform's key of Anthropic among
+# it, each a value of the deployment's file of values (the 2026-11-16 amendments to R05 and R25, the
+# 2026-11-17 amendments).
 #
 # Nothing here exists until api_image names an image in this project's registry: a Cloud Run
 # resource cannot be made without one, and before the first deployment pushes api's image there is
@@ -32,10 +33,12 @@ locals {
   # version in the module's volume, where ignore_changes leaves it.
   container_name = "api"
 
-  # The lowest admission rung, which the list's admission.rung names too, and the catalog's list of
-  # modules, unset when it is empty: the service and the jobs of the check are told the same, so that
-  # api check checks what the revision will run with (R45, R79 api; the 2026-11-16 amendment to R25).
+  # The lowest admission rung, which the list's admission.rung names too, the mode of reading and the
+  # catalog's list of modules, unset when it is empty: the service and the jobs of the check are told
+  # the same, so that api check checks what the revision will run with (R45, R79, R88 api; the
+  # 2026-11-16 and 2026-11-17 amendments to R25).
   admission_rung = var.api_admission_rung
+  reading_mode   = var.api_reading_mode
   catalog        = length(var.api_catalog_modules) > 0 ? { API_CATALOG_MODULES = join(",", var.api_catalog_modules) } : {}
 
   # Where the service reads the platform's key of Anthropic, a file of one exact version of its
@@ -144,6 +147,12 @@ resource "google_cloud_run_v2_service" "api" {
       env {
         name  = "API_ADMISSION_FACTS_FILE"
         value = local.admission_path
+      }
+
+      # How tutor reads handwriting: the two readers of R68 spec, or Haiku alone (R88 api).
+      env {
+        name  = "API_READING_MODE"
+        value = local.reading_mode
       }
 
       # The Firebase project whose ID tokens api accepts: the platform's own (R16).
@@ -343,9 +352,10 @@ resource "google_cloud_run_v2_job" "api" {
           value = var.project_id
         }
 
-        # A job of the check checks the facts, the rung and the catalog's list the revision will run
-        # with: the same rung and list, and the facts at the same path (R05; the second 2026-11-08
-        # amendment to R106 spec). It reads no key, as api check does not (README api).
+        # A job of the check checks the facts, the rung, the mode of reading and the catalog's list
+        # the revision will run with: the same rung, mode and list, and the facts at the same path
+        # (R05; the second 2026-11-08 amendment to R106 spec). It reads no key, as api check does not
+        # (README api).
         # The store of the scans goes to a job that opens it, and to a job of the check, which checks
         # it as the revision will take it (R28).
         dynamic "env" {
@@ -353,6 +363,7 @@ resource "google_cloud_run_v2_job" "api" {
             each.value.deploy == "check" ? merge({
               API_ADMISSION_RUNG       = local.admission_rung
               API_ADMISSION_FACTS_FILE = local.admission_path
+              API_READING_MODE         = local.reading_mode
             }, local.catalog) : {},
             each.value.deploy == "check" || each.value.consent_forms ? local.consent_forms : {},
           )

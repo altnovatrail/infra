@@ -38,6 +38,7 @@ api_memory                   = null
 api_request_timeout          = null
 api_admission_rung           = null
 api_catalog_modules          = null
+api_reading_mode             = null
 api_anthropic_key_version    = null
 deploy_environment           = null
 hosting_environment          = null
