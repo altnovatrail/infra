@@ -287,7 +287,7 @@ The workflow's checks of `main` and of the environments do not apply either, so 
 
 ## 11. Logs, region and what only the platform has
 
-- **Logs** follow R07, as on the platform. Cloud Run's request logs, which hold the client's IP address, are excluded before storage. Your logs are kept 30 days in your region, and Google's audit logs 400 days.
+- **Logs** follow R07, as on the platform. Cloud Run's request logs, which hold the client's IP address, are excluded before storage. Your logs are kept 30 days in your region, and Google's audit logs 400 days. The reads of your secrets' versions are audited and kept with your logs, with the reader's email and IP address — your service accounts', your CI's and yours —, so that a breach shows who read a connection string; they add to your log volume, which is free up to 50 GiB a project a month (sources 7.1).
 - **Traces.** Cloud Run traces some requests by itself. Cloud Trace's API stays on, because Cloud Scheduler depends on it, so traces may come. They are kept in your region.
 - **Region.** Everything regional is in yours. What the platform decided about its learners' region (R04) is the platform's.
 - **Only the platform's:**

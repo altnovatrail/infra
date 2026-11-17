@@ -109,6 +109,11 @@
 
 (architecture 2.8; R27; [BREACH.md](../BREACH.md)), read 2026-11-13 — Google Cloud, [Secret Manager audit logging](https://docs.cloud.google.com/secret-manager/docs/audit-logging): `AddSecretVersion`, `DisableSecretVersion` and `SetIamPolicy` — "ADMIN_WRITE"; `AccessSecretVersion` and `GetSecretVersion` — "DATA_READ"; "Methods that require an IAM permission with the `type` property value of `DATA_READ`, `DATA_WRITE`, or `ADMIN_READ` generate Data Access audit logs."
 
+Read 2026-11-17 (T59), for turning the reads on in the module:
+- Google Cloud, [Configure Data Access audit logs](https://docs.cloud.google.com/logging/docs/audit/configure-data-access), no date on the page: to set the policy a role with "resourcemanager.RESOURCE_TYPE.setIamPolicy"; the `auditConfigs` of the policy name the services and the types `ADMIN_READ`, `DATA_READ` and `DATA_WRITE`; "Data Access audit log volume can be large. Enabling Data Access logs might result in charges to your Google Cloud project for additional log usage";
+- Google Cloud, [IAM conditions attribute reference](https://docs.cloud.google.com/iam/docs/conditions-attribute-reference), no date on the page: `iam.googleapis.com/modifiedGrantsByRole` — "For a request to set the allow policy of a resource, this attribute contains the role names from the role bindings that the request modifies". The page does not say what it holds for a request that changes `auditConfigs` alone;
+- terraform-provider-google v8.10.0, [`google_project_iam.html.markdown`](https://github.com/hashicorp/terraform-provider-google/blob/v8.10.0/website/docs/r/google_project_iam.html.markdown): `google_project_iam_audit_config` — "Authoritative for a given service. Updates the IAM policy to enable audit logging for the given service"; with configs for overlapping services, "the union of the two AuditConfigs is used for that service".
+
 ## 3. The deployment of `api`: the list, the checks, the service and the jobs
 
 ### 3.1. The rollout list: `api`, `app`, `tutor` and `.github`

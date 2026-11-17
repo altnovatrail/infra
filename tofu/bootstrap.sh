@@ -341,9 +341,11 @@ billing_roles=(
 
 # Who holds what in the project may be changed for two roles alone, the publisher's and api's of
 # sign-in: without the condition this role would make the identity the project's owner in all but
-# name.
+# name. The audit config of Secret Manager's reads is written by the same request, and changes no
+# role binding, which the condition counts: by Google's words for the attribute, not yet by an apply
+# (sources 2.6).
 admin_roles=(
-    "roles/resourcemanager.projectIamAdmin google_project_iam_member"
+    "roles/resourcemanager.projectIamAdmin google_project_iam_member google_project_iam_audit_config"
 )
 admin_role="${admin_roles[0]%% *}"
 expression="api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/${publisher_role}', 'projects/${project}/roles/${sign_in_role}'])"
