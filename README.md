@@ -13,15 +13,9 @@
 
 The shared infrastructure of NovaTrail: the cloud projects, the identities that let CI deploy, the image registry, the secrets, the budgets, the domains, the logs and the hosting of the app's build, and the way to run the whole platform yourself, on your own servers or on one machine. It deploys the platform's services and the app's build by one list of exact versions and digests, building each service's image from the signed files of its release, and self-hosting takes the same list. It holds no learner's data and no code of the platform's services.
 
-A component of [NovaTrail](https://github.com/altnovatrail/spec/tree/v0.18.6), a universal open platform for adaptive learning, interactive lessons and AI tutoring. It belongs to stage 2, First slice with learners, with tutor, canvas, api, app and skill-map.
-
-## Status
-
-Detailed, built and deployed. The first epic of [RUN.md](RUN.md) decided what the component's card left open (finished 2026-11-08), and the second, the first code, built the configuration and the deployment and brought up the platform's project, `novatrail` (finished 2026-11-09). The third, self-hosting and running the whole platform locally, is done too (finished 2026-11-10): [SELF-HOSTING.md](SELF-HOSTING.md) is the operator's guide, held by tests on a copy's values. The fourth, the first deployment, rolled out `api` v0.1.22 and `app` v0.1.0 by the list to `https://novatrail.web.app` (finished 2026-11-12); since 2026-11-14 the list names `api` v0.1.42 and `app` v0.1.6, and new releases go out by tasks outside an epic (R29). The fifth, finished 2026-11-15, put the operator's two buckets on the project and wrote the procedure for a breach, [BREACH.md](BREACH.md). The sixth, under way, takes spec's answers to the fifth's questions, after the move to spec v0.18.3 (R30). The infrastructure is described with OpenTofu, the open fork of Terraform (spec's question Т-29, closed by the 2026-11-08 amendment to R11 spec): it is in the devcontainer with ShellCheck and actionlint, with its own CI check (R09), and `tofu/` holds the root module and `bootstrap.sh`, the one-time step that makes the project, its state bucket and the federated identity CI applies the configuration as, and the operator's two buckets with their access (R10–R13, R28); `deploy/schema/` and `tools/deploy-check/` hold the schema of the deployment's list and its checks (R14), `tools/deploy/` and `.github/workflows/deploy.yml` deploy by the list (R15, R17, R18), and `deploy/production.json` is the platform's list (R25, R29). `tools/organizer/` is the organizers' tool for the operator's bucket: the upload links and the dates by which the bucket's rules erase forms and records (R28). The region of the platform's data, spec's question П-11, is decided: the US, with Cloud Run and infra's regional resources in `us-east4` and `api`'s Neon database in `aws-us-east-1` (R109 spec).
+A component of [NovaTrail](https://github.com/altnovatrail/spec), a universal open platform for adaptive learning, interactive lessons and AI tutoring. It belongs to stage 2, First slice with learners, with tutor, canvas, api, app and skill-map.
 
 ## Documents
-
-The documents and the work plan are in English; the current epic's description and table of tasks, the bodies of the plan's tasks and the archives of its epics are in Russian.
 
 - [docs/architecture.md](docs/architecture.md) — the component: what it does and does not do, its data and links, and what is still to decide.
 - [docs/decisions.md](docs/decisions.md) — the decision log: what was decided, why, and what was rejected.
@@ -31,8 +25,4 @@ The documents and the work plan are in English; the current epic's description a
 - [SELF-HOSTING.md](SELF-HOSTING.md) — how to bring up your own copy of the platform, from an empty Google Cloud account to a copy ready to deploy, how to run the whole platform from source on one machine (section 12), and how an organizer makes an upload link to the operator's bucket (section 13).
 - [BREACH.md](BREACH.md) — what the operator does in a breach of learners' data: what counts as one, how to cut the access, where to look, whom to tell and by when.
 
-The working rules, for people and coding agents alike, are in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md). The platform's shared vocabulary, formats, contracts and decisions are in [spec](https://github.com/altnovatrail/spec/tree/v0.18.6), checked out here as a git submodule at `v0.18.6`: clone this repository with `git clone --recurse-submodules`.
-
-## License
-
-[Apache-2.0](LICENSE).
+The working rules, for people and coding agents alike, are in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md). The platform's shared vocabulary, formats, contracts and decisions are in [spec](https://github.com/altnovatrail/spec), checked out here as a git submodule: clone this repository with `git clone --recurse-submodules`.
