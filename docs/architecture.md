@@ -52,7 +52,7 @@ Epic E1 decided everything the card left to the detailing but Т-29, and beyond 
 - 2.5 — Terraform or OpenTofu — put off on purpose and decided first thing in epic E2: OpenTofu, the 2026-11-08 amendment to R11 spec by row В10 (R08), section 3.6;
 - 2.6 — self-hosting and the local run of the whole platform, beyond the card's list — decided by epic E3: R21, R22, section 3.5. What this changes in the card went as row «в реестр spec» В21, and `spec` recorded it in the card (R23);
 - 2.7 — signing the upload link to the operator's bucket — decided by T45 of epic E5: R28, section 3.7;
-- 2.8 — auditing the reads of the secrets, beyond the card's list — open until T59 reads the entries: the module logs the reads by option (a), the author's answer to В47 (the 2026-11-17 amendment to R07; R27; Д20).
+- 2.8 — auditing the reads of the secrets, beyond the card's list — decided by T59 of epic E6: option (a), the two 2026-11-17 amendments to R07, section 3.4; found by the procedure for a breach, T44 (R27).
 
 ### 2.1. Region (П-11)
 
@@ -97,7 +97,9 @@ Recommendation — decide in the bucket's task, when it is planned, between (a) 
 
 ### 2.8. Auditing the reads of the secrets
 
-Open, beyond the card's list; T44 found it while writing the procedure for a breach (R27). Who has read a secret's version — among them the four connection strings to the databases of `api` in Neon, which open learners' data — is `AccessSecretVersion`, a Data Access audit entry (sources 2.6). The project does not turn Data Access on, and every sink excludes it (the 2026-11-09 amendment to R07; section 3.4). So in a breach the logs show who added or disabled a version and who changed a right on a secret — that is Admin Activity —, but not who read the string. The reason R07 gives against Data Access is the `callerIp` in its entries. A read of a secret is made by `api-run`, by the operator in Cloud Shell or by CI: the address is Google's or the operator's, not a learner's. That is an inference from who reads the secrets, not checked on entries.
+Decided: option (a), the 2026-11-17 amendments to R07, both; section 3.4. Task — T59, 2026-11-17. The module turns on `DATA_READ` of Secret Manager and keeps its version reads 30 days in the bucket of `us-east4`; checked on the project, `api-run`'s reads hold `callerIp` `private`, and an entry weighs about 1.8 KB. Below — the question as it stood before T59, and what T59 set out to check.
+
+Open until T59, beyond the card's list; T44 found it while writing the procedure for a breach (R27). Who has read a secret's version — among them the four connection strings to the databases of `api` in Neon, which open learners' data — is `AccessSecretVersion`, a Data Access audit entry (sources 2.6). The project does not turn Data Access on, and every sink excludes it (the 2026-11-09 amendment to R07; section 3.4). So in a breach the logs show who added or disabled a version and who changed a right on a secret — that is Admin Activity —, but not who read the string. The reason R07 gives against Data Access is the `callerIp` in its entries. A read of a secret is made by `api-run`, by the operator in Cloud Shell or by CI: the address is Google's or the operator's, not a learner's. That is an inference from who reads the secrets, not checked on entries.
 
 Options:
 - (a) Data Access, `DATA_READ`, for `secretmanager.googleapis.com` alone, and the exclusion `data-access-audit` of each sink lets those entries through: a read of a version is seen 30 days in the bucket of `us-east4`. To check before: what the entry holds besides the caller and the address, how many entries the instances and jobs of `api` write a day, and what they cost;
@@ -105,13 +107,13 @@ Options:
 
 Recommendation — (a), in a task of its own with code, which checks the entries on the project before it decides; until then (b). Debt — Д20.
 
-**Taken in the module, 2026-11-17** (row В47, the author's answer; the 2026-11-17 amendment to R07): (a) is in `tofu/logging.tf`, and the check reads the entries it keeps after the merge's apply. Before T59 decides, the project shows:
+**Taken in the module, 2026-11-17** (row В47, the author's answer; the 2026-11-17 amendment to R07): (a) is in `tofu/logging.tf`, and the check read the entries it keeps after the merge's apply — what it found is the second 2026-11-17 amendment to R07. The check was to show:
 - an entry of `AccessSecretVersion` of `api-run` in the bucket of `us-east4`, and no Data Access entry of any other service;
 - what an entry holds besides `principalEmail` and `callerIp`, and whose addresses they are;
 - how many entries a day the service, its jobs and CI write, and what that costs against the free 50 GiB of logs a month (sources 7.1);
 - that the apply wrote the audit config under the condition of `infra-config`'s `projectIamAdmin` (sources 2.6).
 
-The section is decided then: (a) kept, or reverted to (b) by a pull request of its own.
+All four showed but the number a day, which the size bounds: (a) is kept.
 
 ## 3. How it is built
 
@@ -426,10 +428,13 @@ The project sets up no log-based metrics of its own, where the address would bec
 
 **Checked on the project (T49)**, 2026-11-15: the window of 25 hours does not open the alert on a run that did not happen between two runs — no incident, open or closed, from the policy's making on 2026-11-13 to 2026-11-15, through a morning when the last point was nearly 24 hours old (sources 3.14; the 2026-11-15 amendment to R07).
 
+**Checked on the project (T59)**, 2026-11-17: the apply of `a94a9f6` wrote the audit config of Secret Manager's reads under the condition of `infra-config`, and the bucket of `us-east4` then held 4 entries of Data Access, all `AccessSecretVersion` of `api-run`, `callerIp` `private`, about 1.8 KB each — no entry of another service passed `data-access-audit` (the second 2026-11-17 amendment to R07).
+
 **Not checked:**
 - the attributes of the traces Cloud Run writes itself: there are no traces yet (Д17);
 - what Cloud Scheduler writes for a failed attempt: none has failed yet; the alert on a run that did not happen does not read it (the third 2026-11-13 amendment to R07);
 - that a missed day opens the alert on a run that did not happen: no run was missed, and the schedule was not paused, since a day's pause would hold back the deletions `sweep` finishes (the 2026-11-15 amendment to R07).
+- a read of a secret by the operator, by CI or by an eval job, and a read of `api-anthropic-key`: none was in the window of T59 (the second 2026-11-17 amendment to R07; Д29).
 
 ### 3.5. Self-hosting and the local run
 
