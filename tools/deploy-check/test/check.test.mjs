@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildReadsSpecVersion, configurationRung, defaultOf, justProgram, Refusal, ROOT, run, valueOf } from "../check.mjs";
+import { buildReadsSpecVersion, configurationRung, defaultOf, justProgram, Refusal, ROOT, run, rungHoldsForFacts, valueOf } from "../check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const main = path.join(here, "..", "main.mjs");
@@ -180,6 +180,7 @@ test("a list that holds passes every check", async () => {
     "the build's csp.json makes the CSP header of production/deployment.json",
     "facts of spec's admission table",
     "the rung full is the one the configuration tells api",
+    "the facts name no category under 18, so the rung full may stand",
     "api v0.2.0 is no lower than v0.1.0 at main",
   ]) {
     assert.ok(r.stdout.includes(line), `${line}\n${r.output}`);
@@ -216,6 +217,28 @@ test("the rung author passes where the values tell api author", async () => {
   }).check();
   assert.ok(r.ok, r.output);
   assert.match(r.stdout, /the rung author is the one the configuration tells api/);
+});
+
+test("facts for a category under 18 pass at the rung full", async () => {
+  const r = await world({ edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ openai: { data_processing_agreement: ["adult", "from_13_to_consent"], minimal_retention: ["under_13"] } })) }).check();
+  assert.ok(r.ok, r.output);
+  assert.match(r.stdout, /the facts name under_13, from_13_to_consent, and the rung is full/);
+});
+
+test("the rung against the facts names each category under 18 it is given, and nothing else", () => {
+  const minors = ["under_13", "from_13_to_consent", "from_consent_to_18"];
+  assert.equal(rungHoldsForFacts({}, "author", minors), "the facts name no category under 18, so the rung author may stand");
+  assert.equal(rungHoldsForFacts({ anthropic: { data_processing_agreement: ["adult"], minimal_retention: ["adult"] } }, "author", minors), "the facts name no category under 18, so the rung author may stand");
+  assert.equal(rungHoldsForFacts({ anthropic: { data_processing_agreement: "under_13" } }, "author", minors), "the facts name no category under 18, so the rung author may stand");
+  assert.throws(() => rungHoldsForFacts({ anthropic: { minimal_retention: ["from_consent_to_18"] } }, "author", minors), (error) => error instanceof Refusal && /names from_consent_to_18, a category under 18, and the rung is author: facts for a learner under 18 come with the rung full/.test(error.message));
+  assert.throws(() => rungHoldsForFacts({ anthropic: { minimal_retention: ["under_6"] } }, "author", ["under_6", ...minors]), /names under_6, a category under 18/);
+});
+
+test("facts refused by the table are not held to the rung", async () => {
+  const r = await world({ edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), "{") }).check();
+  assert.ok(!r.ok, r.output);
+  assert.match(r.stdout, /the rung full is not held to the facts: production\/facts\.json was refused/);
+  assert.equal(r.stderr.match(/production\/facts\.json is not JSON/g)?.length, 1, r.output);
 });
 
 test("a region inside the value of another variable is not the service's", async () => {
@@ -332,6 +355,7 @@ test("refusals, each on its own", async (t) => {
     ["facts not of their form", { edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ openai: { data_processing_agreement: ["grown_up"] } })) }, undefined, /is not facts a deployment declares/],
     ["the rung author, where the configuration tells api full", { edit: (l) => (l.admission.rung = "author") }, undefined, /the rung is author, and the configuration tells api full/],
     ["the rung full, where the values tell api author", { tofu: { "production.auto.tfvars": 'region = "us-east4"\napi_admission_rung = "author"\n' } }, undefined, /the rung is full, and the configuration tells api author/],
+    ["facts for a child at the rung author", { tofu: { "production.auto.tfvars": 'region = "us-east4"\napi_admission_rung = "author"\n' }, edit: (l, w) => { l.admission.rung = "author"; fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), JSON.stringify({ openai: { data_processing_agreement: ["adult", "under_13"] } })); } }, undefined, /names under_13, a category under 18, and the rung is author/],
     ["no rung in the values or as a default", { tofu: { "variables.tf": 'variable "api_service_name" {\n  default = "api"\n}\n' } }, undefined, /nor the default in tofu\/variables\.tf names api_admission_rung/],
     ["api lower than on the base", { tag: "v0.1.9", baseTag: "v0.2.0" }, undefined, /api v0\.1\.9 is lower than v0\.2\.0, the list's at main/],
     ["api lower by its minor, though higher by its patch", { tag: "v0.1.10", baseTag: "v0.2.0" }, undefined, /api v0\.1\.10 is lower than v0\.2\.0/],

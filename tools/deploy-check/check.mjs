@@ -21,7 +21,8 @@
 //      folder again by its own part legal/ (R33);
 //   7. the rung the configuration tells api's service and the jobs of the check: api_admission_rung
 //      of tofu/production.auto.tfvars, or its default in tofu/variables.tf (the 2026-11-16 amendment
-//      to R05);
+//      to R05), and the rung full wherever the facts name a category under 18 (the fifth 2026-11-17
+//      amendment to R149 spec; the third 2026-11-17 amendment to R05);
 //   8. api's tag no lower than in the list at <ref>, the main a pull request merges into; with no
 //      list there, nothing to hold it to.
 // A list that fails its schema is refused there; every other check runs, each says what it found,
@@ -416,7 +417,8 @@ export function buildCsp(build, deploymentFile) {
 }
 
 // production/facts.json against the facts a deployment declares in spec's admission schemas, and
-// every provider and fact it names against the dictionary of spec's admission table.
+// every provider and fact it names against the dictionary of spec's admission table. It gives the
+// facts and the age categories under 18 of spec's table, every one of its schema's but adult.
 function factsHoldToTheTable(factsFile) {
   const facts = readJson(factsFile, "production/facts.json");
   const schemas = path.join(SPEC, "admission", "schemas");
@@ -439,6 +441,28 @@ function factsHoldToTheTable(factsFile) {
     for (const fact of Object.keys(declared)) if (!Object.hasOwn(dictionary.facts, fact)) unknown.push(`the fact ${fact} of ${provider}`);
   }
   if (unknown.length) throw new Refusal(`production/facts.json names what spec's admission table does not: ${unknown.join(", ")}`);
+  const categories = table.$defs?.age_category?.enum;
+  if (!Array.isArray(categories) || !categories.includes("adult")) throw new Refusal(`spec's schema of the admission table gives no $defs/age_category with adult, which the check of the rung against the facts reads`);
+  return { facts, underEighteen: categories.filter((category) => category !== "adult") };
+}
+
+// The list's rung against the categories the facts name: any rung for an adult's facts alone, full
+// for facts that name a category under 18, one of underEighteen, in spec's order. tutor's list
+// selects its entries by the deployment's rung, not by the learner's category, so at the rung author
+// the entries the author's word admitted with no eval would read a child's work (the fifth
+// 2026-11-17 amendment to R149 spec; the third 2026-11-17 amendment to R05). What is not of the
+// facts' form names no category here: the check of the facts refuses it.
+export function rungHoldsForFacts(facts, rung, underEighteen) {
+  const named = new Set();
+  for (const declared of Object.values(facts ?? {})) {
+    for (const categories of Object.values(declared ?? {})) {
+      if (Array.isArray(categories)) for (const category of categories) named.add(category);
+    }
+  }
+  const minors = underEighteen.filter((category) => named.has(category));
+  if (!minors.length) return `the facts name no category under 18, so the rung ${rung} may stand`;
+  if (rung !== "full") throw new Refusal(`production/facts.json names ${minors.join(", ")}, a category under 18, and the rung is ${rung}: facts for a learner under 18 come with the rung full (the fifth 2026-11-17 amendment to R149 spec)`);
+  return `the facts name ${minors.join(", ")}, and the rung is full`;
 }
 
 // A self-hosted copy's folder of legal texts, production/legal, by spec's recipe legal-check-dir, as
@@ -562,7 +586,10 @@ export async function run(deployDir, base, standIns = {}) {
       if (!fs.existsSync(deploymentFile)) return "the CSP header is not made: production/deployment.json is not there";
       buildCsp(build, deploymentFile);
     });
-    await step("production/facts.json declares facts of spec's admission table", () => factsHoldToTheTable(path.join(deployDir, "production", "facts.json")));
+    let declared;
+    await step("production/facts.json declares facts of spec's admission table", () => {
+      declared = factsHoldToTheTable(path.join(deployDir, "production", "facts.json"));
+    });
     await step("production/legal holds to spec's part legal/", () => legalFolder(deployDir, standIns.legalChecker));
     // The list names the rung, and the configuration tells it api: a pull request that changes one
     // alone would check facts against one rung and run the revision on another.
@@ -573,6 +600,10 @@ export async function run(deployDir, base, standIns = {}) {
       const told = configurationRung(root);
       if (rung !== told) throw new Refusal(`the rung is ${rung}, and the configuration tells api ${told}: api_admission_rung of tofu/production.auto.tfvars, or its default in tofu/variables.tf, names the same (R05)`);
       return `the rung ${rung} is the one the configuration tells api`;
+    });
+    await step("facts for a learner under 18 come with the rung full", () => {
+      if (!declared) return `the rung ${list.admission.rung} is not held to the facts: production/facts.json was refused`;
+      return rungHoldsForFacts(declared.facts, list.admission.rung, declared.underEighteen);
     });
     await step("api's tag is no lower than on the base", () => {
       if (!base) return "api's tag: no base named, nothing to hold it to";
