@@ -107,6 +107,29 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
   - как включить для проверки — вопрос автору, В47 в [run/QUESTIONS.md](run/QUESTIONS.md).
 - **Решено автором (2026-11-17):** В47 — «сразу модулем», по рекомендации: `google_project_iam_audit_config` с `DATA_READ` только для `secretmanager.googleapis.com`, исключение `data-access-audit` пропускает только его записи, тесты, тип — под ролью `projectIamAdmin` в `bootstrap.sh`; автор перезапускает `bootstrap.sh` с ветки до мержа (В48), записи читаются после `apply` мержа, и по ним (а) остаётся или откатывается к (б) своим pull request (поправка 2026-11-17 к R07; [docs/architecture.md](docs/architecture.md), раздел 2.8).
 - **Решено автором (2026-11-17):** В48 — «сейчас, до мержа»: автор запустил `bash tofu/bootstrap.sh` в Cloud Shell со свежего клона ветки `t59-secret-reads`, коммит `bc37762`, все три адреса `BOOTSTRAP_*` — его аккаунт, `TF_VAR_billing_account` — счёт проекта. Скрипт дошёл до «Done.» без ошибок, привязки бакетов — те же, что в T58; `gcloud projects get-iam-policy novatrail --format='json(auditConfigs)'` — `null`: настроек аудита на проекте до `apply` нет (поправка 2026-11-17 к R13).
+- **Выяснилось после мержа** (pull request 101, merge `a94a9f6`): выкладка на `a94a9f6` — Target и Configuration success, `api` и `app` пропущены; `google_project_iam_audit_config.secret_reads: Creation complete after 8s [id=novatrail/audit_config/secretmanager.googleapis.com]`, фильтр `data-access-audit` у `_Default` сменился, «Apply complete! Resources: 1 added, 1 changed, 0 destroyed.», 2026-11-17T03:48:25Z. Условие `modifiedGrantsByRole` роли `projectIamAdmin` у `infra-config` запись `auditConfigs` пропустило.
+- **Мой шаг** (В50): записи — одной командой в Cloud Shell. Адреса и почты людей блок сам заменяет на `<person>`; печатает учётные записи сервисов и федеративные принципалы, их адреса, число и объём записей, имена секретов без значений и имена полей записи без их значений:
+
+  ```bash
+  gcloud logging read 'logName="projects/novatrail/logs/cloudaudit.googleapis.com%2Fdata_access"' --project=novatrail --bucket=default-us-east4 --location=us-east4 --view=_AllLogs --freshness=2d --limit=20000 --format=json > ~/t59-reads.json && jq -r '
+    def who: (.protoPayload.authenticationInfo.principalEmail // .protoPayload.authenticationInfo.principalSubject // "-") as $p
+      | if ($p | test("gserviceaccount\\.com$|^principal")) then $p else "<person>" end;
+    def ip: if who == "<person>" then "<person>" else (.protoPayload.requestMetadata.callerIp // "-") end;
+    "entries: \(length), bytes: \(tostring | length)",
+    "from \(map(.timestamp) | min // "-") to \(map(.timestamp) | max // "-")",
+    "services: \([.[].protoPayload.serviceName] | unique | join(", "))",
+    "methods: \([.[].protoPayload.methodName] | unique | join(", "))",
+    "by reader and method:",
+    (group_by([who, .protoPayload.methodName]) | .[] | "  \(length)  \(.[0] | who)  \(.[0].protoPayload.methodName | split(".") | last)"),
+    "by reader and address:",
+    (map("  \(who)  \(ip)") | unique | .[]),
+    "secrets read: \([.[].protoPayload.resourceName // "-" | split("/versions/")[0] | split("/") | last] | unique | join(", "))",
+    "fields: protoPayload \([.[].protoPayload | keys[]] | unique | join(","))",
+    "  authenticationInfo \([.[].protoPayload.authenticationInfo // {} | keys[]] | unique | join(","))",
+    "  requestMetadata \([.[].protoPayload.requestMetadata // {} | keys[]] | unique | join(","))",
+    "  entry \([.[] | keys[]] | unique | join(","))"
+  ' ~/t59-reads.json
+  ```
 - **Сделать:**
   1. На проекте: `DATA_READ` для `secretmanager.googleapis.com` — по В47 модулем, с `apply` мержа, а не на время проверки руками; записи за сутки — состав, число и объём; цена — по прайсу Cloud Logging, записью в `docs/sources.md`.
   2. По решению: (а) — `google_project_iam_audit_config` в `tofu/`, исключение `data-access-audit` каждого приёмника пропускает эти записи, тест; поправки к R07 и решение по [docs/architecture.md](docs/architecture.md), раздел 2.8; [BREACH.md](BREACH.md), раздел 4, и часть 1 — что журнал теперь показывает; (б) — снять проверочное включение, а [docs/architecture.md](docs/architecture.md), раздел 2.8, — решением с причиной.
