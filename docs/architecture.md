@@ -603,7 +603,7 @@ A Custom-Time cannot decrease, but a rewrite of the object resets it. A form wit
 3. the author adds the key as the secret's first version, typed and never shown, and checks that the database `api` holds no account but the author's — any other is the author's to decide, none deleted (R149 spec);
 4. a merge sets `api_anthropic_key_version`, `api_admission_rung = "author"`, `api_catalog_modules`, the list's rung and the facts: its apply makes a revision with no traffic, and the path of the facts checks them by the jobs `check` and brings a new revision to the traffic (the 2026-11-16 amendment to R05). The version must exist before this merge, or the apply's revision does not start.
 
-**A new key** is a new version of the secret and a pull request that names it in `api_anthropic_key_version`: the same path of the facts. **To close platform AI at once**, withdraw a fact (R96 spec; section 3.2, «Rollback»); a leaked key — [BREACH.md](../BREACH.md), section 3. No code of `api invite` goes to another until row 6.24 (R149 spec).
+**A new key** is a new version of the secret and a pull request that names it in `api_anthropic_key_version`: the same path of the facts. The platform's first key, version 1, expires 2027-01-31 (Д28), and its workspace's spend limit is $5 a month (T69). **To close platform AI at once**, withdraw a fact (R96 spec; section 3.2, «Rollback»); a leaked key — [BREACH.md](../BREACH.md), section 3. No code of `api invite` goes to another until row 6.24 (R149 spec).
 
 **A copy** keeps the defaults — the rung `full`, the whole pinned index, no key — or names its own values, and declares only facts that hold for it ([SELF-HOSTING.md](../SELF-HOSTING.md#8-your-list), «Your list»).
 

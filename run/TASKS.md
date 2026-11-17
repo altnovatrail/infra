@@ -36,5 +36,13 @@ Open tasks outside the current epic, each as its body, in Russian (R154 spec, R1
 - **Решено исполнителем** (технические мелочи, R156 spec):
   - ступень, каталог и версия ключа — переменные модуля `api_admission_rung` (по умолчанию `full`), `api_catalog_modules` (по умолчанию пустой список — весь индекс) и `api_anthropic_key_version` (по умолчанию нет ключа). Значения `novatrail` — в `tofu/production.auto.tfvars`, а `deploy-check` держит ступень списка равной ступени конфигурации. У копии остаются значения по умолчанию;
   - секрет — `api-anthropic-key` (по имени службы), том — второй, `/etc/api/anthropic/key`; факты остаются первым томом, и выкладка ставит их версию по месту.
+- **Ход работы (2026-11-16):**
+  - **первый мерж** — pull request 92, мерж b7d746f, прогон `Deploy` 43979833185, все четыре задания зелёные. `config`: «Plan: 2 to add, 0 to change, 0 to destroy» — секрет `api-anthropic-key` и право `api_reads_anthropic_key`; служба и задания не менялись. `api`: «api v0.1.55 after v0.1.42, which takes the traffic», образ `api@sha256:e464dc71933abdfa72e02afaa789f522454b661a9efa4515f231593458b66d4a`, версия фактов 8. `api-check-2f7k2`, `api-migrate-jdkjr` и `api-after-tcmf4` — «has successfully completed», ревизия `api-00008-h6c` — весь трафик. `app`: «app v0.1.6 came before: its 2 files of assets/ are kept», «released: app v0.1.14»;
+  - **сайт** (`curl` из контейнера): sha256 `/deployment.json` — `13e18579…6cd4`, как в списке; у `/` — CSP, `nosniff` и `no-cache`; `index-C1vX3E7p.js` — файл архива v0.1.14; `/health` `api` — 200;
+  - **ждём автора** — В38 (лимит трат), В39 (ключ) и В40 (аккаунты базы).
+- **Решено автором (2026-11-17), ответы на В38–В40:**
+  - **лимит трат** рабочей области Anthropic `novatrail` — $5 в месяц, поставлен 2026-11-17. Лимит организации — $225 в месяц, на 2026-11-17 потрачено $220,32, сброс — 2026-12-01: до него ИИ платформы потратит не больше примерно $4,68;
+  - **ключ** — `novatrail-api-production`, рабочая область `novatrail`, срок — до 2027-01-31 18:00 CST. Добавлен версией 1: «Created version [1] of the secret [api-anthropic-key]». Замена ключа до срока — Д28 в [DEBT.md](DEBT.md);
+  - **база `api`** — 2 строки `accounts`, созданы 2026-11-12 в 17:15 и 17:29, обе — аккаунты автора; чужих нет.
 - **Мой шаг:** лимит трат; ключ в Secret Manager; проверка аккаунтов базы; вход на сайт и задача доски; `site-check`, если его не прогонит оркестратор.
 - **Риски:** `gcloud run services update --update-secrets` пути фактов на службе с двумя томами секретов на проекте ещё не проверялся. Проверка — первый прогон пути фактов в pull request 2, а после него — `tofu plan` без изменений.

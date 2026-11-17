@@ -21,6 +21,6 @@
     }
   },
   "admission": {
-    "rung": "full"
+    "rung": "author"
   }
 }
