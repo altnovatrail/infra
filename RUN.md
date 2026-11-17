@@ -139,7 +139,7 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
   bash tofu/bootstrap.sh > ~/t60-bootstrap.log 2>&1; echo "bootstrap exit $?"; mask < ~/t60-bootstrap.log | grep -E 'essentialcontacts|bucketUploader|upload-eval-set|rror|fail|Done' | head -20; t2=$(date +%s)
   for i in $(seq 12 22); do r="$(node ~/t60-send.mjs upload-t60.html $i 2>&1)"; echo "restored +$(( $(date +%s) - t2 ))s, form $i: $r"; [ "${r%% *}" = 201 ] && break; sleep 60; done
   gcloud storage buckets get-iam-policy $b --format=json | jq -c --arg sa "serviceAccount:$sa" '.bindings[] | select(.members | index($sa)) | {role, condition: .condition.title}'
-  echo "uploaded: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)"; gcloud storage rm "$b/eval-set/samples/$session/**" --quiet 2>&1 | tail -1; echo "left: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)"
+  [[ "$session" =~ ^[0-9a-f]{16}$ ]] && echo "uploaded: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)" && gcloud storage rm "$b/eval-set/samples/$session/**" --quiet 2>&1 | tail -1; echo "left: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)"
   rm -f upload-t60.html ~/t60-send.mjs ~/t60-bootstrap.log
   ```
 
