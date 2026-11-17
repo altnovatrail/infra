@@ -113,24 +113,24 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
 
   ```bash
   cd ~ && rm -rf infra-t60 && git clone -q -b t60-project-checks https://github.com/altnovatrail/infra infra-t60 && cd infra-t60 && git log --oneline -1
-  me="$(gcloud config get-value account 2>/dev/null)"; mask() { sed -E -e "s/${me//./\\.}/<operator>/Ig" -e 's/[0-9A-Z]{6}-[0-9A-Z]{6}-[0-9A-Z]{6}/<billing>/g'; }
+  me="$(gcloud config get-value account 2>/dev/null)"; mask() { sed -E -e "s/${me//./[.]}/<operator>/Ig" -e 's/[0-9A-Z]{6}-[0-9A-Z]{6}-[0-9A-Z]{6}/<billing>/g'; }
   b=gs://novatrail-operator; sa=upload-eval-set@novatrail.iam.gserviceaccount.com; role=projects/novatrail/roles/bucketUploader
   echo "== Д22: parent [$(gcloud projects describe novatrail --format='value(parent.type)')]"
   gcloud services enable essentialcontacts.googleapis.com --project=novatrail 2>&1 | mask | tail -1
-  echo "contacts: [$(gcloud essential-contacts list --project=novatrail --billing-project=novatrail --format='value(notificationCategorySubscriptions)' 2>&1 | mask | tr '\n' ';')]"
-  gcloud projects get-iam-policy novatrail --format=json | jq -r --arg me "user:$me" '.bindings[] | select(.role == "roles/owner" or .role == "roles/resourcemanager.organizationAdmin") | .role as $r | .members[] | "\($r) \(if ascii_downcase == ($me | ascii_downcase) then "<operator>" elif startswith("user:") then "<another person>" else . end)"'
+  echo "contacts: [$(gcloud essential-contacts list --project=novatrail --billing-project=novatrail --format='value(notificationCategorySubscriptions)' 2>&1 | mask | paste -sd ';')]"
+  gcloud projects get-iam-policy novatrail --format=json | jq -r --arg me "user:$me" '.bindings[] | select(.role == "roles/owner" or .role == "roles/resourcemanager.organizationAdmin") | .role as $r | .members[] | $r + " " + (if ascii_downcase == ($me | ascii_downcase) then "<operator>" elif startswith("user:") then "<another person>" else . end)'
   echo "== Д21"
-  out="$(node tools/organizer/organizer.mjs link eval-set --samples=23 --hours=2 --out=upload-t60.html 2>&1)"; echo "$out" | head -1; session="$(echo "$out" | sed -nE 's/^session ([0-9a-f]{16}),.*/\1/p')"
+  out="$(node tools/organizer/organizer.mjs link eval-set --samples=23 --hours=2 --out=upload-t60.html 2>&1)"; echo "$out" | head -1; session="$(echo "$out" | grep -oE '^session [0-9a-f]{16}' | cut -d ' ' -f 2)"
   cat > ~/t60-send.mjs <<'EOF'
   import fs from "node:fs";
   const [page, index] = process.argv.slice(2);
   const un = (t) => t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-  const [, action, body] = [...fs.readFileSync(page, "utf8").matchAll(/<form action="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)][Number(index)];
+  const [, action, body] = [...fs.readFileSync(page, "utf8").matchAll(new RegExp('<form action="([^"]+)"[^>]*>([^]*?)</form>', "g"))][Number(index)];
   const data = new FormData();
   for (const [, name, value] of body.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)) data.append(un(name), un(value));
   data.append("file", new Blob([JSON.stringify({ synthetic: "T60", form: Number(index) })], { type: "application/json" }), "sample.json");
   const res = await fetch(un(action), { method: "POST", body: data });
-  console.log(`${res.status} ${((await res.text()).match(/<Code>([^<]+)<\/Code>/) ?? [])[1] ?? ""}`);
+  console.log(`${res.status} ${((await res.text()).match(new RegExp("<Code>([^<]+)</Code>")) ?? [])[1] ?? ""}`);
   EOF
   echo "before, form 0: $(node ~/t60-send.mjs upload-t60.html 0 2>&1)"
   gcloud storage buckets remove-iam-policy-binding $b --member=serviceAccount:$sa --role=$role --all --quiet 2>&1 >/dev/null | mask; t1=$(date +%s); echo "removed $(date -u +%H:%M:%SZ)"
