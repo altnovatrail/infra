@@ -435,6 +435,7 @@ Read again 2026-11-17 (T60; the second 2026-11-17 amendment to R27), the page of
 - `spec/tools/docs-check/config.mjs` at v0.18.6: `Every repository has moved (T177), so a table back in one of them is a second copy, in spec and in a repository alike. Headings are English, "Table 3." (R154)`; `budgets.json` drops `DEBT.md` from the block `repository`;
 - RULES.md at v0.18.6: table 3 is `run/QUESTIONS.md` alone; apt "comes from a snapshot of the Ubuntu archive alone — a source of its own whose URI names the snapshot's ID"; the sentence on translating a plan with a move to a tag is gone;
 - architecture 3.11 spec, the card, is the same at both tags.
+
 ### 6.5. The `spec` tag v0.18.17
 
 (R36; T79), read 2026-11-17:

@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildReadsSpecVersion, configurationRung, defaultOf, justProgram, readJson, readList, Refusal, ROOT, run, rungHoldsForFacts, valueOf } from "../check.mjs";
+import { buildReadsSpecVersion, configurationRung, defaultOf, justProgram, Refusal, ROOT, run, rungHoldsForFacts, valueOf } from "../check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const main = path.join(here, "..", "main.mjs");
@@ -225,16 +225,20 @@ test("facts for a category under 18 pass at the rung full", async () => {
   assert.match(r.stdout, /the facts name under_13, from_13_to_consent, and the rung is full/);
 });
 
-test("the rung against the facts names each category under 18 it finds, and nothing else", () => {
-  assert.equal(rungHoldsForFacts({}, "author"), "the facts name no category under 18, so the rung author may stand");
-  assert.equal(rungHoldsForFacts({ anthropic: { data_processing_agreement: ["adult"], minimal_retention: ["adult"] } }, "author"), "the facts name no category under 18, so the rung author may stand");
-  assert.equal(rungHoldsForFacts({ anthropic: { data_processing_agreement: "under_13" } }, "author"), "the facts name no category under 18, so the rung author may stand");
-  assert.throws(() => rungHoldsForFacts({ anthropic: { minimal_retention: ["from_consent_to_18"] } }, "author"), (error) => error instanceof Refusal && /names from_consent_to_18, a category under 18, and the rung is author: facts for a learner under 18 come with the rung full/.test(error.message));
+test("the rung against the facts names each category under 18 it is given, and nothing else", () => {
+  const minors = ["under_13", "from_13_to_consent", "from_consent_to_18"];
+  assert.equal(rungHoldsForFacts({}, "author", minors), "the facts name no category under 18, so the rung author may stand");
+  assert.equal(rungHoldsForFacts({ anthropic: { data_processing_agreement: ["adult"], minimal_retention: ["adult"] } }, "author", minors), "the facts name no category under 18, so the rung author may stand");
+  assert.equal(rungHoldsForFacts({ anthropic: { data_processing_agreement: "under_13" } }, "author", minors), "the facts name no category under 18, so the rung author may stand");
+  assert.throws(() => rungHoldsForFacts({ anthropic: { minimal_retention: ["from_consent_to_18"] } }, "author", minors), (error) => error instanceof Refusal && /names from_consent_to_18, a category under 18, and the rung is author: facts for a learner under 18 come with the rung full/.test(error.message));
+  assert.throws(() => rungHoldsForFacts({ anthropic: { minimal_retention: ["under_6"] } }, "author", ["under_6", ...minors]), /names under_6, a category under 18/);
 });
 
-test("the platform's facts hold at the platform's rung", () => {
-  const list = readList(path.join(ROOT, "deploy", "production.json"));
-  assert.doesNotThrow(() => rungHoldsForFacts(readJson(path.join(ROOT, "deploy", "production", "facts.json"), "production/facts.json"), list.admission.rung));
+test("facts refused by the table are not held to the rung", async () => {
+  const r = await world({ edit: (l, w) => fs.writeFileSync(path.join(w.deploy, "production", "facts.json"), "{") }).check();
+  assert.ok(!r.ok, r.output);
+  assert.match(r.stdout, /the rung full is not held to the facts: production\/facts\.json was refused/);
+  assert.equal(r.stderr.match(/production\/facts\.json is not JSON/g)?.length, 1, r.output);
 });
 
 test("a region inside the value of another variable is not the service's", async () => {
