@@ -66,7 +66,7 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
 | [x] | T62 | План по R153–R155 spec: таблицы в `run/`, план на английском | Claude | — | T56 |
 | [x] | T63 | Переход CI на последний релиз `.github` (Д146 spec) | Claude | — | T62 |
 | [x] | T57 | Тексты `infra` по ответам `spec` на В24–В35 | Claude | — | T62 |
-| [ ] | T58 | Правило жизненного цикла на `eval-set/samples/` | я + Claude | — | T56 |
+| [x] | T58 | Правило жизненного цикла на `eval-set/samples/` | я + Claude | — | T56 |
 | [ ] | T59 | Журнал чтения секретов (Д20) | я + Claude | да | T56 |
 | [ ] | T60 | Проверки на проекте: страница загрузки, письма Google, Neon (Д21, Д22) | я + Claude | — | T58 |
 | [ ] | T61 | Итог эпика | Claude, проверяю я | — | T56–T60, T62, T63 |
@@ -93,17 +93,6 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
 - **бакет.** Правило на `eval-set/forms/` в `tofu/bootstrap.sh` уже есть — `age` 364 и `daysSinceCustomTime` 364; на `eval-set/samples/` правила нет.
 
 **Не входит:** ключ поставщика ИИ, факты, ступень `author` и каталог — строка 6.21, вне эпика (R29); свой проект оператора для бакетов — до первого ребёнка (Д23; строка Д240 `spec`); законы об утечках других штатов — T150 `spec`; первая ссылка взрослому — после T151 `spec`; папка юридических текстов копии (Д12); свой домен — после О-16 (R06).
-
-#### T58. Правило жизненного цикла на `eval-set/samples/`
-
-- **Цель:** файл eval-набора в бакете оператора стирается правилом через 12 месяцев от загрузки, если организатор не стёр его раньше (поправка 2026-11-13 к R126 `spec`).
-- **Кто:** я + Claude — `bootstrap.sh` на проекте запускаю я. **План:** —.
-- **Сделать:**
-  1. `tofu/bootstrap.sh` — правило `Delete` с `age` 364 и `matchesPrefix` `eval-set/samples/`, как у `eval-set/forms/` (строка Д239 `spec`), с тестом в `just bootstrap-test`, который без правила падает.
-  2. Раздел 3.7 — правило в таблице правил, без «none … row В32»; поправка к R28; [SELF-HOSTING.md](SELF-HOSTING.md), раздел о бакете, — если перечисляет правила; инструмент организатора `tools/organizer/` — если его текст говорит о сроке файла.
-  3. На проекте: я запускаю `bootstrap.sh` с переменными `BOOTSTRAP_*`; `gcloud storage buckets describe gs://novatrail-operator --format='json(lifecycle_config)'` — шесть правил.
-- **Как проверить:** `just bootstrap-test`; `just tf-check`; `just -f spec/justfile docs-check-repo`; правило на проекте.
-- **Разделы:** поправка 2026-11-13 к R126 `spec`; строка Д239 `spec`; R28; [docs/architecture.md](docs/architecture.md), раздел 3.7; правило [tofu](.claude/rules/tofu.md).
 
 #### T59. Журнал чтения секретов (Д20)
 
