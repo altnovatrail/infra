@@ -465,7 +465,7 @@ run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
   }
 }
 
-# Platform AI on a deployment where the author alone learns, as on novatrail (the 2026-11-16 amendment
+# Platform AI on a deployment at the rung author, as on novatrail (the 2026-11-16 amendment
 # to R25): the rung author and the catalog's list go to the service and to the job of the check, and
 # the key, an exact version of its secret, to the service alone, as its second volume.
 run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {

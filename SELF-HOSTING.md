@@ -170,7 +170,7 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-The platform's first deployment went this way on 2026-11-12, with `api` v0.1.22 and `app` v0.1.0 (R25 in [docs/decisions.md](docs/decisions.md)), and the platform's list has named `api` v0.1.55 and `app` v0.1.14 since 2026-11-16 (R29). A new release of either goes out the same way: a pull request that changes the list, and its merge. The migrations of a release of `api` come in its binary and run in the job `migrate`, so the steps of the deployment do not change. This section says what the list is made of, and the next how the deployment goes.
+The platform's first deployment went this way on 2026-11-12, with `api` v0.1.22 and `app` v0.1.0 (R25 in [docs/decisions.md](docs/decisions.md)), and the platform's list has named `api` v0.1.57 and `app` v0.1.15 since 2026-11-17 (R29). A new release of either goes out the same way: a pull request that changes the list, and its merge. The migrations of a release of `api` come in its binary and run in the job `migrate`, so the steps of the deployment do not change. This section says what the list is made of, and the next how the deployment goes.
 
 The deployment ships what `deploy/` names. A pull request that changes it is checked before the merge, and the merge deploys what changed (R05).
 
@@ -178,7 +178,7 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
   - the exact release of `api` and the sha256 of its binary `api_<tag>_linux_amd64` and of its `Dockerfile`;
   - the exact release of `app` and the name and sha256 of its archive;
   - the sha256 of your `deploy/production/deployment.json`;
-  - the admission rung, `full` or `author`: the same as `api_admission_rung` in `tofu/production.auto.tfvars`, which tells it to `api`'s service, by default `full`. The check refuses a list whose rung is not the configuration's. `author` is for a copy where its author alone learns, as on the platform now (`api`'s README; [docs/architecture.md](docs/architecture.md), section 3.8).
+  - the admission rung, `full` or `author`: the same as `api_admission_rung` in `tofu/production.auto.tfvars`, which tells it to `api`'s service, by default `full`. The check refuses a list whose rung is not the configuration's. `author` admits the models checked on one person's handwriting: for a copy where its author alone learns, or whose privacy policy tells its adults so, as the platform's version 4 does from 2026-11-28 in "How well the models read" — `spec/legal/texts/privacy-policy/4.md` (`api`'s README; R149 spec; [docs/architecture.md](docs/architecture.md), section 3.8).
 
   Take the files from the releases on GitHub (`gh release download <tag> -R altnovatrail/api`, and the same for `app`), and take each sha256 with `sha256sum`. `api`'s releases also carry a `SHA256SUMS`.
 - **`deploy/production/deployment.json`** — the file your copy of `app` reads at its start. Its format is `spec`'s `deployment/`, version 1 (`spec/deployment/README.md`), and it holds:
