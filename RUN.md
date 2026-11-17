@@ -142,6 +142,10 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
   [[ "$session" =~ ^[0-9a-f]{16}$ ]] && echo "uploaded: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)" && gcloud storage rm "$b/eval-set/samples/$session/**" --quiet 2>&1 | tail -1; echo "left: $(gcloud storage ls "$b/eval-set/samples/$session/" 2>/dev/null | wc -l)"
   rm -f upload-t60.html ~/t60-send.mjs ~/t60-bootstrap.log
   ```
+- **Решено автором (2026-11-17):** В53 — «сейчас, до мержа»: автор запустил блок в Cloud Shell около 13:53 UTC, с `89f6b88` ветки `t60-project-checks`. Вывод:
+  - Д22: у проекта нет родителя — организации нет; API Essential Contacts включён; контактов нет; `roles/owner` — один, оператор; `roles/resourcemanager.organizationAdmin` — ни у кого. Значит, до `apply` письмо Security по документации не доходило ни до кого;
+  - Д21: страница `eval-set` на 2 часа, сессия `68f2b20fec5103bd`; форма 0 до снятия — `201`; `bucketUploader` снят в 13:53:19Z, форма 1 в ту же секунду — `403 AccessDenied`; `bootstrap.sh` — exit 0, «Done.», `roles/essentialcontacts.admin` у `infra-config`, `bucketUploader of upload-eval-set, under eval-set/samples/ and eval-set/forms/: granted`; форма 12 через секунду после скрипта — `201`; привязка `upload-eval-set` — `bucketUploader` с условием `eval-set uploads`; загружено 2 файла, оба стёрты, осталось 0;
+  - строка В53 закрыта этим; вторая поправка 2026-11-17 к R28, раздел 3.7 «Checked on the project (T60)», [BREACH.md](BREACH.md), раздел 3; Д21 и Д22 переписаны.
 
 #### T61. Итог эпика
 

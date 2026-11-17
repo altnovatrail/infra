@@ -595,9 +595,9 @@ A Custom-Time cannot decrease, but a rewrite of the object resets it. A form wit
 - `api-run` and the upload service accounts read no object and list no bucket, write only under their prefixes, and an upload service account overwrites nothing (sources 10.2);
 - `gcloud storage buckets get-iam-policy` reads a policy in version 3, with its conditions, `describe` prints the place as `US-EAST4`, and `buckets list` the names alone (sources 10.7, 10.9).
 
-**Not checked on the project:**
-- that an organizer sees neither the other's prefixes nor the scans, as a person: on `novatrail` the two organizers and the operator are one Google account (R139 spec). The policy holds it — each organizer's `roles/storage.objectUser` is under their prefixes, the reading of the scans is the operator's —, and the conditions on the same prefixes held the upload service accounts;
-- that taking `bucketUploader` from an upload service account stops a page already signed (BREACH.md, part 1).
+**Checked on the project (T60)**, 2026-11-17, by a page of `eval-set` on synthetic files, sent form by form from Cloud Shell: taking `bucketUploader` from `upload-eval-set` stops a page already signed at once — its next form, sent in the same second, was refused, `403 AccessDenied` —, and `bootstrap.sh`, which grants the role back, opens the same page again: a form sent a second after it uploaded, `201`. So a page outlives the role's removal until its own expiration, and the role comes back only once it has expired (BREACH.md, part 1; the 2026-11-17 amendment to R28, second).
+
+**Not checked on the project:** that an organizer sees neither the other's prefixes nor the scans, as a person: on `novatrail` the two organizers and the operator are one Google account (R139 spec). The policy holds it — each organizer's `roles/storage.objectUser` is under their prefixes, the reading of the scans is the operator's —, and the conditions on the same prefixes held the upload service accounts.
 
 ### 3.8. Platform AI on `novatrail`
 
