@@ -1326,6 +1326,14 @@ The steps and the runs are in [architecture.md](architecture.md), section 3.2, "
 
 *Rejected:* waiting for the end of E5 of `app` — the author's word asks for milestones. — RUN.md, T75 (`run/TASKS.md`); `deploy/production.json`; [architecture.md](architecture.md), the status; SELF-HOSTING.md, «Your list».
 
+— *Amendment 2026-11-17, fifth:* **the list names `app` v0.1.23, the latest release on 2026-11-17, in place of v0.1.22, and `api` v0.1.60 as before; the conditions of R25 hold, with its third 2026-11-17 amendment, and Д30 with them.** The author's word of 2026-11-17, as in the fourth amendment: a milestone of epic E5 of `app`; the orchestrator named v0.1.23 (T92 `app`).
+- **What comes with `app` v0.1.23:** a way back to "My subjects" on every learner's screen, "Back to My subjects": on "My essays" in each of its states, on the task screen while its attempt is open, and beside "Try again" when the read of a task or a lesson did not answer (T92 `app`, R57 app).
+- **What it needs of `api`:** nothing beyond what v0.1.22 needs, which `api` v0.1.60 serves (the fourth amendment): `git diff v0.1.22 v0.1.23` of `app` changes its screens, their tests and its documents alone — `package.json`, the lock file and the calls to `api` are the same, and `app` stays on `spec` v0.18.12.
+- **The checks before the merge.** `deploy-check` passed on the list, the archive of v0.1.23 verified and of the sha256 named; `deploy/production/deployment.json` is unchanged.
+- **The learners' data.** No store, secret, right, log or call to `api` is added: BREACH.md, part 1, does not change.
+
+*Rejected:* waiting for the next milestone of E5 of `app` — the author's word asks for each one. — RUN.md, T76 (`run/TASKS.md`); `deploy/production.json`; [architecture.md](architecture.md), the status; SELF-HOSTING.md, «Your list».
+
 ## The `spec` tag v0.18.3
 
 **R30. `infra` is on `spec` v0.18.3, the latest release, and takes the move in three tasks of epic E6, by rule 11 of RUN.md: T56 — the tag, the container, the rules that R146 spec, R156 spec and the 2026-11-13 amendment to R19 spec bring, and the address of the containers; T62 — the plan by R153–R155 spec, its tables in `run/` and in English (Д250 spec); T63 — CI on the latest release of `.github` (Д146 spec). Until T62 the plan keeps its layout and its language, which `docs-check` of v0.18.3 still reads.** Task T56, by the author's answer to its step 1 in the prompt of the orchestrator of `spec`, 2026-11-16: the move is to v0.18.3, the latest tag (R156 spec), not to v0.17.12 as the body names, and the parts beyond one review go to tasks of their own, the CI one among them, as T66–T68 `sim` did.
