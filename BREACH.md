@@ -26,7 +26,7 @@ A breach is when anyone without the right has read, copied, changed or erased a 
 
 You learn of it from:
 
-- a letter from Google about the project's security. Google sends these to the project's Essential Contacts, category Security, and without a contact to a fallback contact chosen by IAM role: for Security, the Organization Administrator, whom a project with no organization lacks (sources 5.7). So the module makes the address of `TF_VAR_operator_email` the project's contact for Security, `tofu/contacts.tf` (R27). Without that address your copy has no such contact, and the letter may reach nobody;
+- a letter from Google about the project's security. Google sends these to the project's Essential Contacts, category Security, and without a contact to a fallback contact chosen by IAM role: for Security, the Organization Administrator, whom a project with no organization lacks (sources 5.7). So the module makes the address of `TF_VAR_operator_email` the project's contact for Security, `tofu/contacts.tf` (R27). Without that address your copy has no such contact, and the letter may reach nobody; with it, an organization's administrators no longer get the project's letter;
 - a letter from Neon, from Firebase or from GitHub, about your account or the repository;
 - entries of Admin Activity that neither you nor CI made (section 4);
 - the alert emails of `tofu/alerts.tf`. A burst of requests or of errors is not a breach in itself, but it is a reason to look;

@@ -990,5 +990,6 @@ GCP_CONFIG_SERVICE_ACCOUNT=${service_account}
 
 ${eval_summary}Left to do once, in the repository's settings rather than here: the environment
 ${config_environment}, which only main may run in, and its secrets TF_VAR_billing_account,
-the same id this script was given, and TF_VAR_operator_email, without which no alert is made.${api_summary}
+the same id this script was given, and TF_VAR_operator_email, without which no alert is made and no contact
+gets Google's security letters.${api_summary}
 SUMMARY
