@@ -69,7 +69,7 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
 | [x] | T58 | Правило жизненного цикла на `eval-set/samples/` | я + Claude | — | T56 |
 | [x] | T59 | Журнал чтения секретов (Д20) | я + Claude | да | T56 |
 | [x] | T60 | Проверки на проекте: страница загрузки, письма Google, Neon (Д21, Д22) | я + Claude | — | T58 |
-| [ ] | T61 | Итог эпика | Claude, проверяю я | — | T56–T60, T62, T63 |
+| [x] | T61 | Итог эпика | Claude, проверяю я | — | T56–T60, T62, T63 |
 
 **Почему такой порядок.**
 - T56 — первой: ответы `spec` на В24–В35 и поправки, на которые опираются остальные задачи, есть только на теге линии 0.17 и новее.
@@ -93,40 +93,3 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
 - **бакет.** Правило на `eval-set/forms/` в `tofu/bootstrap.sh` уже есть — `age` 364 и `daysSinceCustomTime` 364; на `eval-set/samples/` правила нет.
 
 **Не входит:** ключ поставщика ИИ, факты, ступень `author` и каталог — строка 6.21, вне эпика (R29); свой проект оператора для бакетов — до первого ребёнка (Д23; строка Д240 `spec`); законы об утечках других штатов — T150 `spec`; первая ссылка взрослому — после T151 `spec`; папка юридических текстов копии (Д12); свой домен — после О-16 (R06).
-
-#### T61. Итог эпика
-
-- **Цель:** E6 сверен с [docs/architecture.md](docs/architecture.md) и карточкой, а следующий эпик выбран.
-- **Кто:** Claude, проверяю я. **План:** —.
-- **Сделать:**
-  - сверить код и выкладку с разделом 3 и с карточкой 3.11 `spec` на теге; если что-то меняет сказанное там, — строкой таблицы 3 «в реестр spec»; о переходе и E6 — строкой таблицы 3 для COORDINATION.md `spec`;
-  - [BREACH.md](BREACH.md) — сверить с тем, что эпик поменял (R27);
-  - что E6 оставил — в таблицу 3 или 4;
-  - следующий эпик — предложить в таблицу 2.
-- **Как проверить:** `just -f spec/justfile docs-check-repo` — ok; в таблице 2 — следующий эпик.
-- **Разделы:** [docs/architecture.md](docs/architecture.md), раздел 3; architecture 3.11 spec; R27.
-- **Мой шаг** (В55): Д29 называет итог эпика — чтения секретов с мержа T59, 2026-11-17T03:48:25Z, — и с ними трассы Д17 после выкладок `api` v0.1.57…v0.1.60. Один блок в Cloud Shell, без ввода и подстановок; почты и адреса людей блок сам заменяет на `<person>`, имена полей печатает без значений, а у трасс — только имена спанов и ключи атрибутов:
-
-  ```bash
-  gcloud logging read 'logName="projects/novatrail/logs/cloudaudit.googleapis.com%2Fdata_access" AND protoPayload.serviceName="secretmanager.googleapis.com" AND timestamp>="2026-11-17T03:48:25Z"' --project=novatrail --bucket=default-us-east4 --location=us-east4 --view=_AllLogs --freshness=30d --limit=50000 --format=json > ~/t61-reads.json && jq -r '
-    def who: (.protoPayload.authenticationInfo.principalEmail // .protoPayload.authenticationInfo.principalSubject // "-") as $p
-      | if ($p | test("gserviceaccount\\.com$|^principal")) then $p else "<person>" end;
-    def ip: if who == "<person>" then "<person>" else (.protoPayload.requestMetadata.callerIp // "-") end;
-    def secret: .protoPayload.resourceName // "-" | split("/versions/")[0] | split("/") | last;
-    "entries: \(length), bytes: \(tostring | length)",
-    "from \(map(.timestamp) | min // "-") to \(map(.timestamp) | max // "-")",
-    "by reader, method and secret:",
-    (group_by([who, .protoPayload.methodName, secret]) | .[] | "  \(length)  \(.[0] | who)  \(.[0].protoPayload.methodName | split(".") | last)  \(.[0] | secret)"),
-    "by reader and address:",
-    (map("  \(who)  \(ip)") | unique | .[]),
-    "delegated: \([.[] | select(.protoPayload.authenticationInfo.serviceAccountDelegationInfo) | who] | unique | join(", "))",
-    "fields: authenticationInfo \([.[].protoPayload.authenticationInfo // {} | keys[]] | unique | join(","))",
-    "  delegation \([.[].protoPayload.authenticationInfo.serviceAccountDelegationInfo // [] | .[] | keys[]] | unique | join(","))",
-    "  requestMetadata \([.[].protoPayload.requestMetadata // {} | keys[]] | unique | join(","))"
-  ' ~/t61-reads.json
-  curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "x-goog-user-project: novatrail" "https://cloudtrace.googleapis.com/v1/projects/novatrail/traces?startTime=2026-11-14T21:00:00Z&view=COMPLETE&pageSize=100" > ~/t61-traces.json && jq -r '
-    .error.message // "traces: \(.traces // [] | length)",
-    "span names: \([.traces[]?.spans[]?.name] | unique | join(", "))",
-    "label keys: \([.traces[]?.spans[]?.labels // {} | keys[]] | unique | join(", "))"
-  ' ~/t61-traces.json
-  ```

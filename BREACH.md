@@ -16,7 +16,7 @@ It has two parts:
 
 A task of `infra` that changes what part 1 names keeps part 1 true in the same change: a place of learners' data, a secret, a right, a log.
 
-> **Status, 2026-11-15.** Nobody has gone through it in a real breach. The adults the operator let in by a code of `api invite` learn on the platform, and no children do (R25). The operator's bucket and the bucket of the scans stand on the project since 2026-11-13 and were checked there from 2026-11-13 to 2026-11-15 (T49; the 2026-11-15 amendment to R28); no upload link has gone to an adult yet.
+> **Status, 2026-11-17.** Nobody has gone through it in a real breach. Only the author learns on the platform; the other adults the operator lets in by a code of `api invite` may learn from 2026-11-28 at the earliest, and no children learn (R25). The operator's bucket and the bucket of the scans stand on the project since 2026-11-13 and were checked there from 2026-11-13 to 2026-11-17 (T49, T60; the 2026-11-15 and 2026-11-17 amendments to R28); no upload link has gone to an adult yet. The reads of the secrets are audited, and their entries were read on the project on 2026-11-17 (T59, T61; R07).
 
 ## Part 1. Any copy
 
