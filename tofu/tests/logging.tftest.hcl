@@ -23,8 +23,9 @@ mock_provider "google-beta" {}
 
 
 # Every sink the project has excludes Cloud Run's request logs, which hold the client's address,
-# the Data Access audit, Identity Platform's activity log and Firebase Hosting's request logs: the ones to come too, since they are
-# made from the same list, which tf-check holds every sink to (R07).
+# the Data Access audit but Secret Manager's, Identity Platform's activity log and Firebase
+# Hosting's request logs: the ones to come too, since they are made from the same list, which
+# tf-check holds every sink to (R07).
 run "every_sink_excludes_what_the_platform_keeps_none_of" {
   command = plan
 
@@ -36,11 +37,43 @@ run "every_sink_excludes_what_the_platform_keeps_none_of" {
   assert {
     condition = alltrue(flatten([for sink in google_logging_project_sink.sinks : [for log in [
       "LOG_ID(\"run.googleapis.com/requests\")",
-      "LOG_ID(\"cloudaudit.googleapis.com/data_access\")",
+      "LOG_ID(\"cloudaudit.googleapis.com/data_access\") AND NOT (protoPayload.serviceName=\"secretmanager.googleapis.com\" AND (protoPayload.methodName:\"AccessSecretVersion\" OR protoPayload.methodName:\"GetSecretVersion\"))",
       "LOG_ID(\"identitytoolkit.googleapis.com/requests\")",
       "resource.type=\"firebase_domain\"",
     ] : contains([for exclusion in sink.exclusions : exclusion.filter if exclusion.disabled != true], log)]]))
     error_message = "A sink lets through a log the platform keeps none of: each needs an exclusion, not disabled, of Cloud Run's request logs, of the Data Access audit, of Identity Platform's requests and of Firebase Hosting's."
+  }
+}
+
+# Of the Data Access audit, the reads of Secret Manager's versions alone are on, and the exclusion
+# lets through those reads of that one service and nothing else, so a breach shows who read a
+# connection string (R07, amended 2026-11-17; sources 2.6).
+run "the_reads_of_the_secrets_alone_are_audited_and_kept" {
+  command = plan
+
+  assert {
+    condition     = google_project_iam_audit_config.secret_reads.project == "novatrail-test-0" && google_project_iam_audit_config.secret_reads.service == "secretmanager.googleapis.com"
+    error_message = "The audit config is the project's, for Secret Manager."
+  }
+
+  assert {
+    condition     = [for c in google_project_iam_audit_config.secret_reads.audit_log_config : c.log_type] == ["DATA_READ"]
+    error_message = "Only the reads, DATA_READ, are audited: no DATA_WRITE, no ADMIN_READ."
+  }
+
+  assert {
+    condition     = alltrue([for c in google_project_iam_audit_config.secret_reads.audit_log_config : length(coalesce(c.exempted_members, [])) == 0])
+    error_message = "No caller is exempted from the audit of the reads."
+  }
+
+  # The service the exclusion lets through is the one the audit config names, and no sink has a
+  # second exclusion of the Data Access audit that would drop the reads again.
+  assert {
+    condition = alltrue([for sink in google_logging_project_sink.sinks : [
+      for exclusion in sink.exclusions : strcontains(exclusion.filter, "protoPayload.serviceName=\"${google_project_iam_audit_config.secret_reads.service}\"")
+      if strcontains(exclusion.filter, "cloudaudit.googleapis.com/data_access")
+    ] == [true]])
+    error_message = "Each sink has one exclusion of the Data Access audit, and it lets through the service the audit config names."
   }
 }
 

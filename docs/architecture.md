@@ -52,7 +52,7 @@ Epic E1 decided everything the card left to the detailing but Т-29, and beyond 
 - 2.5 — Terraform or OpenTofu — put off on purpose and decided first thing in epic E2: OpenTofu, the 2026-11-08 amendment to R11 spec by row В10 (R08), section 3.6;
 - 2.6 — self-hosting and the local run of the whole platform, beyond the card's list — decided by epic E3: R21, R22, section 3.5. What this changes in the card went as row «в реестр spec» В21, and `spec` recorded it in the card (R23);
 - 2.7 — signing the upload link to the operator's bucket — decided by T45 of epic E5: R28, section 3.7;
-- 2.8 — auditing the reads of the secrets, beyond the card's list — open: found by the procedure for a breach, T44 (R27; Д20).
+- 2.8 — auditing the reads of the secrets, beyond the card's list — open until T59 reads the entries: the module logs the reads by option (a), the author's answer to В47 (the 2026-11-17 amendment to R07; R27; Д20).
 
 ### 2.1. Region (П-11)
 
@@ -104,6 +104,14 @@ Options:
 - (b) as now: the procedure says what the logs do not show.
 
 Recommendation — (a), in a task of its own with code, which checks the entries on the project before it decides; until then (b). Debt — Д20.
+
+**Taken in the module, 2026-11-17** (row В47, the author's answer; the 2026-11-17 amendment to R07): (a) is in `tofu/logging.tf`, and the check reads the entries it keeps after the merge's apply. Before T59 decides, the project shows:
+- an entry of `AccessSecretVersion` of `api-run` in the bucket of `us-east4`, and no Data Access entry of any other service;
+- what an entry holds besides `principalEmail` and `callerIp`, and whose addresses they are;
+- how many entries a day the service, its jobs and CI write, and what that costs against the free 50 GiB of logs a month (sources 7.1);
+- that the apply wrote the audit config under the condition of `infra-config`'s `projectIamAdmin` (sources 2.6).
+
+The section is decided then: (a) kept, or reverted to (b) by a pull request of its own.
 
 ## 3. How it is built
 
@@ -366,7 +374,7 @@ The platform's logs are without direct identifiers and IP addresses (privacy 4 s
 
 | Sink | Where to | Exclusion filter |
 |---|---|---|
-| `_Default` | its own log bucket in `us-east4`, 30 days (R04) | `LOG_ID("run.googleapis.com/requests")` — Cloud Run's request logs; and also Data Access, the requests of Identity Platform and the requests of Hosting — the rows below |
+| `_Default` | its own log bucket in `us-east4`, 30 days (R04) | `LOG_ID("run.googleapis.com/requests")` — Cloud Run's request logs; and also Data Access but the reads of Secret Manager, the requests of Identity Platform and the requests of Hosting — the rows below |
 | `_Required` | the bucket `_Required` in `global`, 400 days | does not change; gets no request logs |
 | any sink the project sets up | — | the same as `_Default`'s |
 
@@ -383,7 +391,7 @@ The filter applies to an entry that the Logging API or the Telemetry API has alr
 | Admin Activity | `callerIp` and the caller's email — of the operator and of CI when they edit resources. There are no Identity Platform entries from learners: nobody calls `SignUp` in the project, and the sign-in through the Google window, which creates a user, leaves no entry; T42 did not go through the entries of other services (T42; the 2026-11-13 amendment to R128 spec) | `_Required`, `global`, 400 days (Д3); cannot be excluded |
 | System Event | Google's own actions with the project's resources; among them each run of a job, `/Jobs.RunJob`, which names no service account of the project (T43) | `_Required`, `global`, 400 days |
 | Policy Denied | `callerIp` and the email of whoever a policy refused | the bucket in `us-east4`, 30 days |
-| Data Access audit | would hold `callerIp` | not turned on, and excluded in each sink (the 2026-11-09 amendment to R07) |
+| Data Access audit | holds `callerIp` and the caller's email | on for Secret Manager's reads alone, `DATA_READ` — `AccessSecretVersion` and `GetSecretVersion` —, which the sinks let through: the bucket in `us-east4`, 30 days; the rest not turned on, and excluded in each sink (the 2026-11-09 and 2026-11-17 amendments to R07) |
 | the activity log of Identity Platform | would hold every sign-in request | turned off by the module, `monitoring.request_logging` (R16), and excluded in each sink (the 2026-11-09 amendment to R07) |
 | the export of Firebase Hosting's logs | would hold `remoteIp` | not turned on (R06), and excluded in each sink (the second 2026-11-09 amendment to R07) |
 | the logs of Firebase Auth and Firebase Hosting at Firebase itself | IP addresses | at Firebase: Auth "a few weeks", Hosting "a few months" (П-9) |
@@ -405,7 +413,7 @@ The project sets up no log-based metrics of its own, where the address would bec
 - the module takes over the sink `_Default`: the provider updates a sink that already exists, and on deletion does not touch `_Default`. The former filter word for word, the destination the region's bucket, and the exclusions as blocks `exclusions` of the sink itself: `cloud-run-request-logs`, `data-access-audit`, `identity-platform-requests` and `firebase-hosting-requests`;
 - the project's sinks are listed in one list, `local.sinks`, and each gets the same exclusions; a test holds each sink of this list, and `tf-check` lets no sink or exclusion declared outside it through;
 - the place of `_Trace` — `google_observability_project_settings` with the region's `default_storage_location`: the provider sets the setting through PATCH, and a second `apply` repeats it harmlessly, while the bucket `_Trace` it creates through POST, which refuses if the bucket already exists, and it cannot delete it (the 2026-11-09 amendment to R04; sources 2.2);
-- Data Access audit and the activity log of Identity Platform are off by Google's default, the module does not turn them on, and the sink excludes them (the 2026-11-09 amendment to R07). The activity log is besides turned off explicitly in `tofu/sign_in.tf` (R16).
+- Data Access audit and the activity log of Identity Platform are off by Google's default, the module does not turn them on, and the sink excludes them (the 2026-11-09 amendment to R07). The activity log is besides turned off explicitly in `tofu/sign_in.tf` (R16). The one exception is Secret Manager's reads: `google_project_iam_audit_config.secret_reads` turns on `DATA_READ` for `secretmanager.googleapis.com`, authoritative for that service alone, and the exclusion `data-access-audit` lets through only those reads of that service, by their method names, `AccessSecretVersion` and `GetSecretVersion` — a list or a policy read, which a copy's organization may turn on beside them, stays excluded; a test holds both to `local.audited_reads` (the 2026-11-17 amendment to R07; sources 2.6).
 
 **Checked after the first deployment (T42):**
 - the name of the request log in the filter;

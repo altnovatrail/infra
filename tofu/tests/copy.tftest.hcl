@@ -134,6 +134,7 @@ run "nothing_of_the_platform_reaches_a_copy" {
       jsonencode(google_artifact_registry_repository.images),
       jsonencode(google_logging_project_bucket_config.logs),
       jsonencode(google_logging_project_sink.sinks),
+      jsonencode(google_project_iam_audit_config.secret_reads),
       jsonencode(google_observability_project_settings.traces),
       jsonencode(google_secret_manager_secret.admission_facts),
       jsonencode(google_secret_manager_secret.anthropic_key),

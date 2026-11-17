@@ -6,14 +6,28 @@
 # one. The bucket `_Required` — the audit of who changed what in the project, 400 days — stays
 # where it is: neither it nor its sink can be changed, and it takes no request logs (Д3 in RUN.md).
 #
-# Three more logs are off and nothing here turns them on: the Data Access audit, with the caller's
-# address, and the activity log of Identity Platform, which would hold every sign-in request, are
-# off by Google's own default, and the export of Firebase Hosting's request logs, with remoteIp,
-# only a button in Firebase's console switches on. Every sink excludes them as well, so that they
-# are not kept even where something else turns them on — a self-hosted copy's organization, a
-# later change, a click (R07, amended twice on 2026-11-09).
+# Three more logs are off, and nothing here turns them on but one part of the first: the Data
+# Access audit, with the caller's address, and the activity log of Identity Platform, which would
+# hold every sign-in request, are off by Google's own default, and the export of Firebase Hosting's
+# request logs, with remoteIp, only a button in Firebase's console switches on. Every sink excludes
+# them as well, so that they are not kept even where something else turns them on — a self-hosted
+# copy's organization, a later change, a click (R07, amended twice on 2026-11-09).
+#
+# That part is on and kept: the reads of a secret's versions, among them the connection strings
+# that open the learners' data, so that a breach shows who read one. api's identities, CI — the
+# deployment and the eval jobs — and the operator read them, and the caller's address is Google's,
+# a GitHub runner's or the operator's, not a learner's (R07, amended 2026-11-17;
+# docs/architecture.md, section 2.8).
 
 locals {
+  # The one service whose Data Access audit is on, and the reads of it that are kept, by their
+  # method names: a version read, not a list or a policy read, which a copy's organization may turn
+  # on beside it (R07, amended 2026-11-17; sources 2.6).
+  audited_reads = {
+    service = "secretmanager.googleapis.com"
+    methods = ["AccessSecretVersion", "GetSecretVersion"]
+  }
+
   # What no sink of the project keeps, by the name of each exclusion (R07). Cloud Run's request logs
   # hold the client's address in httpRequest, and this is the name they come under: with traffic to
   # api, no entry of the project's buckets holds httpRequest (T42).
@@ -22,9 +36,10 @@ locals {
       filter      = "LOG_ID(\"run.googleapis.com/requests\")"
       description = "Cloud Run's request logs hold the client's IP address, and the platform keeps none (R07)."
     }
+    # All of it but the reads of a secret version, which the audit config below turns on.
     "data-access-audit" = {
-      filter      = "LOG_ID(\"cloudaudit.googleapis.com/data_access\")"
-      description = "The Data Access audit holds the caller's IP address; the platform keeps none (R07)."
+      filter      = "LOG_ID(\"cloudaudit.googleapis.com/data_access\") AND NOT (protoPayload.serviceName=\"${local.audited_reads.service}\" AND (${join(" OR ", [for m in local.audited_reads.methods : "protoPayload.methodName:\"${m}\""])}))"
+      description = "The Data Access audit holds the caller's IP address; the platform keeps none but Secret Manager's reads (R07)."
     }
     "identity-platform-requests" = {
       filter      = "LOG_ID(\"identitytoolkit.googleapis.com/requests\")"
@@ -118,4 +133,18 @@ resource "google_observability_project_settings" "traces" {
   default_storage_location = var.region
 
   depends_on = [google_project_service.enabled]
+}
+
+# The reads of a secret's versions, AccessSecretVersion and GetSecretVersion, are DATA_READ, and its
+# writes Admin Activity, always on (sources 2.6). This service and this type alone: the resource
+# holds the audit config of the service it names and touches no other, so the rest of the Data
+# Access audit stays as Google's default or a copy's organization leaves it, and every sink excludes
+# it all the same (R07, amended 2026-11-17).
+resource "google_project_iam_audit_config" "secret_reads" {
+  project = var.project_id
+  service = local.audited_reads.service
+
+  audit_log_config {
+    log_type = "DATA_READ"
+  }
 }
