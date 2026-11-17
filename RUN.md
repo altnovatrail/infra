@@ -105,3 +105,28 @@ A task starts with «Выполни задачу T01 из RUN.md» in a new sess
   - следующий эпик — предложить в таблицу 2.
 - **Как проверить:** `just -f spec/justfile docs-check-repo` — ok; в таблице 2 — следующий эпик.
 - **Разделы:** [docs/architecture.md](docs/architecture.md), раздел 3; architecture 3.11 spec; R27.
+- **Мой шаг** (В55): Д29 называет итог эпика — чтения секретов с мержа T59, 2026-11-17T03:48:25Z, — и с ними трассы Д17 после выкладок `api` v0.1.57…v0.1.60. Один блок в Cloud Shell, без ввода и подстановок; почты и адреса людей блок сам заменяет на `<person>`, имена полей печатает без значений, а у трасс — только имена спанов и ключи атрибутов:
+
+  ```bash
+  gcloud logging read 'logName="projects/novatrail/logs/cloudaudit.googleapis.com%2Fdata_access" AND protoPayload.serviceName="secretmanager.googleapis.com" AND timestamp>="2026-11-17T03:48:25Z"' --project=novatrail --bucket=default-us-east4 --location=us-east4 --view=_AllLogs --freshness=30d --limit=50000 --format=json > ~/t61-reads.json && jq -r '
+    def who: (.protoPayload.authenticationInfo.principalEmail // .protoPayload.authenticationInfo.principalSubject // "-") as $p
+      | if ($p | test("gserviceaccount\\.com$|^principal")) then $p else "<person>" end;
+    def ip: if who == "<person>" then "<person>" else (.protoPayload.requestMetadata.callerIp // "-") end;
+    def secret: .protoPayload.resourceName // "-" | split("/versions/")[0] | split("/") | last;
+    "entries: \(length), bytes: \(tostring | length)",
+    "from \(map(.timestamp) | min // "-") to \(map(.timestamp) | max // "-")",
+    "by reader, method and secret:",
+    (group_by([who, .protoPayload.methodName, secret]) | .[] | "  \(length)  \(.[0] | who)  \(.[0].protoPayload.methodName | split(".") | last)  \(.[0] | secret)"),
+    "by reader and address:",
+    (map("  \(who)  \(ip)") | unique | .[]),
+    "delegated: \([.[] | select(.protoPayload.authenticationInfo.serviceAccountDelegationInfo) | who] | unique | join(", "))",
+    "fields: authenticationInfo \([.[].protoPayload.authenticationInfo // {} | keys[]] | unique | join(","))",
+    "  delegation \([.[].protoPayload.authenticationInfo.serviceAccountDelegationInfo // [] | .[] | keys[]] | unique | join(","))",
+    "  requestMetadata \([.[].protoPayload.requestMetadata // {} | keys[]] | unique | join(","))"
+  ' ~/t61-reads.json
+  curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "x-goog-user-project: novatrail" "https://cloudtrace.googleapis.com/v1/projects/novatrail/traces?startTime=2026-11-14T21:00:00Z&view=COMPLETE&pageSize=100" > ~/t61-traces.json && jq -r '
+    .error.message // "traces: \(.traces // [] | length)",
+    "span names: \([.traces[]?.spans[]?.name] | unique | join(", "))",
+    "label keys: \([.traces[]?.spans[]?.labels // {} | keys[]] | unique | join(", "))"
+  ' ~/t61-traces.json
+  ```
