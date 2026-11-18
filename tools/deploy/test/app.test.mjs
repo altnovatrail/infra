@@ -474,8 +474,8 @@ test("a copy's release goes to the copy's site, every call of it", async () => {
 });
 
 // The check after a release reads the site in rounds, ROUND_EVERY apart, for ROUNDS_FOR, since
-// Hosting's CDN serves the build before for a while after a release (R17). The time is the
-// test's: `sleep` only counts the waits, and a round is what the stand-in site answers between two.
+// Hosting's CDN serves the build before for a while after a release (R17). The time is the test's:
+// `sleep` only counts the waits, and a round is what the stand-in site answers between two.
 test("the check after a release waits for the CDN, in rounds, and fails only once they are out", async (t) => {
   // The site as the CDN serves it after a release, for the first `stale` rounds: the page of the
   // build before at / and no file of the new build's assets/.

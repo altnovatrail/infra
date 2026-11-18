@@ -6,8 +6,8 @@
 
 export const RULES = ["deployment.api-origin", "deployment.loopback"];
 
-// The loopback hosts, as spec's text defines them: these three, written so, and nothing else — not
-// another address of 127.0.0.0/8, nor a name under localhost.
+// The loopback hosts, as spec's deployment/README.md defines them: these three, written so, and
+// nothing else — not another address of 127.0.0.0/8, nor a name under localhost.
 export const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
 // What a reader gives file read at origin, with validate the compiled schema of the file: {} when it
@@ -51,7 +51,7 @@ export function fieldsOf(errors) {
   return [...paths].sort(byCodeUnits);
 }
 
-// Strings in the order of their UTF-16 code units, as spec's text orders the paths.
+// Strings in the order of their UTF-16 code units, as spec's deployment/README.md orders the paths.
 function byCodeUnits(a, b) {
   if (a === b) return 0;
   return a < b ? -1 : 1;

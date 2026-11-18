@@ -278,8 +278,8 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
 // that finds something wrong before the last says its number and what is wrong. Each round asks for
 // index.html's bytes, with its headers, at / and at a path of the SPA; a file of assets/ with its
 // own; a 404 for a file of /assets/ that is not there; deployment.json as app reads it; the build's
-// NOTICE and LICENSE at /NOTICE and /LICENSE (R85 spec). The paths that
-// hold no file are new each round, so that no answer of a round before stands in for them.
+// NOTICE and LICENSE at /NOTICE and /LICENSE (R85 spec). The paths that hold no file are new each
+// round, so that no answer of a round before stands in for them.
 async function answers({ url, build, deploymentFile, csp, fetchSite = fetch, rounds = 1, sleep = sleepFor, say }) {
   const asset = buildFiles(build).find((file) => file.startsWith("assets/"));
   const page = { status: 200, body: fs.readFileSync(path.join(build, "index.html")), of: "index.html", headers: { "content-security-policy": csp, "x-content-type-options": "nosniff", "cache-control": /no-cache/, "strict-transport-security": /max-age=\d+/ } };
