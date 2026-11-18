@@ -1,5 +1,5 @@
-# Firebase, the Hosting site of app's build and the identity that publishes it, as R06 and R12
-# decided them, checked against mock providers: no credential, no call to Google.
+# Firebase, the Hosting site of app's build and the identity that publishes it, checked against
+# mock providers: no credential, no call to Google (R06, R12).
 
 mock_provider "google" {
   mock_data "google_project" {

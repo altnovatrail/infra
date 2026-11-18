@@ -1,13 +1,10 @@
-# The APIs this project is allowed to use (R10). Service Usage and Resource Manager are not in the
-# list: they are what enables the rest. bootstrap.sh turns them on before this configuration can be
-# applied at all, and with them whatever it needs for what it creates itself — the state bucket,
-# the federated pool CI signs in through and the custom roles, whose permissions are of Cloud Run,
-# Firebase and sign-in (R13); those that the configuration stands on too are named here as well, because
-# this is the list of what it stands on.
+# The APIs this configuration stands on (R10). Service Usage and Resource Manager are not in the
+# list: they enable the rest, so bootstrap.sh turns them on before the first apply, with whatever its
+# own resources need; those this configuration needs too are named here as well (R13).
 #
-# Cloud Trace is not here: the platform writes no traces of its own. Google turns its API on in a
-# new project, and Cloud Scheduler, which depends on it, keeps it on, so Cloud Run's own traces of
-# some requests may come (R07, its third amendment of 2026-11-09).
+# Cloud Trace is not here: the platform writes no traces of its own, but Google turns its API on in
+# a new project and Cloud Scheduler, which depends on it, keeps it on, so Cloud Run's own traces of
+# some requests may come (R07).
 
 locals {
   apis = [

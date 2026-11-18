@@ -21,24 +21,18 @@ eval_github_subject_prefixes = ["repo:altnovatrail@344507087/modules@1425775415"
 operator_bucket      = "novatrail-operator"
 consent_forms_bucket = "novatrail-consent-forms"
 
-# The first image of api, v0.1.22, which the first deployment pushed (run 43164987259): the jobs are
-# made with it. From now on the deployment owns which image they run (R11).
+# The image the jobs are made with; which image they run after that is the deployment's (R11).
 api_image = "us-east4-docker.pkg.dev/novatrail/images/api@sha256:e3430c99f7069a853768f23222bebc6cd6cecb55caa9db58d7272f5ee46352b2"
 
-# The service of api, once the jobs ran the check of the configuration and the migrations with the
-# first image (run 43264054707). The run of this merge ships app too (R05).
+# The service of api, made only once its jobs have run the check of the configuration and the
+# migrations (R05).
 api_serving = true
 
-# Platform AI for the author, and from 2026-11-28 for the other adults (R149, R150 spec; the 2026-11-16
-# and 2026-11-17 amendments to R25): the rung author, which deploy/production.json names too, the
-# catalog with "Short essays in English" back, at 0.2.1, its version without the reminder of names,
-# which api lays from v0.1.62 (the 2026-11-17 amendment to R150 spec; T78), and the platform's key
-# of Anthropic, version 1 of api-anthropic-key, which the operator added (T69; Д28).
+# Platform AI: the rung, which the rung of deploy/production.json must equal, the catalog api lays,
+# and the version of api-anthropic-key the operator added by hand (R25; R149 spec, R150 spec).
 api_admission_rung        = "author"
 api_catalog_modules       = ["novatrail/olympiad-math", "novatrail/check-board", "novatrail/english-essays"]
 api_anthropic_key_version = "1"
 
-# Handwriting read by Claude Haiku 5.5 at medium alone, not by the pair of R68 spec: the author's
-# word of 2026-11-17 (the 2026-11-17 amendment to R68 spec; R88 api;
-# the second 2026-11-17 amendment to R25; T72).
+# Handwriting read by one model, not by the pair of R68 spec (R25; R88 api).
 api_reading_mode = "single"

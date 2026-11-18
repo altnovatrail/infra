@@ -1,6 +1,6 @@
-# The spend alert and the alerts on Cloud Run's built-in metrics as R06 and R07 decided them,
-# checked against mock providers: no credential, no call to Google. The values are synthetic, and
-# the operator's address is example.com's.
+# The spend alert and the alerts on Cloud Run's built-in metrics, checked against mock providers:
+# no credential, no call to Google (R06, R07). The values are synthetic, and the operator's address
+# is example.com's.
 
 mock_provider "google" {
   mock_data "google_project" {
@@ -71,7 +71,7 @@ run "no_operator_makes_no_alert" {
 # With an operator, Google's security notifications of the project go to the operator's address, and
 # no other category: Security's fallback is the Organization Administrator, whom a project with no
 # organization lacks, and the others fall back to the owners and the billing account's
-# administrators (R27; sources 5.7).
+# administrators (R27).
 run "an_operator_is_the_security_contact" {
   command = plan
 
@@ -179,7 +179,7 @@ run "an_operator_hears_of_a_failed_job_by_the_clock" {
 
 # With an operator and the service: an alert on a job by the clock that has not run for 25 hours,
 # whatever the cause, read from the same count of completed executions, with no result asked: no
-# point in the window is the miss (R07; Д18).
+# point in the window is the miss (R07).
 run "an_operator_hears_of_a_job_by_the_clock_that_did_not_run" {
   command = plan
 

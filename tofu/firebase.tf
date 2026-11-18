@@ -1,9 +1,8 @@
-# Firebase in the project, and the Hosting site app's build is served from (R06, R12). Both
-# resources are in the beta provider alone. Sign-in in this project is sign_in.tf's (R16).
+# Firebase's resources are in the beta provider alone.
 #
 # The export of Hosting's request logs to Cloud Logging is switched on only by a button in
-# Firebase's console, and nothing here switches it on. Every sink excludes those logs all the same
-# (logging.tf), since they hold the client's address (R07).
+# Firebase's console, and nothing here switches it on; every sink excludes those logs all the same,
+# since they hold the client's address (R07).
 
 resource "google_firebase_project" "this" {
   provider = google-beta
@@ -18,7 +17,7 @@ resource "google_firebase_project" "this" {
 # is made, and the first one made becomes the default; one given Firebase before that date got its
 # default site at once, under the project's id, and this resource takes that site over rather than
 # making it again (Firebase, Understand the default Hosting site: "The first Hosting site created in
-# your Firebase project always becomes your default Hosting site"; canvas-api).
+# your Firebase project always becomes your default Hosting site"; R12).
 resource "google_firebase_hosting_site" "app" {
   provider = google-beta
 
@@ -30,11 +29,9 @@ resource "google_firebase_hosting_site" "app" {
   depends_on = [google_firebase_project.this]
 }
 
-# The Firebase web app app signs in as: its id and its API key are what /deployment.json names in
-# signIn, with the project and its authDomain (R09 app; R17). Firebase makes the key itself, a
-# browser key restricted to Firebase's APIs, and it is no secret: it is in every copy of app. The
-# configuration never deletes the app, since a new one would come with a new key, and a new key
-# signs everybody out of app on every device (architecture 3.7 app).
+# The web app app signs in as; its id and API key go into /deployment.json (R17). The key is a
+# browser key restricted to Firebase's APIs and no secret. The app is never deleted: a new one comes
+# with a new key, which signs everybody out of app on every device.
 resource "google_firebase_web_app" "app" {
   provider = google-beta
 

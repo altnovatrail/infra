@@ -1,8 +1,7 @@
 # A self-hosted copy: the same configuration on a copy's own values — another project, a region
 # outside the US, another currency, another repository and pool, its own GitHub environments, and no
 # eval — checked against mock providers: no credential, no call to Google. Nothing of the
-# platform's own deployment may reach it: not the name novatrail, not the region us-east4 (T29;
-# docs/architecture.md, section 3.5).
+# platform's own deployment may reach it: not the name novatrail, not the region us-east4.
 
 mock_provider "google" {
   mock_data "google_project" {

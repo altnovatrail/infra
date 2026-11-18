@@ -21,7 +21,7 @@ locals {
 }
 
 # What api runs as, in the service and in its jobs: it reads its secrets and manages its users of
-# sign-in, and nothing more yet. Each grant comes with what first uses it.
+# sign-in, and nothing more: a grant comes with what first uses it.
 resource "google_service_account" "api" {
   account_id   = "${var.api_service_name}-run"
   display_name = "Runtime identity of ${var.api_service_name}"
@@ -91,9 +91,8 @@ resource "google_secret_manager_secret_iam_member" "deployer_adds_facts" {
 
 # run the jobs with the new image and roll a revision of the one service — and only those. The
 # ready-made developer role carries far more, deleting the service among it; a deployment needs
-# the eleven permissions of bootstrap.sh's role apiDeployer. It is granted on the service and on
-# each job; canvas-api's deployment ran on such grants, run.operations.get among them, and the
-# first deployment ran on them too (T24).
+# the permissions of bootstrap.sh's role apiDeployer, run.operations.get among them, granted on the
+# service and on each job (R11).
 resource "google_cloud_run_v2_service_iam_member" "deployer" {
   count = local.api_serving ? 1 : 0
 

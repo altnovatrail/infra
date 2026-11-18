@@ -16,7 +16,7 @@ resource "google_billing_budget" "spend" {
   # of the type FREE_TIER and is taken off before this is measured. The allowance is the billing
   # account's, shared with every project on it, so this one can be charged before it has used any.
   # No other credit is taken off: the Free Trial's is a PROMOTION, and a budget that took it off
-  # would measure nothing until the trial's credit ran out (the 2026-11-15 amendment to R06).
+  # would measure nothing until the trial's credit ran out (R06).
   budget_filter {
     projects               = ["projects/${data.google_project.this.number}"]
     calendar_period        = "MONTH"
@@ -31,7 +31,6 @@ resource "google_billing_budget" "spend" {
     }
   }
 
-  # Half of it, nine tenths of it, and all of it.
   threshold_rules {
     threshold_percent = 0.5
   }

@@ -1,6 +1,6 @@
-# The platform's keys for eval and who reads them, as R120 spec and R20 have it, checked against
-# mock providers: no credential, no call to Google. The values are synthetic, apart from the
-# subjects of modules and tutor, which are public.
+# The platform's keys for eval and who reads them, checked against mock providers: no credential,
+# no call to Google (R20; R120 spec). The values are synthetic, apart from the subjects of modules
+# and tutor, which are public.
 
 mock_provider "google" {
   mock_data "google_project" {

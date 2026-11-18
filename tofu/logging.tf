@@ -4,25 +4,24 @@
 # Cloud Logging made the project's own buckets in `global`, and a bucket never changes its
 # location, so the logs go to a bucket of this region instead, by the sink that filled the default
 # one. The bucket `_Required` — the audit of who changed what in the project, 400 days — stays
-# where it is: neither it nor its sink can be changed, and it takes no request logs (Д3 in RUN.md).
+# where it is: neither it nor its sink can be changed, and it takes no request logs (R07).
 #
 # Three more logs are off, and nothing here turns them on but one part of the first: the Data
 # Access audit, with the caller's address, and the activity log of Identity Platform, which would
 # hold every sign-in request, are off by Google's own default, and the export of Firebase Hosting's
 # request logs, with remoteIp, only a button in Firebase's console switches on. Every sink excludes
 # them as well, so that they are not kept even where something else turns them on — a self-hosted
-# copy's organization, a later change, a click (R07, amended twice on 2026-11-09).
+# copy's organization, a later change, a click (R07).
 #
 # That part is on and kept: the reads of a secret's versions, among them the connection strings
 # that open the learners' data, so that a breach shows who read one. api's identities, CI — the
 # deployment and the eval jobs — and the operator read them, and the caller's address is Google's,
-# a GitHub runner's or the operator's, not a learner's (R07, amended 2026-11-17;
-# docs/architecture.md, section 2.8).
+# a GitHub runner's or the operator's, not a learner's (R07).
 
 locals {
   # The one service whose Data Access audit is on, and the reads of it that are kept, by their
   # method names: a version read, not a list or a policy read, which a copy's organization may turn
-  # on beside it (R07, amended 2026-11-17; sources 2.6).
+  # on beside it (R07).
   audited_reads = {
     service = "secretmanager.googleapis.com"
     methods = ["AccessSecretVersion", "GetSecretVersion"]
@@ -30,7 +29,7 @@ locals {
 
   # What no sink of the project keeps, by the name of each exclusion (R07). Cloud Run's request logs
   # hold the client's address in httpRequest, and this is the name they come under: with traffic to
-  # api, no entry of the project's buckets holds httpRequest (T42).
+  # api, no entry of the project's buckets holds httpRequest.
   exclusions = {
     "cloud-run-request-logs" = {
       filter      = "LOG_ID(\"run.googleapis.com/requests\")"
@@ -46,8 +45,7 @@ locals {
       description = "Identity Platform's activity log holds every sign-in request; the platform keeps none (R07)."
     }
     # Hosting's request logs, should anyone link them to Cloud Logging in Firebase's console: they
-    # hold remoteIp. By the resource type, since Firebase names the log only as webrequests (R07,
-    # second amendment of 2026-11-09).
+    # hold remoteIp. By the resource type, since Firebase names the log only as webrequests (R07).
     "firebase-hosting-requests" = {
       filter      = "resource.type=\"firebase_domain\""
       description = "Firebase Hosting's request logs hold the client's IP address; the platform keeps none (R06, R07)."
@@ -96,8 +94,7 @@ resource "google_logging_project_bucket_config" "logs" {
 #
 # The bucket is in the sink's own project, and such a sink has no writer identity whatever it asks
 # for. The provider reads a sink with no writer identity as one with a unique identity, so that is
-# what is written here: written false, every plan would show a change that no apply makes (as
-# canvas-api found).
+# what is written here: written false, every plan would show a change that no apply makes.
 resource "google_logging_project_sink" "sinks" {
   for_each = local.sinks
 
@@ -120,9 +117,9 @@ resource "google_logging_project_sink" "sinks" {
 # Where traces are kept: the bucket _Trace, which the system makes with the first trace, in the
 # place the project's settings for observability buckets name. The setting comes before any trace:
 # a bucket keeps its place for good, and only a reprovision that erases the traces could move it
-# (R04, amended 2026-11-09). The platform writes no traces of its own, but Cloud Trace's API stays
-# on beside Cloud Scheduler and Cloud Run samples some requests by itself (R07, its third amendment
-# of 2026-11-09), and the place is set for whatever comes.
+# (R04). The platform writes no traces of its own, but Cloud Trace's API stays on beside Cloud
+# Scheduler and Cloud Run samples some requests by itself, and the place is set for whatever comes
+# (R07).
 #
 # The setting, not the bucket: the provider sets it with a PATCH that a second apply repeats
 # harmlessly, while it creates the bucket with a POST that fails wherever _Trace already is, and
@@ -136,10 +133,9 @@ resource "google_observability_project_settings" "traces" {
 }
 
 # The reads of a secret's versions, AccessSecretVersion and GetSecretVersion, are DATA_READ, and its
-# writes Admin Activity, always on (sources 2.6). This service and this type alone: the resource
-# holds the audit config of the service it names and touches no other, so the rest of the Data
-# Access audit stays as Google's default or a copy's organization leaves it, and every sink excludes
-# it all the same (R07, amended 2026-11-17).
+# writes Admin Activity, always on. This service and this type alone: the resource holds the audit
+# config of the service it names and touches no other, so the rest of the Data Access audit stays as
+# Google's default or a copy's organization leaves it, and every sink excludes it all the same (R07).
 resource "google_project_iam_audit_config" "secret_reads" {
   project = var.project_id
   service = local.audited_reads.service

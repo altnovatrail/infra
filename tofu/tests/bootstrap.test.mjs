@@ -106,8 +106,7 @@ const unconditioned = (state) =>
 
 const expression = `api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/hostingPublisher', 'projects/${project}/roles/signInUsers'])`;
 
-// Each test has a world of its own, so they run four at a time, the number row 7.25 of
-// COORDINATION.md spec gives (measurements 3.1 spec).
+// Each test has a world of its own, so that they run four at a time (R32).
 suite("bootstrap.sh", { concurrency: 4 }, () => {
   test("a first run makes the project, its state, the pool and the configuration's identity", async () => {
     const w = world();
@@ -343,7 +342,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
   });
 
   // A self-hosted copy: its own project, region, currency, pool, repository and environments, and no
-  // eval (T29). Nothing of the platform's own deployment may reach what the script makes or prints.
+  // eval. Nothing of the platform's own deployment may reach what the script makes or prints.
   test("a copy brings up its own project by its own values, and nothing of the platform's", async () => {
     const values = `project_id = "acme-learning-1"
   region     = "europe-west3"
@@ -493,7 +492,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
     assert.ok(!w.calls().some((c) => c.join(" ").startsWith("iam roles create")), w.calls().map((c) => c.join(" ")).join("\n"));
   });
 
-  // -- the operator's buckets (R28; docs/architecture.md, section 3.7) -----------------------------
+  // -- the operator's buckets (R28) ---------------------------------------------------------------
 
   const operatorBucket = `gs://${project}-operator`;
   const consentBucket = `gs://${project}-consent-forms`;
@@ -744,7 +743,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
     }
   });
 
-  // BREACH.md, section 3: a person's access ends by a run again with their variable set to none.
+  // BREACH.md ends a person's access by a run again with their variable set to none (R27).
   test("a run again with a person set to none takes back all they held, and keeps the others' access", async () => {
     const w = applied();
     assert.equal((await w.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: measureOrganizer })).status, 0);

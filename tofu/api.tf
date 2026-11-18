@@ -1,20 +1,16 @@
 # api's Cloud Run service and jobs, and the schedule of the jobs that run by the clock (R11).
 #
 # Which image they run is the deployment's to say, and so is the one value a deployment changes
-# beside it: the version of the facts secret that the service and the jobs of the check mount (R05;
-# the second 2026-11-08 amendment to R106 spec). The configuration sets the two only when it creates
-# the service or a job, and owns everything around them: the lowest admission rung, the mode of
-# reading, the catalog's list of modules and the version of the platform's key of Anthropic among
-# it, each a value of the deployment's file of values (the 2026-11-16 amendments to R05 and R25, the
-# 2026-11-17 amendments).
+# beside it: the version of the facts secret that the service and the jobs of the check mount. The
+# configuration sets the two only when it creates the service or a job, and owns everything around
+# them — the lowest admission rung, the mode of reading, the catalog's list of modules and the
+# version of the platform's key of Anthropic among it —, each a value of the deployment's file of
+# values (R05; R25; R106 spec).
 #
 # Nothing here exists until api_image names an image in this project's registry: a Cloud Run
-# resource cannot be made without one, and before the first deployment pushes api's image there is
-# none to name. Google's placeholder image is no production image of NovaTrail (RULES.md,
-# Production images), so it does not stand in. The jobs come first and the service after them, once
-# api_serving says so: the first deployment runs the check of the configuration and the migrations
-# with the jobs, and only then is the service made, on a database already migrated, as R05 orders
-# every deployment.
+# resource cannot be made without one, and Google's placeholder image is no production image of
+# NovaTrail (R105 spec). The jobs come first and the service after them, once api_serving says so,
+# so that the service is made on a database the jobs have already migrated (R05).
 
 locals {
   api_created = var.api_image != null
@@ -26,17 +22,17 @@ locals {
   admission_file = "facts.json"
   admission_path = "${local.admission_dir}/${local.admission_file}"
 
-  # The name of the one container of the service and of every job. gcloud 592.0.0 keys a container
-  # with no name as "" and reads its name as None, so --update-secrets takes the container's own
-  # facts volume for one another container mounts, and makes a volume of its own instead of setting
-  # the version in this one, which the next apply undoes (T24). Named, the deployment sets the
-  # version in the module's volume, where ignore_changes leaves it.
+  # The name of the one container of the service and of every job. gcloud keys a container with no
+  # name as "" and reads its name as None, so --update-secrets takes the container's own facts
+  # volume for one another container mounts, and makes a volume of its own instead of setting the
+  # version in this one, which the next apply undoes. Named, the deployment sets the version in the
+  # module's volume, where ignore_changes leaves it.
   container_name = "api"
 
   # The lowest admission rung, which the list's admission.rung names too, the mode of reading and the
   # catalog's list of modules, unset when it is empty: the service and the jobs of the check are told
-  # the same, so that api check checks what the revision will run with (R45, R79, R88 api; the
-  # 2026-11-16 and 2026-11-17 amendments to R25).
+  # the same, so that api check checks what the revision will run with (R25; R45 api, R79 api,
+  # R88 api).
   admission_rung = var.api_admission_rung
   reading_mode   = var.api_reading_mode
   catalog        = length(var.api_catalog_modules) > 0 ? { API_CATALOG_MODULES = join(",", var.api_catalog_modules) } : {}
@@ -124,7 +120,6 @@ resource "google_cloud_run_v2_service" "api" {
         # Billed per request: an instance holding no request holds no CPU.
         cpu_idle = true
 
-        # A starting instance gets the processor at full speed.
         startup_cpu_boost = true
       }
 
@@ -312,8 +307,9 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 # api's jobs, one for each entry of the list, with the same image as the service once the deployment
 # has set it. A job added to the list later is made with api_image, the first image, and gets the
 # serving one when the deployment sets the image of every job: a job joins the list with the release
-# of api that has its command, so the deployment of that release follows its apply (R05). A job's secrets come as files, each the latest version of its secret, with the path
-# in the variable the name names with the suffix _FILE, as api reads any secret (R29 api).
+# of api that has its command, so the deployment of that release follows its apply (R05). A job's
+# secrets come as files, each the latest version of its secret, with the path in the variable the
+# name names with the suffix _FILE, as api reads any secret (R29 api).
 resource "google_cloud_run_v2_job" "api" {
   for_each = local.api_created ? var.api_jobs : {}
 
@@ -354,8 +350,7 @@ resource "google_cloud_run_v2_job" "api" {
 
         # A job of the check checks the facts, the rung, the mode of reading and the catalog's list
         # the revision will run with: the same rung, mode and list, and the facts at the same path
-        # (R05; the second 2026-11-08 amendment to R106 spec). It reads no key, as api check does not
-        # (README api).
+        # (R05; R106 spec). It reads no key, as api check does not.
         # The store of the scans goes to a job that opens it, and to a job of the check, which checks
         # it as the revision will take it (R28).
         dynamic "env" {

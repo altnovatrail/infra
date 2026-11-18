@@ -13,11 +13,11 @@
 // STUB_CALLER   the account the stand-in runs as, which its refusals name as gcloud's do: an owner
 //               of the project, spelled with capitals, as Google keeps an account
 // STUB_CAPITALS a person granted is kept spelled as Google keeps an account, each word of the name
-//               with a capital, as IAM keeps it on the project (T49), and is the same person in
+//               with a capital, as IAM keeps it on the project, and is the same person in
 //               any case
 //
 // A policy is printed as one read in version 3 is: a binding under a condition names its role as it
-// is and carries its expression. Which version the real gcloud reads, the first run shows (T23).
+// is and carries its expression. Which version the real gcloud reads, the first real run shows.
 
 import fs from "node:fs";
 
@@ -91,7 +91,7 @@ const conditionOf = () => {
 const projectOf = () => flag("project") ?? fail("no --project");
 const notFound = (what) => fail(`NOT_FOUND: ${what} was not found`);
 // The bindings Cloud Storage gives a new bucket of uniform access, by the convenience values of the
-// project's basic roles (sources 10.9).
+// project's basic roles.
 const conveniences = (project) => [
   { role: "roles/storage.legacyBucketOwner", member: `projectEditor:${project}`, condition: "" },
   { role: "roles/storage.legacyBucketOwner", member: `projectOwner:${project}`, condition: "" },
@@ -101,8 +101,8 @@ const conveniences = (project) => [
   { role: "roles/storage.legacyObjectReader", member: `projectViewer:${project}`, condition: "" },
 ];
 // The caller is an owner of the project, and Owner holds none of a bucket's get, update and policy
-// of its own, only through the owners' legacyBucketOwner on the bucket (sources 10.9): without it,
-// what it asks of the bucket is refused, by the words of gcloud's refusal, which name the caller.
+// of its own, only through the owners' legacyBucketOwner on the bucket: without it, what it asks
+// of the bucket is refused, by the words of gcloud's refusal, which name the caller.
 const ownersHold = (url, permission) => {
   const bucket = state.buckets[url] ?? notFound(`bucket ${url}`);
   if (!bucket.policy.some((b) => b.role === "roles/storage.legacyBucketOwner" && b.member === `projectOwner:${bucket.project}` && b.condition === "")) {
@@ -193,7 +193,7 @@ switch (true) {
     break;
   }
   // What gcloud gives a bucket it is not told otherwise: Standard, soft delete of 7 days, no
-  // uniform access, public access prevention inherited (sources 10.3, 10.7).
+  // uniform access, public access prevention inherited.
   case command === "storage buckets create":
     if (state.buckets[first]) fail("ALREADY_EXISTS: bucket");
     state.buckets[first] = {

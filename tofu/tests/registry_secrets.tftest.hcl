@@ -1,5 +1,5 @@
-# The registry of images and the secret of api's deployment facts as R04 and R05 decided them,
-# checked against mock providers: no credential, no call to Google. The values are synthetic.
+# The registry of images and the secret of api's deployment facts, checked against mock providers:
+# no credential, no call to Google (R04, R05). The values are synthetic.
 
 mock_provider "google" {
   mock_data "google_project" {

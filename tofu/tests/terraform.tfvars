@@ -16,9 +16,9 @@ consent_forms_bucket = "novatrail-test-0-consent-forms"
 
 # Every variable of the configuration is set here: tofu test reads tofu/production.auto.tfvars as
 # well, and this file wins, so no test stands on what a deployment writes there — the platform's
-# values, a copy's, or a later api_image or environment (T30). The ones with a default are null, and
-# a variable that may not be null takes its default for a null, so the tests read the default itself
-# and not a copy of it (Д19). In a run's assertion var.<name> is still the null of this file: read
+# values, a copy's, or a later api_image or environment. The ones with a default are null, and a
+# variable that may not be null takes its default for a null, so the tests read the default itself
+# and not a copy of it. In a run's assertion var.<name> is still the null of this file: read
 # what the module made of it instead. tf-check refuses a variable this file does not set, and one
 # with a default it sets to anything but null.
 eval_github_subject_prefixes = null
