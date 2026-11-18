@@ -10,9 +10,9 @@
 # adds at the end of the stage, such as the browsers of the kind typescript —, and is the stage
 # the automated checks run inside. `devcontainer` adds what a person needs on top of that, and
 # devcontainer.json names it as its target. spec's own file ends with a fourth, `orchestrator`,
-# the devcontainer with the Docker CLI (R156 spec), which `just new-repo` leaves out of a copy: in a
-# copy `devcontainer` is the last stage, the one a build with no target gives, and in spec every
-# build names its stage. A builder that builds every stage before its target builds `orchestrator`
+# the devcontainer with the Docker CLI and the Dev Containers CLI (R156 spec, R158 spec), which
+# `just new-repo` leaves out of a copy: in a copy `devcontainer` is the last stage, the one a
+# build with no target gives, and in spec every build names its stage. A builder that builds every stage before its target builds `orchestrator`
 # for the ordinary configuration too, and the stage builds there as well, without the file only
 # its own configuration writes.
 
@@ -108,31 +108,22 @@ ENV PATH="/usr/local/node/bin:/usr/local/go/bin:/home/vscode/.local/bin:${PATH}"
 
 # -- toolchain: the core, plus what infra's own checks need ------------------
 #
-# infra's checks of its code need three tools the core lacks: OpenTofu, ShellCheck and actionlint
-# (R09). The checks every NovaTrail repository shares need none of them — infra calls the shared
-# Documents check alone, and releases nothing —, so they are here and not in the core, and the
-# shared checks run in the core, which this stage holds more than. A move to a new tag of spec
-# keeps this stage's lines, as the kinds' lines are kept at its end (R09).
+# OpenTofu, ShellCheck and actionlint: infra's own checks need them, and neither a release nor a
+# shared check does, so they are here and not in the core. A move to a new tag of spec keeps this
+# stage's lines, as a kind's lines are kept at its end (R09).
 
 FROM toolchain-core AS toolchain
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-# OpenTofu: infra describes the platform's infrastructure with it, as code on the model of
-# canvas-api's infra/, and its checks — tofu fmt, validate and test — run in this stage. It is the
-# first tool this repository's container has beyond spec's, and spec's template does not carry it:
-# a move to a new tag of spec keeps it (R09). It never ships, and its license, MPL 2.0, is the
-# named exception R09 makes (R12 spec).
+# OpenTofu: the language of the root module in tofu/, whose fmt, validate and test run in this
+# stage. It never ships; its license, MPL 2.0, is a named exception (R09; R12 spec).
 ARG OPENTOFU_VERSION=1.13.9
-# ShellCheck: the analyser of tofu/bootstrap.sh, the script that makes the project, its federated
-# pool and the identity the configuration is applied as, once, with the operator's own rights
-# (R13). The second tool beyond spec's container, kept the same way; it never ships, and its
-# license, GPL-3.0, is the named exception of the 2026-11-09 amendment to R09 (R12 spec).
+# ShellCheck: the analyser of the repository's shell scripts, and of the workflows' scripts through
+# actionlint. It never ships; its license, GPL-3.0, is a named exception (R09; R12 spec).
 ARG SHELLCHECK_VERSION=0.11.0
-# actionlint: the check of the workflows, the deployment's among them, which runs only after a merge
-# and so cannot show its mistakes in the pull request (R18). The third tool beyond spec's container,
-# kept the same way; it never ships, and its license, MIT, is compatible with Apache-2.0 (the second
-# 2026-11-09 amendment to R09). It calls the ShellCheck above on the workflows' scripts.
+# actionlint: the deployment's workflow runs only after a merge, so this check is where its mistakes
+# show before one (R18). Its license, MIT, is compatible with Apache-2.0 (R09).
 ARG ACTIONLINT_VERSION=1.7.12
 # The sums, as in the core: tofu_<version>_SHA256SUMS of the OpenTofu release, whose own signature
 # is checked by hand with gpg each time the version is raised (R09), actionlint_<version>_checksums.txt

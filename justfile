@@ -1,11 +1,10 @@
-# infra's own recipes. spec's, the documents check among them, run from spec's justfile:
-# `just -f spec/justfile docs-check-repo`. CI runs them through spec/tools/toolchain/toolchain.sh
-# (R30 spec): the ci- recipes of OpenTofu, ShellCheck and actionlint, tf-check and bootstrap-test in
-# the toolchain stage of .devcontainer/Dockerfile, the job OpenTofu, required in the ruleset of
-# main; the tests of deploy-check and of the deployment in the stage toolchain-core, which holds
-# none of those three tools, the job Deploy (R34).
+# infra's own recipes; spec's, the documents check among them, run from spec's justfile:
+# `just -f spec/justfile docs-check-repo`. CI runs them in a stage of .devcontainer/Dockerfile by
+# spec/tools/toolchain/toolchain.sh: those of the job Deploy run in toolchain-core, which has no
+# OpenTofu, ShellCheck or actionlint, so they call none of the three (R30 spec; R34).
 
-# The Dockerfile whose ARGs ci-tofu and ci-shellcheck read; their tests point it at broken copies.
+# The Dockerfile whose ARGs the ci- recipes of the three tools read; their tests point it at broken
+# copies.
 dockerfile := env("INFRA_DOCKERFILE", ".devcontainer/Dockerfile")
 
 # The just that runs these recipes, by its absolute path, for the checks of the list, which run spec's
@@ -26,13 +25,12 @@ _arg name:
     echo "$value"
 
 # The OpenTofu on PATH is the one the toolchain stage installs, at the version its ARG names (R09).
-# In the devcontainer it stops a container not rebuilt since the ARG was raised. In CI, where the
-# stage is built from the same Dockerfile, it says that the stage installed tofu and that tofu runs;
-# the module's checks join it in the same job (T12).
+# In the devcontainer it stops a container not rebuilt since the ARG was raised; in CI, where the
+# stage is built from the same Dockerfile, it shows that the stage installed tofu and that tofu runs.
+# OpenTofu on PATH at the version of its ARG
 ci-tofu:
     #!/usr/bin/env bash
     set -euo pipefail
-    # The value as Docker reads it: quotes, a carriage return and trailing blanks are not part of it.
     want=$({{ quote(just_executable()) }} -f {{ quote(justfile()) }} _arg OPENTOFU_VERSION)
     if ! command -v tofu >/dev/null; then
         echo "ci-tofu: no tofu on PATH: the toolchain stage installs it, at ${want}" >&2
@@ -99,8 +97,7 @@ ci-tofu-test:
     echo "ci-tofu-test: ok"
 
 # ShellCheck over the repository's scripts — tofu/bootstrap.sh, tools/deploy/*.sh and tools/ci/*.sh — by the
-# ShellCheck the toolchain stage installs, at the version its ARG names (the 2026-11-09 amendment to
-# R09).
+# ShellCheck the toolchain stage installs, at the version its ARG names (R09).
 ci-shellcheck:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -155,10 +152,9 @@ ci-shellcheck-test:
     env PATH="$work/bin:$PATH" "$just" ci-shellcheck >"$work/out" 2>&1 || { echo "ci-shellcheck-test: ci-shellcheck refused shellcheck ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-shellcheck-test: ok"
 
-# actionlint over the workflows, .github/workflows, by the actionlint the toolchain stage installs, at
-# the version its ARG names, with the stage's ShellCheck for their scripts (the second 2026-11-09
-# amendment to R09). The deployment's workflow runs only after a merge, so this is where its mistakes
-# show before one (R18).
+# The deployment's workflow runs only after a merge, so this is where its mistakes show before one
+# (R18).
+# actionlint over .github/workflows, with ShellCheck for their scripts, both of the toolchain stage (R09)
 ci-actionlint:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -250,9 +246,8 @@ _tf-sinks:
 # Every resource, data source and output of the module is in the list of the run
 # nothing_of_the_platform_reaches_a_copy of tofu/tests/copy.tftest.hcl, and the list names nothing
 # the module lacks, so that the platform's name, region and numbers reach none of a copy's resources
-# and calls (architecture 3.5): one the list leaves out would pass the check by, as the fourth alert
-# did until T51. The list is the run's lines that start with jsonencode(, so a commented entry or a
-# name in a message does not count.
+# and calls: one the list leaves out would pass the check by. The list is the run's lines that start
+# with jsonencode(, so a commented entry or a name in a message does not count (R10).
 _tf-copy:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -286,9 +281,9 @@ _tf-grants:
 
 # Every variable of the configuration is set in tofu/tests/terraform.tfvars: tofu test reads the
 # deployment's tofu/production.auto.tfvars too, and a variable this file leaves out would take the
-# deployment's value into every test (T30). One with a default is set to null there, which gives it
-# its default: a copy of the default instead would let a mistake in the default itself pass every
-# test (Д19). Null gives the default only where the variable is `nullable = false`, or where the
+# deployment's value into every test. One with a default is set to null there, which gives it its
+# default: a copy of the default instead would let a mistake in the default itself pass every test.
+# Null gives the default only where the variable is `nullable = false`, or where the
 # default is null itself; a nullable one with another default would take the null.
 _tf-test-values:
     #!/usr/bin/env bash
@@ -305,7 +300,7 @@ _tf-test-values:
     null_in_tests=$(sed -n 's/^\([a-z0-9_]*\)[[:space:]]*=[[:space:]]*null[[:space:]]*$/\1/p' {{ quote(tofu_dir) }}/tests/terraform.tfvars | sort -u)
     copies=$(comm -23 <(printf '%s\n' "$defaulted") <(printf '%s\n' "$null_in_tests"))
     if [ -n "$copies" ]; then
-        echo "tf-check: tofu/tests/terraform.tfvars sets these variables with a default to something but null, so the tests would not read their default (Д19):" >&2
+        echo "tf-check: tofu/tests/terraform.tfvars sets these variables with a default to something but null, so the tests would not read their default (R10):" >&2
         echo "$copies" >&2
         exit 1
     fi
@@ -377,7 +372,7 @@ deploy-check base="origin/main": _tools
 # downloads no release. Not tofu/ci.env or the values: a fork's first pull request changes them
 # alone, while its list is still the platform's, with the platform's address of api (R14). But a
 # change of the line of the values that names the rung does run them: the list's rung is held to
-# that line (the 2026-11-16 amendment to R05).
+# that line (R05).
 ci-deploy-check base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -474,7 +469,7 @@ ci-deploy-environments +names:
 
 # The configuration applied, by the lock file and the backend of the deployment, with the billing
 # account and the operator's address kept out of what it prints: the budget's name holds the first,
-# and a refresh prints it (canvas-api).
+# and a refresh prints it.
 ci-tf-apply:
     #!/usr/bin/env bash
     set -euo pipefail

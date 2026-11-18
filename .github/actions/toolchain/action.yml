@@ -1,24 +1,18 @@
 # A stage of .devcontainer/Dockerfile — toolchain or toolchain-core — as the image
 # novatrail-toolchain, for the jobs of ci.yml that run their recipes in it by
-# spec/tools/toolchain/toolchain.sh (R30 spec; R32). The image comes from the cache of GitHub
-# Actions, as a file of docker save, by the key, the path and the image's name that the shared
-# workflows of .github and spec's script give that stage — novatrail-<stage>.tar by the key
-# <stage>-<OS>-<architecture>-<sha256 of the Dockerfile> (R42 .github, R47 .github) —, so that a
-# stage keeps one entry for every workflow that takes it: the core's is the shared Documents
-# check's too. On a hit the Dockerfile does not run, and a failure of nodejs.org, GitHub or the
-# Ubuntu snapshot fails no check (the second 2026-11-09 amendment to R31 spec; sources 5.8, 5.9,
-# 5.10). Only a push to main saves the entry: one of a pull request serves only its own re-runs, and
-# crowds out main's.
+# spec/tools/toolchain/toolchain.sh (R30 spec; R32). The cache's key, path and image name are those
+# the shared workflows of .github and spec's script give the stage (R42 .github, R47 .github), so
+# that a stage keeps one entry for every workflow that takes it: the core's is the shared Documents
+# check's too. On a hit the Dockerfile does not run, and an outage of nodejs.org, GitHub or the
+# Ubuntu snapshot fails no check (R31 spec). Only a push to main saves an entry: one of a pull
+# request serves only its own re-runs, and crowds out main's.
 #
-# Two roles, as in go.yml of .github. The job toolchain, with role build, looks the entry of each
-# stage up and, on a miss, alone builds the image and hands its file to the jobs after it as an
-# artifact of the run, <stage>-image; it needs only the Dockerfile and this file checked out, and
-# calls the action once a stage, the core first, so that the build of toolchain reuses its layers.
-# The jobs after it, with role load, take the entry of their stage, or on a miss the artifact by its
-# ID, or with neither build the image themselves, and save nothing; they need the repository
-# checked out with its spec submodule. A build, a save or an upload that fails in the job toolchain
-# fails no check: the jobs after it build the image, and fail with the build when the Dockerfile is
-# broken.
+# Role build, the job toolchain, needs only the Dockerfile and this file checked out, and is called
+# once a stage, the core first, so that the build of toolchain reuses its layers. Role load needs the
+# repository checked out with its spec submodule: it takes the entry of its stage, or on a miss the
+# artifact by its ID, or with neither builds the image itself, and saves nothing. A build, a save or an upload
+# that fails with role build fails no check: the jobs after it build the image themselves, and fail
+# with the build when the Dockerfile is broken.
 name: Toolchain image
 description: A toolchain stage from the cache, from the job that built it, or built here.
 
@@ -57,7 +51,6 @@ runs:
             *) echo "::error::The stage of the toolchain action is toolchain or toolchain-core, not ${STAGE}."; exit 1 ;;
         esac
 
-    # With role build the lookup downloads nothing.
     - id: cache
       name: Toolchain image from the cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -85,7 +78,7 @@ runs:
         fi
 
     # An entry never changes, and another workflow of the run, the shared Documents check, may save
-    # the same key first: that only warns (sources 5.8).
+    # the same key first: that only warns.
     - name: Toolchain image into the cache
       if: steps.build.outcome == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
       continue-on-error: true
@@ -94,7 +87,7 @@ runs:
         path: ${{ runner.temp }}/novatrail-${{ inputs.stage }}.tar
         key: ${{ steps.cache.outputs.cache-primary-key }}
 
-    # Kept a day and compressed fast, as go.yml keeps its own (R42 .github; sources 5.9).
+    # Kept a day and compressed fast, as go.yml of .github keeps its own (R42 .github).
     - id: upload
       name: Toolchain image as an artifact
       if: steps.build.outcome == 'success'
