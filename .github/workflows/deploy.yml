@@ -2,7 +2,7 @@
 # commit, the cloud's configuration on every run, then only the parts of the list that changed.
 #
 #   target   decides, with no access to anything: whether main still stands on the commit, whether
-#            the project is set up (tofu/ci.env, T23), and which parts changed against the last run
+#            the project is set up (tofu/ci.env), and which parts changed against the last run
 #            that delivered (tools/deploy/target.mjs);
 #   config   applies the configuration as infra-config, in the environment production-config, and
 #            hands its outputs on;
