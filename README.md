@@ -15,6 +15,6 @@ The shared infrastructure of NovaTrail: the cloud projects, the identities that 
 
 A component of [NovaTrail](https://github.com/altnovatrail/spec), a universal open platform for adaptive learning, interactive lessons and AI tutoring.
 
-Nothing calls it while the platform runs, and it calls nothing: it deploys the releases of `api`, the platform's server and the one part that stores learners' data, and of `app`, the web app of learners and adults, and it lays the managed services they run on.
+Nothing calls it while the platform runs, and it calls nothing: it deploys the releases of `api`, the platform's server, which alone of its parts stores learners' data, and of `app`, the web app of learners and adults, and it lays the cloud they run on — the services, the image registry, the secrets, the hosting and the logs —, while `api` chooses its own database and sign-in service.
 
 Its card is architecture 3.11 spec, among the documents of [spec](https://github.com/altnovatrail/spec); its own documents, its decisions and its plan, with the guide to a self-hosted copy and the procedure for a breach of learners' data, are in [docs/](docs/README.md).

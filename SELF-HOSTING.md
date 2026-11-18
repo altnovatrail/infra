@@ -321,7 +321,7 @@ Follow "Run on the dev projects" in [`api`'s `docs/build.md`](https://github.com
 
 ### `app`
 
-Follow "Run locally with api" in [`app`'s README](https://github.com/altnovatrail/app#run-locally-with-api), in `app`'s devcontainer:
+Follow "Run locally with api" in [`app`'s `docs/README.md`](https://github.com/altnovatrail/app/blob/main/docs/README.md#run-locally-with-api), in `app`'s devcontainer:
 
 1. Copy `deployment.example.json` to `deployment.local.json`, which git ignores, and fill in `signIn` from the dev project's Web App. The development server and `vite preview` serve it as `/deployment.json`. Its format is `spec`'s, version 1 (`spec/deployment/README.md`):
 
@@ -339,7 +339,7 @@ Follow "Run locally with api" in [`app`'s README](https://github.com/altnovatrai
    }
    ```
 
-2. `just dev`, whose proxy finds `api`'s container by its name, `http://api:8080`; `NOVATRAIL_API` names another address (`app`'s README, `main` ec3285a). Then open `http://127.0.0.1:5173`.
+2. `just dev`, whose proxy finds `api`'s container by its name, `http://api:8080`; `NOVATRAIL_API` names another address (`app`'s `docs/README.md`, `main` d93b7d7). Then open `http://127.0.0.1:5173`.
 
 What holds the file to that shape:
 
