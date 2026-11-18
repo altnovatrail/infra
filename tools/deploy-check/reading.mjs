@@ -1,13 +1,13 @@
-// The reading of a deployment configuration, /deployment.json, as section 5 of spec's
-// deployment/README.md lays it out: the schema first, then the rules in the order of the text's
-// table, and the first step that finds something wrong refuses the file and names every field it
-// refuses, by its path. The rollout is a reader, as app is: it accepts the file so before it writes
-// it (R85 spec). spec's vectors of reading hold this to the text (test/reading.test.mjs).
+// The reading of a deployment configuration, /deployment.json, as spec's deployment/README.md lays
+// it out: the schema first, then the rules in the order of the text's table, and the first step
+// that finds something wrong refuses the file and names every field it refuses, by its path. The
+// rollout is a reader, as app is: it accepts the file so before it writes it (R85 spec). spec's
+// vectors of reading hold this to the text (test/reading.test.mjs).
 
 export const RULES = ["deployment.api-origin", "deployment.loopback"];
 
-// The loopback hosts, as section 5 defines them: these three, written so, and nothing else — not
-// another address of 127.0.0.0/8, nor a name under localhost.
+// The loopback hosts, as spec's deployment/README.md defines them: these three, written so, and
+// nothing else — not another address of 127.0.0.0/8, nor a name under localhost.
 export const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
 // What a reader gives file read at origin, with validate the compiled schema of the file: {} when it
@@ -51,7 +51,7 @@ export function fieldsOf(errors) {
   return [...paths].sort(byCodeUnits);
 }
 
-// Strings in the order of their UTF-16 code units, as section 5 orders the paths.
+// Strings in the order of their UTF-16 code units, as spec's deployment/README.md orders the paths.
 function byCodeUnits(a, b) {
   if (a === b) return 0;
   return a < b ? -1 : 1;

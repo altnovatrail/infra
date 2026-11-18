@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs the tools a job of the deployment runs, each at the exact version written down and
-# checked against its sha256 before anything unpacks it (R18; RULES.md, Exact versions only):
+# checked against its sha256 before anything unpacks it (R18):
 # OpenTofu, just and Node at the ARGs of .devcontainer/Dockerfile, the versions the container checks
 # the repository with, and the Google Cloud CLI, jq and buildx at tools/ci/versions.env. `docker`
 # installs nothing: it checks that the runner's Docker engine is the version written down.

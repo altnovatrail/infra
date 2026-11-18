@@ -9,8 +9,8 @@
 // target prints, one `key=value` a line for $GITHUB_OUTPUT, whether the run delivers and which parts
 // of the list it delivers: `deliver`, `commit`, `image`, `api`, `facts`, `app`, each part true or
 // false. It delivers only while main still stands on <commit>, and only once the project is set up:
-// tofu/ci.env, tofu/production.auto.tfvars and tofu/backend.hcl at <commit> (T23). The parts are the
-// list's blocks that changed against the commit of the last run of the workflow that delivered:
+// tofu/ci.env, tofu/production.auto.tfvars and tofu/backend.hcl at <commit> (R18). The parts are
+// the list's blocks that changed against the commit of the last run of the workflow that delivered:
 // pushed to main, green, and its job Configuration through — a run that delivered nothing, because
 // main had moved on or the project was not set up, is green too and counts for nothing. Not against
 // the push before this one either, which a run waiting in the queue and replaced by a newer one, or a
@@ -23,7 +23,7 @@
 // does what else api's revision runs with but its image: the list's rung, and the values of
 // tofu/production.auto.tfvars that tell it the rung, the mode of reading, the catalog's list and the
 // key's version. The apply makes a revision of them that takes no traffic, and only a new revision
-// brings them to it (the 2026-11-16 and 2026-11-17 amendments to R05).
+// brings them to it (R05).
 //
 // A run started by hand delivers the parts it names, among image, api, facts and app, and none when
 // it names none: --by-hand=<parts>, apart by commas, or, in the workflow, GITHUB_EVENT_NAME
@@ -125,7 +125,7 @@ export async function environmentsHoldToMain({ repository, token, names, api = "
   if (!repository || !token) throw new Refusal("GITHUB_REPOSITORY and GITHUB_TOKEN name the repository and read its environments");
   for (const name of names) {
     const at = `${api}/repos/${repository}/environments/${encodeURIComponent(name)}`;
-    const environment = await github(at, token, `the environment ${name}`, { missing: `there is no environment ${name}: a job in it would make it, with no rule of branches, and lend its identity to any branch; make it with the rule main first (docs/architecture.md, section 3.2)` });
+    const environment = await github(at, token, `the environment ${name}`, { missing: `there is no environment ${name}: a job in it would make it, with no rule of branches, and lend its identity to any branch; make it with the rule main first, as SELF-HOSTING.md says (R18)` });
     const policy = environment.deployment_branch_policy;
     if (!policy || policy.protected_branches || !policy.custom_branch_policies) throw new Refusal(`the environment ${name} is not run from chosen branches alone: its rule is main, and main alone`);
     const rules = ((await github(`${at}/deployment-branch-policies?per_page=100`, token, `the branches of the environment ${name}`)).branch_policies ?? []).map((rule) => `${rule.type ?? "branch"}:${rule.name}`);
@@ -209,7 +209,7 @@ export function decide({ dir, commit, tip, base, byHand = null }) {
   const no = { deliver: false, commit, image: false, api: false, facts: false, app: false };
   if (tip !== commit) return { ...no, lines: [`main stands on ${tip.slice(0, 12)} now, not on ${commit.slice(0, 12)}: its own run delivers it, and this one would roll it back`] };
   const missing = SETUP.filter((file) => !has(dir, commit, file));
-  if (missing.length) return { ...no, lines: [`the project is not set up yet: ${missing.join(", ")} not at ${commit.slice(0, 12)} (T23)`] };
+  if (missing.length) return { ...no, lines: [`the project is not set up yet: ${missing.join(", ")} not at ${commit.slice(0, 12)} (R18)`] };
 
   if (byHand !== null) {
     const parts = partsByHand(byHand);
@@ -257,7 +257,7 @@ export function identity(file) {
   try {
     text = fs.readFileSync(file, "utf8");
   } catch {
-    throw new Refusal(`${file} is not there: the project is not set up yet (T23)`);
+    throw new Refusal(`${file} is not there: the project is not set up yet (R18)`);
   }
   const { values, wrong } = envValues(text);
   if (wrong !== null) throw new Refusal(`${file} holds ${JSON.stringify(wrong)}, not one line of KEY=value of its own`);

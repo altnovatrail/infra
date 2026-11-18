@@ -126,7 +126,7 @@ test("against the last run that delivered, each part changes alone, and the rest
     // A self-hosted copy's folder of legal texts goes by the path of the facts (R33).
     ["a copy's legal texts, put in", { "deploy/production/legal/VERSION": "3\n" }, { api: false, facts: true, app: false }],
     // What else the revision runs with goes by the same path: the apply alone makes a revision of it
-    // that takes no traffic (the 2026-11-16 amendment to R05).
+    // that takes no traffic (R05).
     ["the list's rung", { "deploy/production.json": { ...list(), admission: { rung: "author" } } }, { api: false, facts: true, app: false }],
     ["the rung of the values", { "tofu/production.auto.tfvars": `${tfvars}api_admission_rung = "author"\n` }, { api: false, facts: true, app: false }],
     ["the catalog's list", { "tofu/production.auto.tfvars": `${tfvars}api_catalog_modules = ["novatrail/check-board"]\n` }, { api: false, facts: true, app: false }],
@@ -308,7 +308,7 @@ test("tofu/ci.env: the provider and the configuration's identity, of their forms
     fs.writeFileSync(file, text);
     assert.throws(() => identity(file), message);
   }
-  assert.throws(() => identity(path.join(dir, "none.env")), /is not there: the project is not set up yet \(T23\)/);
+  assert.throws(() => identity(path.join(dir, "none.env")), /is not there: the project is not set up yet \(R18\)/);
 });
 
 test("the command line: current fails once main moved on, and target prints its outputs", () => {

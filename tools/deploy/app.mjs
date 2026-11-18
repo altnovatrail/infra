@@ -56,13 +56,13 @@ const PARALLEL = 8;
 const gzip = promisify(zlib.gzip);
 
 // The check after a release reads the site again until it answers as the release has it: for a
-// while after a release Hosting's CDN still serves the build before — in run 43991456418 of Deploy,
-// read 19 s after the release, / was the old index.html and the new build's file of assets/ a 404,
-// and a minute later it was there (В45; T71). A round every 10 s, so that the site is read soon
-// after it turns; rounds for 120 s, twice the lag seen, and a site still wrong then is wrong. One
-// round is the first read and one 10 s after each round before, so the waits add up to 120 s. A read
-// of the site that takes over 10 s is a wrong answer of its round, which reads every path at once:
-// a round ends within READ_FOR, and the check within ROUNDS × READ_FOR + ROUNDS_FOR, 250 s.
+// while after a release Hosting's CDN still serves the build before — / the old index.html and the
+// new build's file of assets/ a 404, for up to a minute (R17). A round every 10 s, so that the site
+// is read soon after it turns; rounds for 120 s, twice the lag seen, and a site still wrong then is
+// wrong. One round is the first read and one 10 s after each round before, so the waits add up to
+// 120 s. A read of the site that takes over 10 s is a wrong answer of its round, which reads every
+// path at once: a round ends within READ_FOR, and the check within ROUNDS × READ_FOR + ROUNDS_FOR,
+// 250 s.
 export const ROUND_EVERY = 10_000;
 export const ROUNDS_FOR = 120_000;
 export const ROUNDS = 1 + ROUNDS_FOR / ROUND_EVERY;
@@ -278,8 +278,8 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
 // that finds something wrong before the last says its number and what is wrong. Each round asks for
 // index.html's bytes, with its headers, at / and at a path of the SPA; a file of assets/ with its
 // own; a 404 for a file of /assets/ that is not there; deployment.json as app reads it; the build's
-// NOTICE and LICENSE at /NOTICE and /LICENSE (the 2026-11-11 amendment to R85 spec). The paths that
-// hold no file are new each round, so that no answer of a round before stands in for them.
+// NOTICE and LICENSE at /NOTICE and /LICENSE (R85 spec). The paths that hold no file are new each
+// round, so that no answer of a round before stands in for them.
 async function answers({ url, build, deploymentFile, csp, fetchSite = fetch, rounds = 1, sleep = sleepFor, say }) {
   const asset = buildFiles(build).find((file) => file.startsWith("assets/"));
   const page = { status: 200, body: fs.readFileSync(path.join(build, "index.html")), of: "index.html", headers: { "content-security-policy": csp, "x-content-type-options": "nosniff", "cache-control": /no-cache/, "strict-transport-security": /max-age=\d+/ } };

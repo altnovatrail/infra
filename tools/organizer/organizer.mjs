@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// The organizer's tool for the operator's bucket (R28; docs/architecture.md, section 3.7). It runs
-// where gcloud is signed in as the measurement organizer or the eval-set organizer — Cloud Shell or
-// their own machine with Linux or macOS, where gcloud is a program of that name — on Node.js alone,
-// with no package of tools/package.json.
+// The organizer's tool for the operator's bucket (R28). It runs where gcloud is signed in as the
+// measurement organizer or the eval-set organizer — Cloud Shell or their own machine with Linux or
+// macOS, where gcloud is a program of that name — on Node.js alone, with no package of
+// tools/package.json.
 //
 //   link <purpose> [--samples=N] [--hours=H] [--session=ID] [--out=FILE]
 //       an upload link: one self-contained HTML page with a form per file, each form a V4 POST
@@ -66,7 +66,7 @@ export const PURPOSES = {
   "eval-set": { account: "upload-eval-set", what: "eval-set samples", form: "your signed volunteer form" },
 };
 
-// The prefixes whose lifecycle rule reads the Custom-Time, and how its date is reckoned (section 3.7).
+// The prefixes whose lifecycle rule reads the Custom-Time, and how its date is reckoned (R28).
 // A form of a measurement or of a parent keeps 5 years after its samples, which the rule of samples
 // erases 2 years from the session: its Custom-Time is the session plus 730 days.
 // `rule` is the days of the rule that erases by it, as bootstrap.sh writes the rules.
@@ -321,11 +321,11 @@ export function time({ bucket, objects, date, now = new Date(), gcloud = runGclo
 }
 
 // A withdrawal erases the samples before their term, and the form keeps 5 years from that day: the
-// form is rewritten with the day, since only a rewrite resets a Custom-Time (section 3.7; sources
-// 10.3). gcloud rewrites an object by a copy, which takes --custom-time in place of the source's,
-// and copies none onto itself, nor does objects update rewrite one of the same class (sources 10.8):
-// so the form moves to a name beside it and back, each move a copy and an erasure. The form keeps
-// the day in its metadata, `withdrawn`, by which time refuses to move it forward again.
+// form is rewritten with the day, since only a rewrite resets a Custom-Time (sources 10.3). gcloud
+// rewrites an object by a copy, which takes --custom-time in place of the source's, and copies none
+// onto itself, nor does objects update rewrite one of the same class (sources 10.8): so the form
+// moves to a name beside it and back, each move a copy and an erasure. The form keeps the day in
+// its metadata, `withdrawn`, by which time refuses to move it forward again.
 export function withdraw({ bucket, objects, erased, now = new Date(), gcloud = runGcloud, say = console.log }) {
   if (objects.length === 0) refuse("name the forms whose samples were erased");
   const wanted = extended(erased);
