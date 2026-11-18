@@ -1391,7 +1391,7 @@ The steps and the runs are in [architecture.md](architecture.md), section 3.2, "
 - **The checks before the merge.** The archive's `csp.json`, `deployment.schema.json` and `LICENSE` are byte for byte those of v0.1.35, and its `NOTICE` differs by the versions raised alone, so the hosting's headers and `deploy/production/deployment.json` do not change, and `font-src 'none'` holds; `deploy-check` passed on the list, the archive of v0.1.37 verified and of the sha256 named.
 - **The learners' data.** No store, secret, right, log or call to `api` is added: the avatar changed is the profile's field the first 2026-11-18 amendment names, among «the profiles» that BREACH.md, part 1, names: it does not change.
 
-*Rejected:* waiting for T91 `app`, E5's outcome — it brings no release; `api` v0.1.65 — the orchestrator did not name it, and `app` v0.1.37 needs nothing of it. — RUN.md, T84 (`run/TASKS.md`); `deploy/production.json`; [architecture.md](architecture.md), the status; SELF-HOSTING.md, «Your list».
+*Rejected:* waiting for T91 `app`, E5's outcome — it brings no release; `api` v0.1.65 — the orchestrator did not name it, and `app` v0.1.37 needs nothing of it. — T84 (`docs/plan/E6.md`); `deploy/production.json`; [architecture.md](architecture.md), the status; SELF-HOSTING.md, «Your list».
 
 ## The `spec` tag v0.18.3
 
