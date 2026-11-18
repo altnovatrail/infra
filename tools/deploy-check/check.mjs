@@ -20,9 +20,8 @@
 //      spec's legal-check-dir at the tag of the submodule — an early sign too, since api checks the
 //      folder again by its own part legal/ (R33);
 //   7. the rung the configuration tells api's service and the jobs of the check: api_admission_rung
-//      of tofu/production.auto.tfvars, or its default in tofu/variables.tf (the 2026-11-16 amendment
-//      to R05), and the rung full wherever the facts name a category under 18 (the fifth 2026-11-17
-//      amendment to R149 spec; the third 2026-11-17 amendment to R05);
+//      of tofu/production.auto.tfvars, or its default in tofu/variables.tf, and the rung full
+//      wherever the facts name a category under 18 (R05; R149 spec);
 //   8. api's tag no lower than in the list at <ref>, the main a pull request merges into; with no
 //      list there, nothing to hold it to.
 // A list that fails its schema is refused there; every other check runs, each says what it found,
@@ -46,7 +45,7 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const SPEC = path.join(ROOT, "spec");
 const LIST_SCHEMA = path.join(ROOT, "deploy", "schema", "production.schema.json");
 // The path of the schema of /deployment.json stays the same from version to version, and its $id
-// names the version (spec's deployment/README.md, section 3).
+// names the version (R85 spec).
 const SPEC_DEPLOYMENT_SCHEMA = path.join(SPEC, "deployment", "schemas", "deployment.schema.json");
 const DEPLOYMENT_ID = /^https:\/\/altnovatrail\.github\.io\/spec\/deployment\/([1-9]\d*)\/deployment\.schema\.json$/;
 // The platform's app is open on Hosting, at https://<site>.web.app (R06), never on a loopback host.
@@ -60,7 +59,7 @@ const TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 // The programs the checks run, by absolute path, as spec's tools run theirs (spec/tools/shared.mjs):
 // no directory on PATH decides which program runs. just is the one that runs the recipe, whose path
 // the justfile exports as INFRA_JUST: /usr/local/bin/just of the toolchain stages, or, on a runner of
-// the workflow Deploy, the one tools/ci/install.sh put in a folder no fixed path names (T24). Run
+// the workflow Deploy, the one tools/ci/install.sh put in a folder no fixed path names (R14). Run
 // outside a recipe, it is the toolchain stages'. git is the devcontainers base image's, or else the
 // system's; tar the system's.
 const JUST = justProgram(process.env.INFRA_JUST);
@@ -142,8 +141,8 @@ async function fetchRelease(repository, tag, name, work, releases) {
   return path.join(folder, name);
 }
 
-// spec's release-verify, as RULES.md has a repository run it, or, for the tests, a command that
-// stands in for it with the same arguments.
+// spec's release-verify, or, for the tests, a command that stands in for it with the same
+// arguments (R77 spec).
 export function verify(repository, tag, file, command = [JUST, "-f", path.join(SPEC, "justfile"), "release-verify"]) {
   const run = spawnSync(command[0], [...command.slice(1), repository, tag, file], { encoding: "utf8" });
   if (run.error) throw new Refusal(`${command[0]} cannot be run: ${run.error.message}`);
@@ -186,7 +185,7 @@ function baseList(base, deployDir) {
   }
 }
 
-// app reads /deployment.json only if it is no larger (architecture 3.7 app).
+// app reads /deployment.json only if it is no larger.
 const DEPLOYMENT_LIMIT = 16 * 1024;
 
 // The list of <deploy dir>, held to its schema: what the release of either part reads it as.
@@ -208,8 +207,8 @@ export function deploymentOfTheList(app, deploymentFile) {
 
 // What a build of app holds at the root of its archive, and what a release of it is made of: its
 // page, its assets, the schema of /deployment.json, the table of the CSP header and the notices of
-// the licenses of what it bundles, NOTICE and LICENSE (the 2026-11-11 amendment to R85 spec); never
-// a deployment.json of its own, which is the deployment's (architecture 3.7 app; R17).
+// the licenses of what it bundles, NOTICE and LICENSE; never a deployment.json of its own, which is
+// the deployment's (R17; R85 spec).
 const BUILD_FILES = ["index.html", "deployment.schema.json", "csp.json", "NOTICE", "LICENSE"];
 
 // The archive of a build unpacked into dir, once its listing shows nothing but files and folders
@@ -331,7 +330,7 @@ function configurationValue(root, values, name) {
 
 // The lowest admission rung the configuration tells api's service and the jobs of the check: the
 // value of tofu/production.auto.tfvars, or, when they leave it out, its default in tofu/variables.tf
-// (the 2026-11-16 amendment to R05).
+// (R05).
 export function configurationRung(root) {
   const rung = configurationValue(root, null, "api_admission_rung");
   if (!rung) throw new Refusal("neither tofu/production.auto.tfvars nor the default in tofu/variables.tf names api_admission_rung, and the rung the configuration tells api is not known");
@@ -382,7 +381,7 @@ export function deploymentHolds(build, deploymentFile, origin) {
 // The Content-Security-Policy header of a release, out of the build's csp.json and the
 // deployment.json it ships with (R17). csp.json is one table of directives, each name to its
 // sources as one string, with two places in it: {api}, which takes the origin of api, and
-// {authDomain}, the host sign-in's window is opened on (architecture 3.7 app). frame-ancestors is
+// {authDomain}, the host sign-in's window is opened on. frame-ancestors is
 // 'none', and a table that does not say so gets it: the header is the only place it holds, a meta
 // tag cannot carry it. Anything else — another shape, another place, a value that would end a
 // directive or start another — is refused rather than guessed at.
@@ -449,9 +448,8 @@ function factsHoldToTheTable(factsFile) {
 // The list's rung against the categories the facts name: any rung for an adult's facts alone, full
 // for facts that name a category under 18, one of underEighteen, in spec's order. tutor's list
 // selects its entries by the deployment's rung, not by the learner's category, so at the rung author
-// the entries the author's word admitted with no eval would read a child's work (the fifth
-// 2026-11-17 amendment to R149 spec; the third 2026-11-17 amendment to R05). What is not of the
-// facts' form names no category here: the check of the facts refuses it.
+// the entries the author's word admitted with no eval would read a child's work (R05; R149 spec).
+// What is not of the facts' form names no category here: the check of the facts refuses it.
 export function rungHoldsForFacts(facts, rung, underEighteen) {
   const named = new Set();
   for (const declared of Object.values(facts ?? {})) {
@@ -461,16 +459,16 @@ export function rungHoldsForFacts(facts, rung, underEighteen) {
   }
   const minors = underEighteen.filter((category) => named.has(category));
   if (!minors.length) return `the facts name no category under 18, so the rung ${rung} may stand`;
-  if (rung !== "full") throw new Refusal(`production/facts.json names ${minors.join(", ")}, a category under 18, and the rung is ${rung}: facts for a learner under 18 come with the rung full (the fifth 2026-11-17 amendment to R149 spec)`);
+  if (rung !== "full") throw new Refusal(`production/facts.json names ${minors.join(", ")}, a category under 18, and the rung is ${rung}: facts for a learner under 18 come with the rung full (R149 spec)`);
   return `the facts name ${minors.join(", ")}, and the rung is full`;
 }
 
 // A self-hosted copy's folder of legal texts, production/legal, by spec's recipe legal-check-dir, as
-// the part's text has a copy check it (the second 2026-11-09 amendment to R115 spec), or, for the
-// tests, a command that stands in for it with the same argument; the deployment lays the folder over
-// api's image, where API_LEGAL_DIR names it (R33). What is neither a file nor a folder is refused
-// first: a link would lay into the image what the review did not see. With no folder api serves the
-// texts of its tag of spec, as the platform's does, and there is nothing to check.
+// spec's part legal/ has a copy check it (R115 spec), or, for the tests, a command that stands in
+// for it with the same argument; the deployment lays the folder over api's image, where
+// API_LEGAL_DIR names it (R33). What is neither a file nor a folder is refused first: a link would
+// lay into the image what the review did not see. With no folder api serves the texts of its tag of
+// spec, as the platform's does, and there is nothing to check.
 export function legalFolder(deployDir, command = [JUST, "-f", path.join(SPEC, "justfile"), "legal-check-dir"]) {
   const folder = path.join("production", "legal");
   const at = path.join(deployDir, folder);

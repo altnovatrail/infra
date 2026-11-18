@@ -1,8 +1,9 @@
 // The test of tools/organizer/organizer.mjs, with no cloud: gcloud-stub.mjs stands in for gcloud,
 // named to the tool by ORGANIZER_GCLOUD, and signs with a key made here, so that each form's
-// signature is checked as Cloud Storage would check it. It holds the link to R28 — the purpose's own prefixes and upload service
-// account, at most 12 hours, the type and size of each file, a random name for each — and the
-// Custom-Time to section 3.7 of docs/architecture.md. Run by `just organizer-test`.
+// signature is checked as Cloud Storage would check it. It holds the link to R28 — the purpose's
+// own prefixes and upload service account, at most 12 hours, the type and size of each file, a
+// random name for each — and the Custom-Time to the lifecycle rules of R28. Run by
+// `just organizer-test`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -23,7 +24,7 @@ after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-// What R28 and section 3.7 set, written here and not taken from the tool, so that a tool that drifts
+// What R28 sets, written here and not taken from the tool, so that a tool that drifts
 // from them fails: at most 12 hours; each purpose's prefixes and upload service account; a sample
 // of the samples page, and a scan as api takes one (sources 10.5, 10.8).
 const MAX_HOURS = 12;

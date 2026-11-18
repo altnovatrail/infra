@@ -1,6 +1,6 @@
 // The reading of /deployment.json against spec's vectors of reading at the tag of the submodule:
-// each case read at its origin gives exactly what the vector says (section 7 of spec's
-// deployment/README.md). Run by `just deploy-check-test`.
+// each case read at its origin gives exactly what the vector says (R85 spec). Run by
+// `just deploy-check-test`.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";

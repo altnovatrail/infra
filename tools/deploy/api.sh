@@ -8,7 +8,7 @@
 # image builds api's image of the list's release and pushes it, tagged with the release, and prints
 # its digest: the files of the release are downloaded and verified again, release-verify and sha256,
 # by tools/deploy-check/fetch.mjs, and the image is built as api's release says, around the binary
-# alone. The first deployment runs it before api_image names the image (T24).
+# alone. A project's first deployment runs it before api_image names the image (R15).
 #
 # A self-hosted copy whose deploy/production/legal/ holds its operator's legal texts runs the image
 # of its release with that folder laid over it: the image FROM the release's image by its digest,
@@ -111,9 +111,9 @@ lower() {
 # The service, as JSON, or nothing when the configuration has not made it yet. Whether it has, the
 # outputs say by api_service_url, as they do for the release of app: Cloud Run cannot say it to the
 # deployment's account, whose right to read the service is on the service alone, and for a service
-# not there it answers PERMISSION_DENIED "(or resource may not exist)", as the first deployment
-# found (T24). A service the outputs name and gcloud cannot read stops the deployment: read as no
-# service, it would skip the revision without a word.
+# not there it answers PERMISSION_DENIED "(or resource may not exist)". A service the outputs name
+# and gcloud cannot read stops the deployment: read as no service, it would skip the revision
+# without a word.
 describe_service() {
     jq -e '.api_service_url.value | type == "string"' "$outputs" > /dev/null || return 0
     gcloud run services describe "$service" "${where[@]}" --format=json || fail "the service ${service} cannot be read"
@@ -137,8 +137,8 @@ serving_digest() {
 }
 
 # The registry's tags of api's image, as lines of tag and digest. Before the first push the registry
-# has no package of the image, and gcloud says NOT_FOUND: that is no tags, as the first deployment
-# found (T24). Any other failure stops the deployment, as for the service.
+# has no package of the image, and gcloud says NOT_FOUND: that is no tags. Any other failure stops
+# the deployment, as for the service.
 registry_tags() {
     local errors status=0 listed
     errors="$work/tags-errors"
@@ -302,7 +302,7 @@ run_jobs() {
 # A revision by the image's digest with that version of the facts, taking no traffic; when it is
 # ready by its own condition Ready, all the traffic to that revision, by its name. The service's
 # latestReadyRevisionName does not tell: with --no-traffic Cloud Run leaves it on the revision that
-# serves, as the first deployment found (T24).
+# serves.
 roll() {
     local version="$1" described created ready
     echo "==> a revision of ${service}, with no traffic yet"

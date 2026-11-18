@@ -47,7 +47,7 @@ function gcloud() {
     case command === "run services describe":
       if (state.describeError) fail(state.describeError);
       // As Cloud Run answers the deployment's account for a service not there: its right is on the
-      // service, which is not there to hold it (T24).
+      // service, which is not there to hold it.
       if (!service || service.name !== subject)
         fail(`PERMISSION_DENIED: Permission 'run.services.get' denied on resource 'namespaces/p/services/${subject}' (or resource may not exist).`);
       out(
@@ -64,7 +64,7 @@ function gcloud() {
     case positional.slice(0, 4).join(" ") === "artifacts docker tags list": {
       const image = positional[4];
       if (state.tagsError) fail(state.tagsError);
-      // As Artifact Registry answers for an image with no package yet, before its first push (T24).
+      // As Artifact Registry answers for an image with no package yet, before its first push.
       if (!state.packages.includes(image)) fail("NOT_FOUND: Requested entity was not found.");
       out(
         JSON.stringify(
@@ -105,7 +105,7 @@ function gcloud() {
       service.revisions[name] = { image: flag("image"), factsFile: file, facts: secretVersion, ...(state.notReady ? { ready: false } : {}) };
       service.latestCreated = name;
       // As Cloud Run does: a revision with no traffic leaves latestReadyRevisionName on the one that
-      // serves, ready or not (T24).
+      // serves, ready or not.
       if (!state.notReady && !args.includes("--no-traffic")) service.latestReady = name;
       // With --no-traffic, the traffic stays where it was; without it, the new revision would take
       // it all at once.
