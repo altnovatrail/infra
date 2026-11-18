@@ -1,7 +1,7 @@
 # The configuration against what bootstrap.sh lets the identity that applies it do (R13): a role
 # granted here and not let there would pass every other check and be refused at the apply, after
-# the merge. Read from the script itself, as canvas-api's test does, so that the two change
-# together and the script is run again before the merge.
+# the merge. Read from the script itself, so that the two change together and the script is run
+# again before the merge.
 
 mock_provider "google" {
   mock_data "google_project" {

@@ -7,7 +7,7 @@
 # and tutor read the keys for eval through (R120 spec; R20). It also makes and keeps the operator's
 # bucket and the bucket of the scans of consents: their settings and lifecycle rules, the custom
 # roles granted in them, the two upload service accounts and the whole policy of each bucket (R28;
-# the 2026-11-13 amendment to R13). Everything else is the configuration's, and CI applies it.
+# R13). Everything else is the configuration's, and CI applies it.
 #
 # Safe to run again: every step looks before it makes, and what is written here is brought back
 # where it has drifted — the provider's condition, the custom roles' permissions, what the
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 # gcloud names in its errors the account it runs as, the operator's own, spelled as Google keeps it,
-# capitals and all; a member it was given or is taking back, a person this run no longer names among
+# capitals and all; a member it was given or is taking back, a person this run does not name among
 # them; and the billing account. A refusal is the likeliest thing for it to say here. So all the
 # script writes to stderr goes through one filter, which replaces any address of a person, in any
 # case, and any billing account's id; a service account's address, which is no person's, stays.
@@ -215,7 +215,7 @@ billing="${TF_VAR_billing_account:-}"
 # by a file of the repository (R28): the measurement organizer, the eval-set organizer, and the
 # operator, who lists and reads the scans of consents. A variable not set is a refusal, since a run
 # from a shell that lacks it would take that person's access away; none means no binding for them.
-# Today all three are the author (R139 spec). The address of the alerts, TF_VAR_operator_email, is
+# One person may be all three (R139 spec). The address of the alerts, TF_VAR_operator_email, is
 # not reused: it may be a list, not an account. An address is never printed, not even in a refusal.
 person() {
     local name="$1" who="$2" value
@@ -261,7 +261,7 @@ deployer_permissions=(
 # Firebase Hosting Admin less firebasehosting.sites.create and .delete, so that the site that is
 # app's address cannot be made anew or deleted by the publisher (R12), and less
 # resourcemanager.projects.list, which a role of a project cannot hold: IAM refuses it as "not
-# valid" there (T23).
+# valid" there.
 publisher_role=hostingPublisher
 publisher_permissions=(
     firebase.clients.get
@@ -286,9 +286,9 @@ sign_in_permissions=(
 )
 
 # The roles of the operator's bucket and of the scans' bucket, which this script alone grants, in
-# the buckets' own policies (R28). Each organizer lists the whole operator's bucket, as a list is
-# granted on the bucket and no condition on names narrows it (sources 10.2); what they read, write
-# and erase, roles/storage.objectUser grants them under a condition on their prefixes.
+# the buckets' own policies. Each organizer lists the whole operator's bucket, as a list is granted
+# on the bucket and no condition on names narrows it; what they read, write and erase,
+# roles/storage.objectUser grants them under a condition on their prefixes (R28).
 lister_role=operatorBucketLister
 lister_permissions=(
     storage.objects.list
@@ -296,7 +296,7 @@ lister_permissions=(
 
 # api's own identity on the scans' prefix: it puts each scan under a new name and erases one by a
 # name from its database, and reads and lists none; an insert that overwrites nothing needs no more
-# (sources 10.2, 10.5).
+# (R28).
 consent_writer_role=consentFormsWriter
 consent_writer_permissions=(
     storage.objects.create
@@ -315,9 +315,9 @@ uploader_permissions=(
 # Enumerated rather than Owner: enough to make everything the configuration describes, and nothing
 # beyond this project. Each line is a role and the types of resource and data in tofu/ it is held
 # for, and just tf-check refuses a type of the configuration that no line names, or a line that
-# names a type no longer there. The pools and their providers are not among them: what the identity
-# signs in through is not its to change, and no condition of IAM narrows a right over pools to one,
-# so this script makes both pools. Nor is iam.roleAdmin (above).
+# names a type the configuration does not have. The pools and their providers are not among them:
+# what the identity signs in through is not its to change, and no condition of IAM narrows a right
+# over pools to one, so this script makes both pools. Nor is iam.roleAdmin (above).
 project_roles=(
     "roles/serviceusage.serviceUsageAdmin google_project_service"
     "roles/browser data.google_project"
@@ -343,8 +343,7 @@ billing_roles=(
 # Who holds what in the project may be changed for two roles alone, the publisher's and api's of
 # sign-in: without the condition this role would make the identity the project's owner in all but
 # name. The audit config of Secret Manager's reads is written by the same request, and changes no
-# role binding, which the condition counts: by Google's words for the attribute, and the apply of T59
-# wrote it under the condition (sources 2.6; R13).
+# role binding, which is all the condition counts (R13).
 admin_roles=(
     "roles/resourcemanager.projectIamAdmin google_project_iam_member google_project_iam_audit_config"
 )
@@ -462,9 +461,9 @@ fi
 # Without the first six nothing below can be made, and they are why this script exists rather than
 # one more file of the configuration. Observability is here because its settings refuse requests
 # for a while after the API is enabled, so it goes on long before the apply that says where the
-# traces are kept (canvas-api). The last four are the services the custom roles name permissions
-# of: a permission "might not be available for use in custom roles if you have not enabled the API
-# for the service" (IAM, Create and manage custom roles).
+# traces are kept. The last four are the services the custom roles name permissions of: a
+# permission "might not be available for use in custom roles if you have not enabled the API for
+# the service" (IAM, Create and manage custom roles).
 echo "==> the APIs this script and the first apply need"
 retry gcloud services enable \
     serviceusage.googleapis.com \
@@ -577,8 +576,7 @@ member="serviceAccount:${service_account}"
 # Which version of a policy gcloud reads it chooses itself: "These tools specify the version
 # automatically" (IAM, Allow policies). In version 3 a binding under a condition carries its
 # expression; in version 1 IAM "appends the string _withcond_ to the role name, followed by a hash
-# value", and gives no condition. So the IAM admin role is matched as a prefix, as canvas-api matched
-# it, and the first run checks that the condition comes back (T23).
+# value", and gives no condition. So the IAM admin role is matched as a prefix.
 read_project_policy() {
     retry_read gcloud projects get-iam-policy "$project" \
         --flatten='bindings[].members' \
@@ -665,7 +663,7 @@ echo "    ${admin_role}, for the publisher's role and api's of sign-in alone"
 # who may act as them is the right to act as them, for each of them. So none of the project's own
 # service accounts may hold Owner or Editor, through which acting as it would reach past every limit
 # above — the default one of Compute Engine and of App Engine among them, which Google grants
-# Editor on its own where no organization says otherwise, and this project has none (Д3). The
+# Editor on its own where no organization says otherwise, and this project has none. The
 # configuration never enables Compute Engine or App Engine; this takes the role back from any that
 # holds it at each run, and an account given one between two runs holds it until the next (R13).
 # Google's own service agents are not the project's accounts and are left alone.
@@ -708,8 +706,7 @@ echo "    ${borrower##*/subject/}"
 # -- the operator's buckets (R28) -------------------------------------------------
 #
 # The policy of a bucket is one resource, and the configuration would grant it at each apply of CI,
-# so the buckets and all their access are made here, as the pools and the custom roles are (the
-# 2026-11-13 amendment to R13). How they are built and why is docs/architecture.md, section 3.7.
+# so the buckets and all their access are made here, as the pools and the custom roles are (R13).
 
 # A member of a policy as the script names it in what it prints: a person by what they are, never
 # by their address, also once their account is deleted.
@@ -731,10 +728,10 @@ shown() {
 # its commas would split it on the command line. Which version of the policy gcloud reads it chooses
 # itself (R13); in version 1 a binding under a condition would read as a role named
 # <role>_withcond_<hash>, not given, and taking it back by that name would fail and stop the script
-# rather than pass by it. On the project it reads a bucket's conditions as they are (T49). A member
-# is compared in any case: IAM keeps a person's address as Google spells the account, capitals and
-# all, and this script takes it in lower case, so that a run would otherwise take each person's
-# binding back and grant it again (T49). One is taken back as IAM spells it.
+# rather than pass by it. On the project it reads a bucket's conditions as they are. A member is
+# compared in any case: IAM keeps a person's address as Google spells the account, capitals and all,
+# and this script takes it in lower case, so that a run would otherwise take each person's binding
+# back and grant it again. One is taken back as IAM spells it.
 #   keep_policy bucket <name> <bindings>...
 #   keep_policy account <email> <bindings>...
 keep_policy() {
@@ -799,11 +796,11 @@ under() {
 
 # A bucket of learners' files, made, or brought back to its settings: in the region, of the class
 # Standard, with uniform access, public access prevention enforced, no soft delete, no object
-# versions and no CORS (R28; sources 10.3, 10.7). It is the project's own or none: names are
-# global, and a bucket of the name in another project, the operator's own among them, would get
-# these rules and this policy over its files, so it is looked for among the project's buckets, and
-# the create of a name taken elsewhere is refused and stops the script. Its place cannot change once
-# it is made, so a bucket of the project found in another place stops the script too.
+# versions and no CORS (R28). It is the project's own or none: names are global, and a bucket of
+# the name in another project, the operator's own among them, would get these rules and this
+# policy over its files, so it is looked for among the project's buckets, and the create of a name
+# taken elsewhere is refused and stops the script. Its place cannot change once it is made, so a
+# bucket of the project found in another place stops the script too.
 at_bucket=""
 # grep reads the whole list, not stopping at the name: under pipefail a gcloud cut off by an early
 # exit would fail the pipeline, and the bucket found would read as none.
@@ -840,11 +837,10 @@ data_bucket() {
     if [[ -n "$lifecycle" ]]; then echo "    its lifecycle rules"; else echo "    no lifecycle rule"; fi
 }
 
-# The lifecycle of the operator's bucket, docs/architecture.md, section 3.7. Rules of one action
-# hold where any of them matches, and a rule's conditions where all of them do (sources 10.7). The
-# files of a session are erased by their age, as nobody rewrites one; what an organizer may rewrite,
-# by the Custom-Time the organizer's tool sets: two years are at least 730 days and five years at
-# most 1827, and the link adds up to half a day to the session (sources 10.3).
+# Rules of one action hold where any of them matches, and a rule's conditions where all of them do.
+# The files of a session are erased by their age, as nobody rewrites one; what an organizer may
+# rewrite, by the Custom-Time the organizer's tool sets: two years are at least 730 days and five
+# years at most 1827, and the link adds up to half a day to the session (R28).
 cat > "$work/lifecycle.json" << 'LIFECYCLE'
 {
   "lifecycle": {
@@ -861,13 +857,13 @@ cat > "$work/lifecycle.json" << 'LIFECYCLE'
 LIFECYCLE
 
 # The scans have no rule: a scan's period is its consent's and five years, and api's sweep erases it
-# (R116, R136 spec).
+# (R116 spec, R136 spec).
 data_bucket "$operator_bucket" "$work/lifecycle.json"
 data_bucket "$consent_forms_bucket" ""
 
 # The service accounts an upload link is signed as, one per organizer, so that one's link does not
 # reach the other's prefixes (R28). Each holds nothing on the project, and its own policy lends it to
-# its organizer alone, by the Token Creator, which signs blobs (sources 10.2).
+# its organizer alone, by the Token Creator, which signs blobs.
 at_account=""
 upload_account_exists() { gcloud iam service-accounts describe "${at_account}@${project}.iam.gserviceaccount.com" --project="$project"; }
 make_upload_account() {
@@ -919,11 +915,11 @@ fi
 custom="projects/${project}/roles"
 # Each bucket keeps one of the bindings Cloud Storage gives a new bucket: the project's owners, as
 # legacyBucketOwner. The basic role Owner holds no storage.buckets.get, update, getIamPolicy or
-# setIamPolicy of its own, only through this binding (sources 10.9), so a policy without it would
-# shut out whoever runs this script, the operator, who could then neither keep the bucket nor give
-# its access back; the first run on the project did so (T49). The role reads no object: it lists
-# them, creates and erases them, and keeps the bucket and its policy. The other bindings of a new
-# bucket, of the project's editors and viewers and the owners' object roles, are taken back.
+# setIamPolicy of its own, only through this binding, so a policy without it would shut out whoever
+# runs this script, the operator, who could then neither keep the bucket nor give its access back
+# (R28). The role reads no object: it lists them, creates and erases them, and keeps the bucket and
+# its policy. The other bindings of a new bucket, of the project's editors and viewers and the
+# owners' object roles, are taken back.
 owners="$(binding roles/storage.legacyBucketOwner "projectOwner:${project}" "" "" "roles/storage.legacyBucketOwner of the project's owners")"
 operator_bindings=("$owners")
 if [[ "$measure_organizer" != none ]]; then

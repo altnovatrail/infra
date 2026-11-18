@@ -1,5 +1,5 @@
-# Sign-in in the platform's project as R16 decided it, checked against mock providers: no
-# credential, no call to Google.
+# Sign-in in the platform's project, checked against mock providers: no credential, no call to
+# Google (R16).
 
 mock_provider "google" {
   mock_data "google_project" {

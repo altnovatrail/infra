@@ -1,14 +1,9 @@
-# Sign-in in the platform's project: Identity Platform, which Firebase Authentication runs on, and
-# its settings (R16). Firebase Authentication's settings are written by configuration only through
-# it: the resource below "enable[s] Google Cloud Identity Platform (GCIP) (which is the backend for
-# Firebase Authentication)" (Firebase, Get started with Terraform and Firebase). The step cannot be
-# undone, and this resource is never deleted in Google Cloud: a destroy only forgets it.
+# Firebase Authentication's settings are written by configuration only through Identity Platform,
+# which it runs on. Turning it on cannot be undone, and a destroy only forgets this resource (R16).
 #
-# Sign-in with Google itself is not here. Its OAuth client and consent screen can no longer be made
-# by any API, and the provider's resource for it would keep the client's secret in the state in
-# plain text, so the operator turns it on in Firebase's console once, after the first apply
-# (architecture 3.3). What app and api ask of sign-in is Google's window and nothing else
-# (R03 api; R09 app).
+# Sign-in with Google itself is not here: its OAuth client and consent screen cannot be made by any
+# API, and the provider's resource for it would keep the client's secret in the state in plain
+# text, so the operator turns it on in Firebase's console once, after the first apply (R16).
 
 resource "google_identity_platform_config" "this" {
   project = var.project_id
@@ -42,7 +37,7 @@ resource "google_identity_platform_config" "this" {
   }
 
   # Activity logging writes every request of sign-in; it stays off, and every sink excludes it all
-  # the same (R07 and its 2026-11-09 amendment).
+  # the same (R07).
   monitoring {
     request_logging {
       enabled = false

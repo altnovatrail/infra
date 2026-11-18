@@ -1,5 +1,5 @@
-# The logs and the traces as R04 and R07 decided them, checked against mock providers, as the
-# configuration's other tests are: no credential, no call to Google. The values are synthetic.
+# The logs and the traces, checked against mock providers, as the configuration's other tests are:
+# no credential, no call to Google (R04, R07). The values are synthetic.
 
 mock_provider "google" {
   mock_data "google_project" {
@@ -47,7 +47,7 @@ run "every_sink_excludes_what_the_platform_keeps_none_of" {
 
 # Of the Data Access audit, the reads of Secret Manager's versions alone are on, and the exclusion
 # lets through those reads of that one service and nothing else, so a breach shows who read a
-# connection string (R07, amended 2026-11-17; sources 2.6).
+# connection string (R07).
 run "the_reads_of_the_secrets_alone_are_audited_and_kept" {
   command = plan
 
@@ -118,7 +118,7 @@ run "the_logs_are_kept_30_days_in_the_region" {
   }
 }
 
-# The place _Trace is made in, with the first trace, is the region (R04, amended 2026-11-09).
+# The place _Trace is made in, with the first trace, is the region (R04).
 run "traces_are_kept_in_the_region" {
   command = plan
 

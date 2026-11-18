@@ -1,6 +1,6 @@
 # The alerts on Cloud Run's built-in metrics, which Cloud Monitoring keeps by itself and at no
-# charge (R07). The alerts themselves are charged from September 1, 2027: $0.35 a month for each
-# metric a condition names, one here in each, and $0.50 a million points its query returns.
+# charge (R07). The alerts themselves are charged by each metric a condition names and the points
+# its query returns, so each condition names one.
 #
 # The spend alert hears of a burst only once Billing has counted it, hours later; these read the
 # platform's own count of api's requests and mail the operator while it lasts and again once it is
@@ -115,10 +115,9 @@ resource "google_monitoring_alert_policy" "api" {
 # picks up what it left (README api). A pass that fails day after day leaves the deletions and the
 # terms of retention standing, with nobody told; this mails the operator at the first. It reads
 # Cloud Run's own count of a job's completed executions by their result: every result but
-# "succeeded". Google's list of metrics names the label and not its values. On the project, Cloud
-# Run wrote "succeeded" for the deployment's jobs and for the first run of sweep by the clock, and
-# "failed" for a run of api-migrate (T42, T43). Matching what is not a success, a value spelled
-# otherwise mails too many rather than none. One metric, charged as the two above.
+# "succeeded". Google's list of metrics names the label and not its values; on the project Cloud
+# Run wrote "succeeded" and "failed". Matching what is not a success, a value spelled otherwise
+# mails too many rather than none (R07).
 locals {
   # The names of the jobs by the clock, as Cloud Run knows them.
   api_clock_job_names = [for name in keys(local.api_scheduled_jobs) : google_cloud_run_v2_job.api[name].name]
@@ -185,16 +184,16 @@ resource "google_monitoring_alert_policy" "api_jobs" {
 # A job by the clock that did not run at all: Cloud Scheduler could not call it — its account's
 # right, the job's address —, the schedule is paused, or Cloud Scheduler failed. No execution writes
 # no point, so the alert above stays silent; Cloud Scheduler has no metric of its own and retries no
-# failed call (the 2026-11-13 amendment to R07). This counts each job's executions whatever their
-# result, over the last 25 hours, the longest window an alert may roll, and takes no data as the
-# condition met: a job that runs every day, and completes within the hour, always has a point in it,
-# and a day with no run empties it about an hour after the run it missed. A condition on absence
-# waits 23.5 hours at most, less than a day, and would open at each day's gap (T34). So a job by the
-# clock runs every day, and its timeout is under the hour (variables.tf). Each job is a condition of
-# its own, so that one job's points never stand for another's missing ones, and each is a metric
-# charged as the others. A job with no run yet has no data either: made, renamed or added, it may
-# mail before its first run. It mails only when the incident opens: Cloud Monitoring also closes
-# one that has had no data for a day more than auto_close, and a mail of that would read as a run.
+# failed call (R07). This counts each job's executions whatever their result over the last 25
+# hours, the longest window an alert may roll, and takes no data as the condition met: a job that
+# runs every day and completes within the hour always has a point in it, and a day with no run
+# empties it about an hour after the run it missed. A condition on absence waits 23.5 hours at
+# most, less than a day, and would open at each day's gap. So a job by the clock runs every day,
+# and its timeout is under the hour (variables.tf). Each job is a condition of its own, so that one
+# job's points never stand for another's missing ones. A job with no run yet has no data either:
+# made, renamed or added, it may mail before its first run. It mails only when the incident opens:
+# Cloud Monitoring also closes one that has had no data for a day more than auto_close, and a mail
+# of that would read as a run.
 resource "google_monitoring_alert_policy" "api_jobs_missed" {
   count = local.operator_named && length(local.api_scheduled_jobs) > 0 ? 1 : 0
 

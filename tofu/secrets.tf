@@ -1,11 +1,9 @@
-# The secrets the configuration makes. It makes the secret and never a value: the values arrive
-# from whoever holds them, never from a file of this repository (RULES.md, Hard rules).
+# The configuration makes each secret and never a value: the values arrive from whoever holds them,
+# never from a file of this repository. Every secret's replicas stay in the region (R04).
 #
-# The facts of the deployment for api's admission function: no secret is in them (R25 api), and a
-# secret is only the way to hand api's revision a file. The deployment adds each new facts.json as
-# a new version and mounts that exact version as a volume, with its path in
-# API_ADMISSION_FACTS_FILE (R05; the second 2026-11-08 amendment to R106 spec). Its replicas stay
-# in the region, as every secret's do (R04).
+# The deployment facts hold no secret (R25 api): a secret is only the way to hand api's revision a
+# file. The deployment adds each facts.json as a version and mounts that exact version (R05;
+# R106 spec).
 
 resource "google_secret_manager_secret" "admission_facts" {
   secret_id = "api-admission-facts"
@@ -29,11 +27,8 @@ resource "google_secret_manager_secret" "admission_facts" {
   depends_on = [google_project_service.enabled]
 }
 
-# The secrets api's service reads: the pooler's connection strings of its two databases,
-# api-database-url and api-openfga-database-url (README api). They are made with the configuration,
-# before any service: their values are put by whoever holds them, before the service is made. A job
-# that names one reads the same secret. Each is replicated to the region alone, and the
-# configuration never deletes one the serving revision mounts.
+# Made before any service, so that whoever holds the values can put them before the service is
+# made; a job that names one reads the same secret. Never deleted: the serving revision mounts them.
 resource "google_secret_manager_secret" "api_service" {
   for_each = local.api_service_secret_ids
 
@@ -56,11 +51,8 @@ resource "google_secret_manager_secret" "api_service" {
   depends_on = [google_project_service.enabled]
 }
 
-# The secrets api's jobs read as files, one for every id the list of jobs names: the direct
-# connection strings of api's two databases for migrate, to begin with (R11). Their values are put
-# by whoever holds them; each is replicated to the region alone. A secret the list stops naming is
-# let go rather than deleted: the configuration forgets it and its value stays, for whoever holds
-# it to delete.
+# One for every id the list of jobs names (R11). A secret the list stops naming is let go rather
+# than deleted: its value stays, for whoever holds it to delete.
 resource "google_secret_manager_secret" "api_job" {
   for_each = local.api_job_secret_ids
 
@@ -83,10 +75,10 @@ resource "google_secret_manager_secret" "api_job" {
   depends_on = [google_project_service.enabled]
 }
 
-# The platform's keys for eval, one a provider, for the eval jobs of modules and tutor to read
-# (eval.tf; R120 spec; R20). Replicated to the region alone too: a regional secret is read only from
-# its region, and GitHub's runners are elsewhere. A provider the list stops naming is let
-# go rather than deleted: its value stays, for the author to delete.
+# The platform's keys for eval, one a provider (R20; R120 spec). A global secret with its replica in
+# the region, not a regional one: a regional secret is read only from its region, and GitHub's
+# runners are elsewhere. A provider the list stops naming is let go rather than deleted: its value
+# stays, for the author to delete.
 resource "google_secret_manager_secret" "eval" {
   for_each = local.eval_secrets
 
@@ -109,11 +101,9 @@ resource "google_secret_manager_secret" "eval" {
   depends_on = [google_project_service.enabled]
 }
 
-# The platform's key of Anthropic, which api's service reads as a file, by the exact version
-# api_anthropic_key_version names (R46 api; the 2026-11-16 amendment to R25). The operator puts the
-# value, by hand, before the merge that names its version; it never enters this repository. Made on
-# every deployment, a copy with no key among them: an empty secret opens nothing. Replicated to the
-# region alone, and never deleted: the serving revision mounts one of its versions.
+# The service reads the exact version api_anthropic_key_version names, which the operator puts by
+# hand before the merge that names it (R25; R46 api). Made on every copy, one with no key among them:
+# an empty secret opens nothing. Never deleted: the serving revision mounts one of its versions.
 resource "google_secret_manager_secret" "anthropic_key" {
   secret_id = "api-anthropic-key"
 

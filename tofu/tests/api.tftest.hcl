@@ -1,6 +1,6 @@
-# api's service, jobs and schedule, and the identities of api and of its deployment, as R11
-# decided them, checked against mock providers: no credential, no call to Google. The values are
-# synthetic, the image's digest among them.
+# api's service, jobs and schedule, and the identities of api and of its deployment, checked against
+# mock providers: no credential, no call to Google (R11). The values are synthetic, the image's
+# digest among them.
 
 mock_provider "google" {
   mock_data "google_project" {
@@ -164,7 +164,7 @@ run "the_service_is_made_with_the_first_image" {
       google_cloud_run_v2_service.api[0].template[0].containers[0].name == "api" &&
       alltrue([for job in google_cloud_run_v2_job.api : job.template[0].template[0].containers[0].name == "api"])
     )
-    error_message = "The container of the service and of every job is named api: gcloud's --update-secrets sets the facts' version in the volume of a named container only, and in an unnamed one makes a volume of its own (T24)."
+    error_message = "The container of the service and of every job is named api: gcloud's --update-secrets sets the facts' version in the volume of a named container only, and in an unnamed one makes a volume of its own."
   }
 
   assert {
@@ -379,7 +379,7 @@ run "after_runs_once_the_revision_takes_all_traffic" {
 }
 
 # A job that names a secret of the service reads that secret: the configuration makes no second
-# one of the same id, and makes the job's own as before.
+# one of the same id, and still makes the job's own.
 run "a_job_naming_a_service_secret_reads_the_services_own" {
   command = plan
 
@@ -470,10 +470,9 @@ run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
   }
 }
 
-# Platform AI on a deployment at the rung author, as on novatrail (the 2026-11-16 and 2026-11-17
-# amendments to R25): the rung author, the mode single and the catalog's list go to the service and
-# to the job of the check, and the key, an exact version of its secret, to the service alone, as its
-# second volume.
+# Platform AI on a deployment at the rung author: the rung author, the mode single and the catalog's
+# list go to the service and to the job of the check, and the key, an exact version of its secret,
+# to the service alone, as its second volume (R25).
 run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
   command = plan
 
@@ -538,9 +537,9 @@ run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
   }
 }
 
-# Handwriting read by Haiku alone (the second 2026-11-17 amendment to R25): the mode goes to the
-# service and to the job of the check at the rung full too (R88 api); at author, as on novatrail, the
-# run of the rung, the catalog and the key below checks it.
+# Handwriting read by Haiku alone: the mode goes to the service and to the job of the check at the
+# rung full too; at author, the run of the rung, the catalog and the key below checks it (R25;
+# R88 api).
 run "the_mode_single_reaches_the_service_and_the_check" {
   command = plan
 
@@ -689,8 +688,8 @@ run "a_job_with_a_schedule_runs_by_the_clock" {
   }
 }
 
-# The deployment's way in: one GitHub environment of the repository, and the rights the steps of
-# R05 need, each on its own resource.
+# The deployment's way in: one GitHub environment of the repository, and the rights the
+# deployment's steps need, each on its own resource (R05).
 run "the_deployment_holds_what_its_steps_need_and_no_more" {
   command = plan
 
@@ -824,9 +823,8 @@ run "a_job_timeout_past_168_hours_is_refused" {
   expect_failures = [var.api_jobs]
 }
 
-# The alert on a job by the clock that did not run looks 25 hours back (R07): a job that runs
-# less often than every day, or may run longer than 3000s, would empty the window with nothing
-# missed.
+# The alert on a job by the clock that did not run looks 25 hours back: a job that runs less often
+# than every day, or may run longer than 3000s, would empty the window with nothing missed (R07).
 run "a_job_by_the_clock_not_every_day_is_refused" {
   command = plan
 
@@ -906,8 +904,8 @@ run "a_request_timeout_past_an_hour_is_refused" {
 }
 
 # Each job's part in api's deployment, which the deployment reads from the configuration's outputs
-# with the service's name and the file of the facts (R15): migrate migrates; a job of the clock has
-# none.
+# with the service's name and the file of the facts: migrate migrates; a job of the clock has none
+# (R15).
 run "the_deployment_reads_the_jobs_parts_from_the_outputs" {
   command = plan
 
