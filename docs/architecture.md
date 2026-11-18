@@ -76,11 +76,11 @@ What this changes in the card 3.11 spec is R23. The steps of the guide that nobo
 
 ### 2.7. Signing the upload link to the operator's bucket (R125 spec)
 
-Decided: R28; section 3.7. The link is a V4 POST policy, with conditions on the object's name and size in the signature itself, signed through IAM as an upload service account, with no key: without a key a signature lives at most 12 hours (sources 10.1; R125, R126 spec). There are no keys of service accounts in files (RULES.md, Hard rules).
+Decided: R28; section 3.7. The link is a V4 POST policy, with conditions on the object's name and size in the signature itself, signed through IAM as an upload service account, with no key: without a key a signature lives at most 12 hours (sources 10.1; R125, R126 spec). There are no keys of service accounts in files, and there will be none (RULES.md, Hard rules).
 
 ### 2.8. Auditing the reads of the secrets
 
-Beyond the card's list; found by the procedure for a breach (R27). Decided: R07; section 3.4. The module turns on `DATA_READ` of Secret Manager, and each sink keeps its version reads 30 days in the bucket of `us-east4`: in a breach the logs show who read a version — among them the four connection strings to the databases of `api` in Neon, which open learners' data —, not only who added or disabled one and who changed a right on a secret, which is Admin Activity (sources 2.6).
+Beyond the card's list; found by the procedure for a breach (R27). Decided: R07, option (a); section 3.4. The options: (a) Data Access, `DATA_READ`, for `secretmanager.googleapis.com` alone, which the exclusion `data-access-audit` of each sink lets through; (b) none, and the procedure says what the logs do not show. An entry holds the reader's email or principal and `callerIp`, and the readers are `api-run`, CI and the operator, never a learner. The module turns on `DATA_READ` of Secret Manager, and each sink keeps its version reads 30 days in the bucket of `us-east4`: in a breach the logs show who read a version — among them the four connection strings to the databases of `api` in Neon, which open learners' data —, not only who added or disabled one and who changed a right on a secret, which is Admin Activity (sources 2.6).
 
 ## 3. How it is built
 
@@ -249,7 +249,7 @@ A deployment that did not get through is repeated by rerunning its jobs, or fixe
 
 **The first deployment of a copy** — by the order of R11 and SELF-HOSTING.md, "Deploying" (R25):
 1. a pull request with the list — the image of `api` in `images`;
-2. the four connection strings of the Neon databases — as secret versions, by the operator's hand in Cloud Shell, each with `sslmode=verify-full`, without which `api` does not take it; a pull request with `api_image` — the jobs;
+2. the four connection strings of the Neon databases — as secret versions, by the operator's hand in Cloud Shell, each with `sslmode=verify-full`, which `api` asks for, in place of Neon's `sslmode=require` (SELF-HOSTING.md, «Deploying»); a pull request with `api_image` — the jobs;
 3. `Deploy` with **api** — `check` and `migrate`;
 4. a pull request with `api_serving = true` — the service, the schedule of `sweep` and the release of `app`;
 5. `Deploy` with **api** — the revision, all the traffic to it, and `after`;
@@ -326,7 +326,7 @@ The price is by monthly active users: sign-in through Google is free up to 50,00
 4. do not touch the authorized domains in the console: the module holds them, and the next `apply` removes one added by hand;
 5. `tofu plan` after the step shows no changes: the step changes the sign-in provider, not the settings the module holds.
 
-The sign-in window opens under another Google account too (R16). Self-hosting does the same step in its own project.
+A learner signs in through the window with their own Google account, not only with the operator's (R16). Self-hosting does the same step in its own project.
 
 ### 3.4. Logs and traces
 
@@ -382,13 +382,13 @@ The project sets up no log-based metrics of its own, where the address would bec
 - the values of the label `result` — `succeeded` and `failed`, as the alert expects (R07);
 - a run by the clock: `api-scheduler` calls `sweep` at 09:00 UTC, the execution passes, and `completed_execution_count` writes `succeeded`; Cloud Scheduler's log of its attempts is as in the inventory above; Cloud Scheduler has no metric of its own, and a failed call is not retried: `retryConfig` is empty (R07);
 - the window of 25 hours does not open the alert between two runs on time, through a morning when the last point is nearly 24 hours old (sources 3.14; R07);
-- the reads of the secrets: the `apply` writes the audit config under the condition of `infra-config`'s `projectIamAdmin`, and the bucket of `us-east4` holds entries of `AccessSecretVersion` of `api-run`, of the service's secrets, `api-anthropic-key` among them, each with `callerIp` `private` and about 1.8 KB (sources 7.1 for the price of logs); no entry of another service passes `data-access-audit`, and `api-deploy` and `infra-config` deploy and apply without reading a version (R07).
+- the reads of the secrets: the `apply` writes the audit config under the condition of `infra-config`'s `projectIamAdmin`, and the bucket of `us-east4` holds entries of `AccessSecretVersion` of `api-run`, of the service's secrets, `api-anthropic-key` among them, each with `callerIp` `private` and about 1.8 KB (sources 7.1 for the price of logs); no entry of another service passes `data-access-audit`, and no entry of `api-deploy` or `infra-config` was among them, though they deployed and applied (R07; Д29).
 
 **Not checked:**
-- the attributes of the traces Cloud Run writes itself: there are no traces yet (Д17);
+- the attributes of the traces Cloud Run writes itself, until the first trace (Д17);
 - what Cloud Scheduler writes for a failed attempt: none has failed yet; the alert on a run that did not happen does not read it (R07);
 - that a missed day opens the alert on a run that did not happen: no run was missed, and the schedule was not paused, since a day's pause would hold back the deletions `sweep` finishes (R07; Д21);
-- a read of a secret by the operator, by CI or by an eval job: none has been in the bucket (R07; Д29).
+- what an entry of a read by the operator, by CI or by an eval job holds, until one is in the bucket (R07; Д29).
 
 ### 3.5. Self-hosting and the local run
 
@@ -560,7 +560,7 @@ A Custom-Time cannot decrease, but a rewrite of the object resets it. A form wit
 | the rung | `author`; the default `full` | `admission.rung` of `deploy/production.json` and `api_admission_rung` of `tofu/production.auto.tfvars`, held equal by the list's check (R05) |
 | the facts | what holds for `novatrail` alone: Anthropic's data processing agreement, for adults (R25; R149 spec) | `deploy/production/facts.json` (section 3.2) |
 | the key | the secret `api-anthropic-key`, one exact version, mounted in the service alone as `/etc/api/anthropic/key`, its path in `API_ANTHROPIC_KEY_FILE` (R46 api) | `api_anthropic_key_version`; the value — the operator, by hand (R11) |
-| the catalog | the platform's list of modules (R150 spec; R25) | `api_catalog_modules`, `API_CATALOG_MODULES` of the service and of the jobs `check` (R150 spec; R79 api) |
+| the catalog | the modules `tofu/production.auto.tfvars` names, `novatrail/english-essays` among them (R150 spec; R25) | `api_catalog_modules`, `API_CATALOG_MODULES` of the service and of the jobs `check` (R150 spec; R79 api) |
 | the mode of reading | `single`, one reading by one model for everyone, in place of the pair of R68 spec; the default `pair` (R25) | `api_reading_mode`, `API_READING_MODE` of the service and of the jobs `check` (R88 api) |
 
 **The order of opening it:**
