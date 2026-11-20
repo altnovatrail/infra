@@ -329,14 +329,14 @@ variable "api_memory" {
 }
 
 variable "api_request_timeout" {
-  description = "How long a request to api may take before the platform cuts it off: api's own write timeout, API_HTTP_WRITE_TIMEOUT, is 60s."
+  description = "How long a request to api may take before the platform cuts it off: as long as api's own write timeout, API_HTTP_WRITE_TIMEOUT, at its default, which is over the deadline of api's longest methods (R11)."
   type        = string
-  default     = "60s"
+  default     = "120s"
   nullable    = false
 
   validation {
     condition     = can(regex("^[1-9][0-9]*s$", var.api_request_timeout)) && try(tonumber(trimsuffix(var.api_request_timeout, "s")) <= 3600, false)
-    error_message = "api_request_timeout is a whole number of seconds up to 3600s, Cloud Run's limit, such as 60s."
+    error_message = "api_request_timeout is a whole number of seconds up to 3600s, Cloud Run's limit, such as 120s."
   }
 }
 
