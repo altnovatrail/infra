@@ -224,6 +224,10 @@ The project showed it, 2026-11-15 (T49), by the Monitoring API's `timeSeries` an
 - [Metrics and logs reference](https://neon.com/docs/reference/metrics-logs), `updatedOn: '2026-08-07T13:46:01.605Z'`, «Postgres logs»: "When log export is enabled, Postgres sends its standard server log output to the integration"; `log_connections` `on` — "`connection received`, `connection authenticated`, and `connection authorized` lines for each new connection"; `log_disconnections` `on` — "A line for each closed connection, including session duration";
 - [HIPAA Compliance](https://neon.com/docs/security/hipaa), `updatedOn: '2026-10-30T18:05:21.319Z'`: "a self-serve feature available to customers on the Scale plan"; its audit trail is "Neon Console and API audit logs" and "Postgres audit logs … Logged using the pgAudit extension"; "Self-serve access to HIPAA audit logs is currently not supported. Access to audit logs can be requested by raising a Support request".
 
+### 3.17. The request timeout of `api`
+
+(R11; T91), read 2026-11-20 — `api` [v0.1.72](https://github.com/altnovatrail/api/blob/v0.1.72/docs/build.md), `docs/build.md`, the table of the configuration: `API_HTTP_WRITE_TIMEOUT` — "`120s`", "how long the server may take to answer"; `API_PAPER_REQUEST_TIMEOUT` — "`90s`", "the same of `FindTasks` and `SubmitWork`, whose calls of a task from paper ask up to three models in turn, under `API_HTTP_WRITE_TIMEOUT` too". The write timeout of sources 3.6, `60s`, is that of `api` v0.1.3.
+
 ## 4. The hosting of the build of `app` and sign-in
 
 ### 4.1. Firebase Hosting

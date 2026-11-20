@@ -329,7 +329,7 @@ variable "api_memory" {
 }
 
 variable "api_request_timeout" {
-  description = "How long a request to api may take before the platform cuts it off: api's own write timeout, API_HTTP_WRITE_TIMEOUT, is 120s, over the 90s of a task from paper (R98 api)."
+  description = "How long a request to api may take before the platform cuts it off: as long as api's own write timeout, API_HTTP_WRITE_TIMEOUT, at its default, which is over the deadline of api's longest methods (R11)."
   type        = string
   default     = "120s"
   nullable    = false
