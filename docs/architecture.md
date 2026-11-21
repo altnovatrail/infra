@@ -301,7 +301,7 @@ Rollback — by R05, a pull request with the former block `app`; a rollback by a
 
 The default site answers at two addresses, `web.app` and `firebaseapp.com`, with the same content. The origin of `app` is only `web.app`: the CORS of `api` and `/deployment.json` name it. The authorized domains of the Firebase project (Т-19) are it and `firebaseapp.com`, as the module's full list (R16).
 
-**The samples page of `canvas`** does not move to the hosting yet. It will move as a separate site of the project with its own origin when the author decides so — Google is a processor for Hosting (R128 spec): the sign-out of `app` erases the storage of its origin, and Firebase's logs would then also get the IP addresses of the devices on which children's samples are made (R25 spec).
+**The samples page of `canvas`** does not move to the hosting yet. It will move as a separate site of the project with its own origin when the author decides so — Google is a processor for Hosting (R128 spec): "Erase everything on this device" and a sign-in of another account in `app` erase the web storage of its origin, while its sign-out erases nothing (architecture 3.7 app), and Firebase's logs would then also get the IP addresses of the devices on which children's samples are made (R25 spec).
 
 **In the module** (R12):
 - `tofu/firebase.tf` — Firebase in the project and the Hosting site with the project's ID, `deletion_policy = "PREVENT"`; the Web App `app`, also `PREVENT`, and the output `app_sign_in` — the block `signIn` for `/deployment.json`: `service`, `apiKey`, `authDomain`, `projectId`, `appId` (R17). The author writes the file, and the review of the pull request sees it (R05);
