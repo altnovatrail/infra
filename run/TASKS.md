@@ -7,15 +7,6 @@ Open tasks outside the current epic, each as its body, in Russian (R154 spec, R1
 
 ## Tasks outside an epic
 
-#### T96. Ссылки по R171 spec: архитектура, BREACH.md, SELF-HOSTING.md, указатель
-
-- **Цель:** `docs/architecture.md`, [BREACH.md](../BREACH.md), [SELF-HOSTING.md](../SELF-HOSTING.md) и [docs/README.md](../docs/README.md) ссылаются по R171 spec.
-- **Почему:** вторая часть T95 по шагу 9 её тела; правила, замер и шаги — в T95, архив E6.
-- **Кто:** Claude. **План:** —. **Зависит от:** T95.
-- **Сделать:** шаги 3–8 T95 для этих четырёх файлов: механические места — `docs-check-repo` с ключом `"citations": true`, поставленным только на время проверки; остальное — `grep -nE` по шаблону `measurements 1.18 spec`. Ключ в `docs-budgets.json` не коммитить.
-- **Как проверить:** `docs-check-repo` без ключа — зелёный, с ключом — ни одного места в этих файлах; `/code-review high`, один круг; в отчёте — ссылок было и стало по командам `measurements 1.18 spec`.
-- **Разделы:** как у T95.
-
 #### T97. Ссылки по R171 spec: `docs/sources.md` и `docs/measurements.md`
 
 - **Цель:** `docs/sources.md` и `docs/measurements.md` ссылаются по R171 spec; начало `docs/sources.md` — по заготовке `spec/repo-template/files/docs/sources.md`.

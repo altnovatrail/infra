@@ -1,8 +1,8 @@
 # Self-hosting NovaTrail
 
-This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). This guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [section 12](#12-running-the-whole-platform-on-one-machine). An organizer who gives an upload link to the operator's bucket goes to [section 13](#13-upload-links-to-the-operators-bucket).
+This guide takes you from an empty Google Cloud account to your own copy of the NovaTrail platform, ready to deploy. It uses the same code the platform uses, with your own values. Why things are built the way they are is in [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md). This guide links to them only for the reasons behind a step. To run the whole platform from source on one machine, with no copy at all, go to [Running the whole platform on one machine](#12-running-the-whole-platform-on-one-machine). An organizer who gives an upload link to the operator's bucket goes to [Upload links to the operator's bucket](#13-upload-links-to-the-operators-bucket).
 
-> **Status, 2026-11-17.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. Section 12, a local run, is checked against the author's first run from source, on 2026-11-12. Section 13, the upload links, is held by tests on a stand-in for `gcloud`, and ran on the platform's project from 2026-11-13 to 2026-11-15: a page of the tool took uploads and was refused after 12 hours, and `time`, `withdraw` and `untimed` did what this section says; on 2026-11-17 a page already signed was refused at once when its upload role was taken, and uploaded again when the role came back (T60); no link has gone to an adult yet.
+> **Status, 2026-11-17.** Everything up to and including [Deploying](#9-deploying) has run on the platform's own project (`novatrail`), whose first deployment went on 2026-11-12, and is held by tests on a copy's values, except the steps the guide marks as not run or not checked. The local run is checked against the author's first run from source, on 2026-11-12. The upload links are held by tests on a stand-in for `gcloud`, and ran on the platform's project from 2026-11-13 to 2026-11-15: a page of the tool took uploads and was refused after 12 hours, and `time`, `withdraw` and `untimed` did what that part of the guide says; on 2026-11-17 a page already signed was refused at once when its upload role was taken, and uploaded again when the role came back; no link has gone to an adult yet.
 
 ## 1. What a copy is
 
@@ -13,15 +13,15 @@ A copy runs the same releases of `api` and `app` as the platform. They are downl
 - `tofu/ci.env` holds the two lines `bootstrap.sh` prints.
 - The `deploy/` directory holds your list of releases, your `/deployment.json`, your deployment facts and, if you have them, your own legal texts.
 
-The full table of what a copy sets and what every copy shares is in [docs/architecture.md](docs/architecture.md), section 3.5. Nothing of the platform's own deployment reaches a copy: no project, region, pool or repository number. `tofu/tests/copy.tftest.hcl` and the copy tests of `tofu/tests/bootstrap.test.mjs` and `tools/deploy/test/` hold that. The name NovaTrail does reach a copy, on purpose: it is the display name of the project `bootstrap.sh` makes, and Hosting's versions carry the label `deployment-tool: novatrail-infra`.
+The full table of what a copy sets and what every copy shares is in [docs/architecture.md](docs/architecture.md#35-self-hosting-and-the-local-run). Nothing of the platform's own deployment reaches a copy: no project, region, pool or repository number. `tofu/tests/copy.tftest.hcl` and the copy tests of `tofu/tests/bootstrap.test.mjs` and `tools/deploy/test/` hold that. The name NovaTrail does reach a copy, on purpose: it is the display name of the project `bootstrap.sh` makes, and Hosting's versions carry the label `deployment-tool: novatrail-infra`.
 
-**The main path is a fork of this repository with GitHub Actions**, which is how the platform runs. Every merge to `main` applies the configuration and deploys what changed, as the limited identity `infra-config` (R13, R18). [Without GitHub Actions](#10-without-github-actions) covers the other path.
+**The main path is a fork of this repository with GitHub Actions**, which is how the platform runs. Every merge to `main` applies the configuration and deploys what changed, as the limited identity `infra-config`. [Without GitHub Actions](#10-without-github-actions) covers the other path.
 
 ## 2. Before you start
 
 You need:
 
-- **A Google Cloud billing account.** Firebase calls a project with billing the Blaze plan. Before the first deployment the project should cost close to nothing. Its secrets have no versions, no service runs, and the rest stays within free tiers. Your budget alert ([section 3](#3-your-values)) mails you when it doesn't. The prices, as read on 2026-11-09 — check them again on the providers' pages:
+- **A Google Cloud billing account.** Firebase calls a project with billing the Blaze plan. Before the first deployment the project should cost close to nothing. Its secrets have no versions, no service runs, and the rest stays within free tiers. Your budget alert ([Your values](#3-your-values)) mails you when it doesn't. The prices, as read on 2026-11-09 — check them again on the providers' pages:
   - IAM and Workload Identity Federation: "All use of Identity and Access Management API is free of charge" ([IAM pricing](https://cloud.google.com/iam/pricing)).
   - Secret Manager: 6 active versions a month free, then $0.000082192 an hour per version ([pricing](https://cloud.google.com/secret-manager/pricing)).
   - Cloud Logging: the first 50 GiB a project a month free. Alerting: "$0.35 per month for each metric reference in an alerting policy", not charged until September 1, 2027 ([pricing](https://cloud.google.com/stackdriver/pricing)).
@@ -29,7 +29,7 @@ You need:
   - Firebase Hosting: 10 GB stored and 360 MB a day served free ([pricing](https://firebase.google.com/pricing)).
   - Artifact Registry: 0.5 GiB free ([pricing](https://cloud.google.com/artifact-registry/pricing)).
   - The state bucket is a few kilobytes in Cloud Storage ([pricing](https://cloud.google.com/storage/pricing)). The operator's two buckets hold scans and sample files, megabytes: Standard storage in `us-east4` is $0.023 per GiB a month, and the free tier covers only `us-west1`, `us-central1` and `us-east1`, as read on 2026-11-13.
-  - Once deployed, NovaTrail's own copy, with two learners and the daily `sweep`, cost about a cent a day in Google Cloud in November 2026, and its database stayed within Neon's Free plan, about 8.5 of its 100 CU-hours a month (R25).
+  - Once deployed, NovaTrail's own copy, with two learners and the daily `sweep`, cost about a cent a day in Google Cloud in November 2026, and its database stayed within Neon's Free plan, about 8.5 of its 100 CU-hours a month.
 - **A Google account that may create projects and link them to that billing account.**
 - **A fork of this repository on GitHub**, with Actions turned on, cloned with `--recurse-submodules`.
 - **The devcontainer.** Open the clone in VS Code and choose "Reopen in Container". It has OpenTofu, `just`, Node and the checks at the versions this repository pins.
@@ -45,7 +45,7 @@ If your billing account is a free trial, upgrade it to a paid account before the
 
 ## 3. Your values
 
-Your fork carries the platform's own `tofu/production.auto.tfvars`, `tofu/backend.hcl` and `tofu/ci.env`. **Replace all three** with yours in your first commit. Keep none of the platform's values: not its `api_image`, an image in the platform's own registry, nor `api_serving`, nor `eval_github_subject_prefixes`, nor the values of its platform AI — `api_admission_rung`, `api_catalog_modules`, `api_reading_mode` and `api_anthropic_key_version`, a version of a secret your project does not hold ([section 8](#8-your-list)). Until then, a push to your `main` runs `Deploy` against the platform's project, and it fails to sign in: the platform's pool admits only the platform's repository.
+Your fork carries the platform's own `tofu/production.auto.tfvars`, `tofu/backend.hcl` and `tofu/ci.env`. **Replace all three** with yours in your first commit. Keep none of the platform's values: not its `api_image`, an image in the platform's own registry, nor `api_serving`, nor `eval_github_subject_prefixes`, nor the values of its platform AI — `api_admission_rung`, `api_catalog_modules`, `api_reading_mode` and `api_anthropic_key_version`, a version of a secret your project does not hold ([Your list](#8-your-list)). Until then, a push to your `main` runs `Deploy` against the platform's project, and it fails to sign in: the platform's pool admits only the platform's repository.
 
 Write `tofu/production.auto.tfvars`. It is committed: nothing in it is a secret.
 
@@ -64,7 +64,7 @@ consent_forms_bucket = "acme-learning-1-consent-forms"
 ```
 
 - **`project_id`** — your new project's ID: 6 to 30 lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen. It is permanent, and it names your app's address `https://<project_id>.web.app` and its sign-in domain `<project_id>.firebaseapp.com`.
-- **`region`** — where everything regional lives: the services and jobs, the schedule of `sweep`, the images, the secrets' replicas, the logs and the traces. The platform's region is `us-east4`, chosen for its learners (R04). Yours is yours.
+- **`region`** — where everything regional lives: the services and jobs, the schedule of `sweep`, the images, the secrets' replicas, the logs and the traces. The platform's region is `us-east4`, chosen for its learners. Yours is yours.
 - **`budget_amount`, `budget_currency`** — a monthly spend alert, in whole units of your billing account's own currency. It is an alert, not a cap. `bootstrap.sh` refuses a currency other than the account's. It counts your charges before any credit but the free tier's, so a free trial's credit does not hide them.
 - **`workload_identity_pool_id`** — the federated pool your GitHub Actions sign in through: 4 to 32 lowercase letters, digits and hyphens, and not `github-eval`.
 - **`github_oidc_subject_prefix`** — how GitHub begins the subject of your fork's tokens. Print it with:
@@ -75,8 +75,8 @@ consent_forms_bucket = "acme-learning-1-consent-forms"
 
   It must read `repo:<owner>@<owner's number>/<repository>@<repository's number>`, and the pool admits tokens of these two numbers alone. If it prints another form, your repository does not put the numbers into its tokens' subject. GitHub's documentation on OIDC subject claims says how to turn that on; this guide has not checked the steps.
 - **`deploy_environment`, `hosting_environment`** — optional. They name the GitHub environments of api's deployment and of app's publisher, `production` and `production-hosting` by default. The configuration's own environment is always `production-config`.
-- **`operator_bucket`, `consent_forms_bucket`** — the two private buckets `bootstrap.sh` makes in your region (R28): the operator's bucket, where the organizers get the files of the samples page and the scans of their forms by an upload link, and the bucket of the scans of the parents' consent forms, which `api` writes: the configuration tells `api`'s service, `sweep` and `check` its name and `api`'s prefix in it, `consent-forms/`. Bucket names are global, so pick names nobody else has, two different ones, and neither the state bucket's.
-- **`eval_github_subject_prefixes`** — leave it out. The platform's keys for eval are the platform's own (R20). A copy has none.
+- **`operator_bucket`, `consent_forms_bucket`** — the two private buckets `bootstrap.sh` makes in your region: the operator's bucket, where the organizers get the files of the samples page and the scans of their forms by an upload link, and the bucket of the scans of the parents' consent forms, which `api` writes: the configuration tells `api`'s service, `sweep` and `check` its name and `api`'s prefix in it, `consent-forms/`. Bucket names are global, so pick names nobody else has, two different ones, and neither the state bucket's.
+- **`eval_github_subject_prefixes`** — leave it out. The platform's keys for eval are the platform's own. A copy has none.
 
 The other variables of `tofu/variables.tf` have defaults that fit a small copy.
 
@@ -89,14 +89,14 @@ prefix = "tofu"
 
 ## 4. Bootstrap
 
-`tofu/bootstrap.sh` makes once, with your own rights, what the configuration cannot make for itself (R13):
+`tofu/bootstrap.sh` makes once, with your own rights, what the configuration cannot make for itself:
 
 - the project and its link to the billing account;
 - the state bucket, versioned, in your region;
 - the federated pool and its GitHub provider;
 - the identity the configuration is applied as, `infra-config`, with exactly its roles;
 - six custom roles: three the configuration grants, three the buckets' policies grant;
-- the operator's bucket and the bucket of the scans of consents, in your region, of the class Standard, with uniform access, public access prevention enforced, no soft delete, no object versions and no CORS, and the operator's bucket with its lifecycle rules, which erase the files by their periods (R28);
+- the operator's bucket and the bucket of the scans of consents, in your region, of the class Standard, with uniform access, public access prevention enforced, no soft delete, no object versions and no CORS, and the operator's bucket with its lifecycle rules, which erase the files by their periods;
 - the two service accounts an upload link is signed as, `upload-measure` and `upload-eval-set`, each lent to its own organizer alone;
 - the whole access policy of each bucket: each organizer reads, writes and erases under their own prefixes and lists the operator's bucket, the operator reads the scans, `api`'s service account creates and erases scans under `consent-forms/` and reads none, and the project's owners keep each bucket and its policy, as a new bucket has it: the role Owner holds no right on a bucket of its own, so without this binding the script would shut out whoever runs it. The script takes back every other binding a new bucket comes with.
 
@@ -113,7 +113,7 @@ just bootstrap
 
 It is safe to run again: every step looks before it makes, and it brings back what drifted, the buckets' settings and policies among it. Run it again whenever `bootstrap.sh` or the values it reads change, before you merge, with the same three addresses.
 
-On a new copy `api`'s service account does not exist yet: the first apply makes it ([section 6](#6-first-apply)). The script then makes the bucket of the scans without its binding, and says so. Run it again after the first apply.
+On a new copy `api`'s service account does not exist yet: the first apply makes it ([First apply](#6-first-apply)). The script then makes the bucket of the scans without its binding, and says so. Run it again after the first apply.
 
 At the end it prints two lines. Neither is a secret:
 
@@ -134,9 +134,9 @@ In your fork's Settings → Environments, make three environments. Use the names
 | `production` (`deploy_environment`) | Selected branches and tags → `main` | none |
 | `production-hosting` (`hosting_environment`) | Selected branches and tags → `main` | none |
 
-`TF_VAR_operator_email` is the address the alerts on Cloud Run's metrics, and the budget's too, are mailed to, and the project's contact for Google's security notifications. Without it no alert on Cloud Run is made, the budget mails only the billing account's administrators and users, and for a project with no organization Google's documentation names nobody to get its security letters ([BREACH.md](BREACH.md), section 1). With it, the address gets those letters in place of anyone else: in an organization, its administrators no longer get the project's, so give an address they read too. Set the secrets with `gh secret set <name> --env production-config` so their values stay out of your shell's history. None of the environments asks for reviewers: the review of the pull request is the approval (R05).
+`TF_VAR_operator_email` is the address the alerts on Cloud Run's metrics, and the budget's too, are mailed to, and the project's contact for Google's security notifications. Without it no alert on Cloud Run is made, the budget mails only the billing account's administrators and users, and for a project with no organization Google's documentation names nobody to get its security letters ([BREACH.md](BREACH.md#1-what-counts-as-a-breach)). With it, the address gets those letters in place of anyone else: in an organization, its administrators no longer get the project's, so give an address they read too. Set the secrets with `gh secret set <name> --env production-config` so their values stay out of your shell's history. None of the environments asks for reviewers: the review of the pull request is the approval.
 
-The deployment checks these environments itself. After its apply, the job `Configuration` asks GitHub's API that all three exist and run from `main` alone, and stops if not, before the jobs of `api` and `app` run in theirs. GitHub would otherwise create an environment a job names, with no rule of branches (R18). `Configuration` itself runs in `production-config`, so make that one before your first merge.
+The deployment checks these environments itself. After its apply, the job `Configuration` asks GitHub's API that all three exist and run from `main` alone, and stops if not, before the jobs of `api` and `app` run in theirs. GitHub would otherwise create an environment a job names, with no rule of branches. `Configuration` itself runs in `production-config`, so make that one before your first merge.
 
 **Protect your `main`.** A fork does not inherit the platform's ruleset, and the rule "`main` alone" of the environments means only as much as `main` is protected. In Settings → Rules → Rulesets, make one for the default branch:
 - no deletion and no force push;
@@ -151,7 +151,7 @@ Commit `tofu/production.auto.tfvars`, `tofu/backend.hcl` and `tofu/ci.env`. Open
 
 The merge starts the workflow `Deploy` (`.github/workflows/deploy.yml`), and its job `Configuration` applies the configuration as `infra-config`. On the platform, the first apply made 48 resources with no refusal of rights. Run the workflow again by hand with no part chosen: its apply should say "No changes".
 
-Then run `just bootstrap` again, with the same values in the environment ([section 4](#4-bootstrap)): it grants `api`'s service account, which the apply has just made, its right on the scans' prefix. Until then `api` cannot store a parent's consent form.
+Then run `just bootstrap` again, with the same values in the environment ([Bootstrap](#4-bootstrap)): it grants `api`'s service account, which the apply has just made, its right on the scans' prefix. Until then `api` cannot store a parent's consent form.
 
 Your fork also carries the platform's list, `deploy/production.json` and the files of `deploy/production/`, and no run of yours has delivered it yet. So the same run builds the image of the `api` release that list names and pushes it into your registry, as in step 1 of [Deploying](#9-deploying), and holds `app` back. It is a release every copy may run, and nothing of it goes beyond your registry until you set `api_image`. Leave the list where it is: a pull request may change the list but not remove it, and [Your list](#8-your-list) puts your own values into it. Not run yet: on the platform, the first apply came before there was a list.
 
@@ -159,7 +159,7 @@ From then on, every merge that changes what the workflow watches applies the con
 
 ## 7. Sign-in with Google
 
-The configuration turns your project to Identity Platform and holds its settings: two authorized domains, no email, phone or anonymous sign-in, no request logging (R16). Turning on Google as a provider is one step in the console. "The IAP OAuth Admin API was shut down on March 19, 2026" ([Programmatically create OAuth clients for IAP](https://docs.cloud.google.com/iap/docs/programmatic-oauth-clients), updated 2026-10-26), and a provider in the module would keep the client's secret in the state.
+The configuration turns your project to Identity Platform and holds its settings: two authorized domains, no email, phone or anonymous sign-in, no request logging. Turning on Google as a provider is one step in the console. "The IAP OAuth Admin API was shut down on March 19, 2026" ([Programmatically create OAuth clients for IAP](https://docs.cloud.google.com/iap/docs/programmatic-oauth-clients), updated 2026-10-26), and a provider in the module would keep the client's secret in the state.
 
 1. Open the Firebase console of your project → Authentication → Sign-in method → Add new provider → Google → Enable.
 2. Set the public name and the support email. Until Google verifies your brand, which needs a domain of your own, users see `<project_id>.firebaseapp.com` on the consent screen rather than the name ([OAuth App Verification](https://support.google.com/cloud/answer/9110914)). If the console asks for a Web client ID and secret, create a client of type "Web application" in Google Cloud → APIs & Services → Credentials. Give it the authorized redirect URI `https://<project_id>.firebaseapp.com/__/auth/handler`, and paste the secret into this form alone. On the platform, the console made the client by itself and asked for nothing.
@@ -170,15 +170,15 @@ Run `Deploy` by hand once more. Its apply should still say "No changes".
 
 ## 8. Your list
 
-The platform's first deployment went this way on 2026-11-12, with `api` v0.1.22 and `app` v0.1.0 (R25 in [docs/decisions.md](docs/decisions.md)); the releases the platform runs now are those its list, `deploy/production.json`, names (R29). A new release of either goes out the same way: a pull request that changes the list, and its merge. The migrations of a release of `api` come in its binary and run in the job `migrate`, so the steps of the deployment do not change. This section says what the list is made of, and the next how the deployment goes.
+The platform's first deployment went this way on 2026-11-12, with `api` v0.1.22 and `app` v0.1.0; the releases the platform runs now are those its list, `deploy/production.json`, names. A new release of either goes out the same way: a pull request that changes the list, and its merge. The migrations of a release of `api` come in its binary and run in the job `migrate`, so the steps of the deployment do not change. This section says what the list is made of, and the next how the deployment goes.
 
-The deployment ships what `deploy/` names. A pull request that changes it is checked before the merge, and the merge deploys what changed (R05).
+The deployment ships what `deploy/` names. A pull request that changes it is checked before the merge, and the merge deploys what changed.
 
-- **`deploy/production.json`** — the list. Its schema is `deploy/schema/production.schema.json`, and [docs/architecture.md](docs/architecture.md), section 3.2, has an example. It names:
+- **`deploy/production.json`** — the list. Its schema is `deploy/schema/production.schema.json`, and [docs/architecture.md](docs/architecture.md#32-the-rollout-list-and-the-deployment) has an example. It names:
   - the exact release of `api` and the sha256 of its binary `api_<tag>_linux_amd64` and of its `Dockerfile`;
   - the exact release of `app` and the name and sha256 of its archive;
   - the sha256 of your `deploy/production/deployment.json`;
-  - the admission rung, `full` or `author`: the same as `api_admission_rung` in `tofu/production.auto.tfvars`, which tells it to `api`'s service, by default `full`. The check refuses a list whose rung is not the configuration's. `author` admits the models checked on one person's handwriting: for a copy where its author alone learns, or whose privacy policy tells its adults so, as the platform's version 4 does from 2026-11-28 in "How well the models read" — `spec/legal/texts/privacy-policy/4.md` (`api`'s `docs/build.md`, «Configuration»; R149 spec; [docs/architecture.md](docs/architecture.md), section 3.8). From `api` v0.1.60 `author` also admits, until 2027-01-17, reading a workbook page, reading an essay and assessing it by the rubric with no eval at all, by the word of the platform's author, which holds on the platform's deployment, `novatrail`, alone and only while its author alone learns there (R07 spec, its third and fifth 2026-11-17 amendments). `api` takes them on any copy at `author` from that release, whoever learns there, and refuses them at `full`: it cannot tell who learns, and the platform's author's word is not your learners' word. A copy where others than its operator learn at `author` names an `api` before v0.1.60, from its first list, or the rung `full`. After 2027-01-17 every deployment, the platform's too, names only an `api` whose `tutor` admits each of the three by an eval, or admits none: the package has no clock, and a deployed `api` keeps admitting them. Facts for a learner under 18 — any of `under_13`, `from_13_to_consent` and `from_consent_to_18` in `facts.json` — come with the rung `full`, and the check refuses them at `author`: `tutor` selects its entries by the rung, not by the learner's age, so at `author` those entries would read a child's work (R149 spec, its fifth 2026-11-17 amendment).
+  - the admission rung, `full` or `author`: the same as `api_admission_rung` in `tofu/production.auto.tfvars`, which tells it to `api`'s service, by default `full`. The check refuses a list whose rung is not the configuration's. `author` admits the models checked on one person's handwriting: for a copy where its author alone learns, or whose privacy policy tells its adults so, as the platform's version 4 does from 2026-11-28 in "How well the models read" — `spec/legal/texts/privacy-policy/4.md` (`api`'s `docs/build.md`; [docs/architecture.md](docs/architecture.md#38-platform-ai-on-novatrail)). From `api` v0.1.60 `author` also admits, until 2027-01-17, reading a workbook page, reading an essay and assessing it by the rubric with no eval at all, by the word of the platform's author, which holds on the platform's deployment, `novatrail`, alone and only while its author alone learns there. `api` takes them on any copy at `author` from that release, whoever learns there, and refuses them at `full`: it cannot tell who learns, and the platform's author's word is not your learners' word. A copy where others than its operator learn at `author` names an `api` before v0.1.60, from its first list, or the rung `full`. After 2027-01-17 every deployment, the platform's too, names only an `api` whose `tutor` admits each of the three by an eval, or admits none: the package has no clock, and a deployed `api` keeps admitting them. Facts for a learner under 18 — any of `under_13`, `from_13_to_consent` and `from_consent_to_18` in `facts.json` — come with the rung `full`, and the check refuses them at `author`: `tutor` selects its entries by the rung, not by the learner's age, so at `author` those entries would read a child's work.
 
   Take the files from the releases on GitHub (`gh release download <tag> -R altnovatrail/api`, and the same for `app`), and take each sha256 with `sha256sum`. `api`'s releases also carry a `SHA256SUMS`.
 - **`deploy/production/deployment.json`** — the file your copy of `app` reads at its start. Its format is `spec`'s `deployment/`, version 1 (`spec/deployment/README.md`), and it holds:
@@ -190,7 +190,7 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
 
   `spec`'s schema at the submodule's tag and the schema in the build of `app` must both accept it.
 - **`deploy/production/facts.json`** — the deployment facts your copy declares for `api`'s admission to AI, by provider and fact, each to the age categories it holds for. For example, `{"openai": {"data_processing_agreement": ["adult"]}}`. The providers and facts it may name, and its form, are `spec`'s admission table (`spec/admission/admission-table.json` and `$defs/declared_facts` in `spec/admission/schemas/answer-vector.schema.json`). A copy declares only what is true of its own contracts with AI providers. The platform's facts are not yours.
-- **`deploy/production/legal/`** — your own legal texts, if your copy has them: the privacy policy, the terms and the consents your `api` gives your learners in place of the platform's (R115 spec). The folder holds `VERSION`, `legal.yaml` and `texts/` alone, in the layout of `spec`'s part `legal/` (`spec/legal/README.md`, sections 3 and 8), with a privacy policy whose section "Who we are" names you, and nothing but files and folders: a link is refused. Check it with `just -f spec/justfile legal-check-dir deploy/production/legal`. The pull request's check `Deploy` runs the same whenever it checks the list. The deployment lays the folder over `api`'s image at `/etc/api/legal` and names that path in `API_LEGAL_DIR` (R33). `api`'s job `check` refuses a folder that breaks the part's rules before the migrations, and so does its service before a revision takes traffic. Without the folder, `api` gives the platform's texts, the texts of its tag of `spec`. `api` gives the texts to anyone, with no token: they hold no learner's data and no secret.
+- **`deploy/production/legal/`** — your own legal texts, if your copy has them: the privacy policy, the terms and the consents your `api` gives your learners in place of the platform's. The folder holds `VERSION`, `legal.yaml` and `texts/` alone, in the layout of `spec`'s part `legal/` (`spec/legal/README.md`), with a privacy policy whose section "Who we are" names you, and nothing but files and folders: a link is refused. Check it with `just -f spec/justfile legal-check-dir deploy/production/legal`. The pull request's check `Deploy` runs the same whenever it checks the list. The deployment lays the folder over `api`'s image at `/etc/api/legal` and names that path in `API_LEGAL_DIR`. `api`'s job `check` refuses a folder that breaks the part's rules before the migrations, and so does its service before a revision takes traffic. Without the folder, `api` gives the platform's texts, the texts of its tag of `spec`. `api` gives the texts to anyone, with no token: they hold no learner's data and no secret.
 - **Platform AI**, if your copy opens it. `api` calls a provider only by your own key and only where your facts and your rung admit it. In `tofu/production.auto.tfvars`:
   - `api_catalog_modules`, the IDs of the modules your catalog gives, such as `["novatrail/olympiad-math", "novatrail/check-board"]`. Left out, the catalog gives every module of the release. `api`'s job `check` refuses an ID the release does not hold, before the migrations;
   - `api_reading_mode`, how `api` reads handwriting: `pair`, the default, two readers whose readings must agree, or `single`, Claude Haiku 5.5 at `medium` alone, as the platform reads. `api` reads it from v0.1.58, and its job `check` refuses another value, before the migrations;
@@ -201,7 +201,7 @@ The deployment ships what `deploy/` names. A pull request that changes it is che
     ```
 
     The version must be there before that merge, or the revision its apply makes does not start. A new key is a new version and a new pull request. The key never goes into the repository or into a chat.
-- **The databases.** `api` keeps its data in two Postgres databases, its own and OpenFGA's. The platform's are on Neon (R03 api). You add four connection strings yourself, as the values of secrets the configuration makes, with `gcloud secrets versions add`:
+- **The databases.** `api` keeps its data in two Postgres databases, its own and OpenFGA's. The platform's are on Neon. You add four connection strings yourself, as the values of secrets the configuration makes, with `gcloud secrets versions add`:
   - the direct ones, for the migrations: `api-migrate-database-url` and `api-migrate-openfga-database-url`;
   - the pooler's, for the service, for `sweep` and, `api-database-url` alone, for `after`: `api-database-url` and `api-openfga-database-url`. The service reads them at its start and does not start without them.
 
@@ -228,7 +228,7 @@ Run `just deploy-check` before you open the pull request. It downloads the relea
 
 ## 9. Deploying
 
-After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. Your legal texts go with the facts, and so do the rung, `api_reading_mode`, `api_catalog_modules` and `api_anthropic_key_version`: a change of `deploy/production/legal/` alone runs the check of the configuration and a new revision on the release that takes the traffic, with the texts laid over its image anew, and builds no release and runs no migration. `api` goes in steps, because its jobs and its service are made with their first image (R11), and `app` goes after `api`'s service, which its `/deployment.json` names (R05):
+After a merge, the workflow delivers only the parts of the list that changed: `api`'s image or release, the facts, `app`'s build. Your legal texts go with the facts, and so do the rung, `api_reading_mode`, `api_catalog_modules` and `api_anthropic_key_version`: a change of `deploy/production/legal/` alone runs the check of the configuration and a new revision on the release that takes the traffic, with the texts laid over its image anew, and builds no release and runs no migration. `api` goes in steps, because its jobs and its service are made with their first image, and `app` goes after `api`'s service, which its `/deployment.json` names:
 
 1. With no `api_image` in your values, there are no jobs and no service. When a run's list names a release of `api` that the last run that delivered did not, the run builds `api`'s image alone from that release, pushes it into your registry, holds `app` back, and prints `IMAGE=<region>-docker.pkg.dev/<project_id>/images/api@sha256:…` in its job `api`. If your list keeps the release of the platform's list, your first merge built it already ([First apply](#6-first-apply)). To ask for that alone, or to print the reference of an image your registry holds already, run `Deploy` by hand with **image** chosen.
 2. Put that whole reference, not only the `sha256:…`, into `tofu/production.auto.tfvars` as `api_image`, and merge. The jobs are made. Before this merge, add the values of the four connection strings ([Your list](#8-your-list)), and a first version of the facts, `gcloud secrets versions add api-admission-facts --project=<project_id> --data-file=deploy/production/facts.json`: the jobs mount them, the job of the check the facts. The deployment adds the version it checks and deploys anyway.
@@ -258,7 +258,7 @@ After a merge, the workflow delivers only the parts of the list that changed: `a
 
 ## 10. Without GitHub Actions
 
-You can run every step by hand with the same recipes, but as **your own account rather than `infra-config`**. You still need the GitHub repository of your fork. `bootstrap.sh` and the configuration build the pool and its provider for its subject, and they cannot be left out. A copy not on GitHub at all would have to change both, and that is not supported. The limits R13 puts on the configuration's identity then do not hold. Whatever your account may do, the apply may do. Prefer the fork with Actions.
+You can run every step by hand with the same recipes, but as **your own account rather than `infra-config`**. You still need the GitHub repository of your fork. `bootstrap.sh` and the configuration build the pool and its provider for its subject, and they cannot be left out. A copy not on GitHub at all would have to change both, and that is not supported. The limits put on the configuration's identity, `infra-config`, then do not hold. Whatever your account may do, the apply may do. Prefer the fork with Actions.
 
 ```bash
 gcloud auth application-default login
@@ -287,28 +287,28 @@ The workflow's checks of `main` and of the environments do not apply either, so 
 
 ## 11. Logs, region and what only the platform has
 
-- **Logs** follow R07, as on the platform. Cloud Run's request logs, which hold the client's IP address, are excluded before storage. Your logs are kept 30 days in your region, and Google's audit logs 400 days. The reads of your secrets' versions are audited and kept with your logs, with the reader's email and IP address — your service accounts', your CI's and yours —, so that a breach shows who read a connection string; they add to your log volume, which is free up to 50 GiB a project a month (sources 7.1).
+- **Logs** are kept as on the platform. Cloud Run's request logs, which hold the client's IP address, are excluded before storage. Your logs are kept 30 days in your region, and Google's audit logs 400 days. The reads of your secrets' versions are audited and kept with your logs, with the reader's email and IP address — your service accounts', your CI's and yours —, so that a breach shows who read a connection string; they add to your log volume, which is free up to 50 GiB a project a month (sources 7.1).
 - **Traces.** Cloud Run traces some requests by itself. Cloud Trace's API stays on, because Cloud Scheduler depends on it, so traces may come. They are kept in your region.
-- **Region.** Everything regional is in yours. What the platform decided about its learners' region (R04) is the platform's.
+- **Region.** Everything regional is in yours. What the platform decided about its learners' region is the platform's.
 - **Only the platform's:**
   - the project `novatrail` and its address;
   - the keys for eval and their pool, `github-eval`;
   - the platform's deployment facts.
 
   None of them reaches a copy.
-- **A breach of your learners' data.** [BREACH.md](BREACH.md) is the procedure for one. Its part 1 fits your copy as it is: read your project, region and Neon project for the platform's. Its part 2 is the law that binds the platform's operator, in Texas. Write your own part 2 from the laws that bind you, and keep the records of your cases outside your fork (R27).
+- **A breach of your learners' data.** [BREACH.md](BREACH.md) is the procedure for one. Its part 1 fits your copy as it is: read your project, region and Neon project for the platform's. Its part 2 is the law that binds the platform's operator, in Texas. Write your own part 2 from the laws that bind you, and keep the records of your cases outside your fork.
 
 ## 12. Running the whole platform on one machine
 
-> **Status, 2026-11-12.** Checked against the author's first run of `app` with `api` from source, on 2026-11-12 (`app`'s T30, `api`'s T42), and against the code of `app` at `main` 55ab358 and of `api` v0.1.27. That run went the whole way in a browser: sign-in through Google, lessons, handwriting read by two models, hints and the engine's choices. The steps are in the two READMEs; this section points to them and says how the pieces fit (R22 and its amendments).
+> **Status, 2026-11-12.** Checked against the author's first run of `app` with `api` from source, on 2026-11-12, and against the code of `app` at `main` 55ab358 and of `api` v0.1.27. That run went the whole way in a browser: sign-in through Google, lessons, handwriting read by two models, hints and the engine's choices. The steps are in the two READMEs; this section points to them and says how the pieces fit.
 
-A local run is the platform from source: `api` and `app`, each in its own devcontainer and run by its own recipes, with the browser on your machine. It is how the author's first app runs (R76 spec). It needs no copy on Google Cloud, no list and nothing from this repository: `infra` deploys releases, and a local run has none. What `infra` gives here is this section.
+A local run is the platform from source: `api` and `app`, each in its own devcontainer and run by its own recipes, with the browser on your machine. It is how the author's first app runs. It needs no copy on Google Cloud, no list and nothing from this repository: `infra` deploys releases, and a local run has none. What `infra` gives here is this section.
 
 It is not offline. Sign-in goes to a Firebase project and `api`'s databases are on Neon. `api` puts it so: "the first app runs locally: `app` and `api` on one machine, preflight is local, and the token check, the database and the AI provider go over the network, as in a deployment" (`api`'s `docs/architecture.md`, «Протокол между `app` и `api`», in Russian). A reading of handwriting goes to Anthropic with the key whose file `dev.env` names, outside the repository. Whoever runs `api` brings that key, and each reading is a paid call on its account.
 
 ### `api`
 
-Follow "Run on the dev projects" in [`api`'s `docs/build.md`](https://github.com/altnovatrail/api/blob/main/docs/build.md#run-on-the-dev-projects), in `api`'s devcontainer, which holds from `api` v0.1.63 what its README held (R93 api): it names every line of the configuration, and its section "With app" the steps of a run with `app`. They come to this:
+Follow "Run on the dev projects" in [`api`'s `docs/build.md`](https://github.com/altnovatrail/api/blob/main/docs/build.md#run-on-the-dev-projects), in `api`'s devcontainer, which holds from `api` v0.1.63 what its README held: it names every line of the configuration, and its section "With app" the steps of a run with `app`. They come to this:
 
 1. The configuration is the file `/home/vscode/.novatrail-dev/dev.env`, in a Docker volume of the container, outside the repository. It holds the databases' strings, the Firebase project and the service account's key, the folder of the modules' packages, admission to AI and the key of Anthropic, the folder for the scans of parents' forms, and the project's Web API key, which `just dev-check` alone reads.
 2. `just packages` lays the packages of the release of `modules` that `api` pins, v0.2.5 of format 0.4, into the folder `API_PACKAGES_DIR` names, and only into an empty one. The catalog then holds olympiad mathematics, the first app's module, and two small modules.
@@ -346,11 +346,11 @@ What holds the file to that shape:
 - `api` is the origin of `app` itself. Both servers of `app`, the development server and `vite preview`, listen on `127.0.0.1:5173` with `strictPort`, so a second one on a taken port stops rather than moving to another, and lead `api`'s paths to `NOVATRAIL_API` by a proxy; with no `NOVATRAIL_API`, there is no proxy. `app` serves the file only when its `api` is the origin of the server that serves it. The lower layer of the page's CSP lets no origin over `http` but its own, so a browser would refuse `api` on a port of its own, though the format accepts it (`app`'s `docs/architecture.md`, «Локальный запуск», in Russian).
 - `api` may be `http` only because `app` itself is open on a loopback host: the rule `deployment.loopback`. A loopback host is `127.0.0.1`, `localhost` or `[::1]`, and nothing else.
 - `projectId` is the project in `API_FIREBASE_PROJECT_ID`: `api` accepts ID tokens of that one project.
-- Open `app` at `http://127.0.0.1:5173`, not at `localhost`. The Firebase project of a local run has `127.0.0.1` among its authorized domains (architecture 3.12 spec), and Firebase matches an IP address only exactly (`app`'s `docs/architecture.md`, «Конфигурация развёртывания», in Russian).
+- Open `app` at `http://127.0.0.1:5173`, not at `localhost`. The Firebase project of a local run has `127.0.0.1` among its authorized domains, and Firebase matches an IP address only exactly (`app`'s `docs/architecture.md`, in Russian).
 
 ### The two containers
 
-Each devcontainer comes up on a Docker network of its own, `novatrail-api` and `novatrail-app`, and `app`'s container joins `api`'s network too, by the `runArgs` of its `devcontainer.json`. `api`'s container publishes no port. The browser talks to `app`'s origin alone, and the request to `api` goes on from `app`'s proxy, inside `app`'s container, to `api`'s container on `novatrail-api`, by its name there, `api`. Each devcontainer names its container by its repository, `--network-alias=<repository>` in its `runArgs` right after its own network, since Docker gives an alias on the first network alone; the name stays while the address a rebuild gives the container may change (the 2026-11-13 amendment to R21 of `spec`). One container of a repository runs at a time, since a second would take the same name. Before it starts, each devcontainer makes the folder `.epics` beside your clones, if it is not there, and mounts it at `/workspaces/.epics`: the clones of a task across repositories go there (R166 spec), and a local run leaves it empty.
+Each devcontainer comes up on a Docker network of its own, `novatrail-api` and `novatrail-app`, and `app`'s container joins `api`'s network too, by the `runArgs` of its `devcontainer.json`. `api`'s container publishes no port. The browser talks to `app`'s origin alone, and the request to `api` goes on from `app`'s proxy, inside `app`'s container, to `api`'s container on `novatrail-api`, by its name there, `api`. Each devcontainer names its container by its repository, `--network-alias=<repository>` in its `runArgs` right after its own network, since Docker gives an alias on the first network alone; the name stays while the address a rebuild gives the container may change. One container of a repository runs at a time, since a second would take the same name. Before it starts, each devcontainer makes the folder `.epics` beside your clones, if it is not there, and mounts it at `/workspaces/.epics`: the clones of a task across repositories go there, and a local run leaves it empty.
 
 Your browser reaches `app` through a port that VS Code forwards to your machine ([Developing inside a Container](https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port), updated 2026-11-04, read 2026-11-10):
 
@@ -360,29 +360,29 @@ Your browser reaches `app` through a port that VS Code forwards to your machine 
 
 ### A Firebase project
 
-A local run needs one. The format requires `signIn` with the service `firebase`, has no default and no field for an emulator, and `authDomain` is a host name with no port. `api` refuses to start with `FIREBASE_AUTH_EMULATOR_HOST` set, because the emulator verifies no signature (R32 api).
+A local run needs one. The format requires `signIn` with the service `firebase`, has no default and no field for an emulator, and `authDomain` is a host name with no port. `api` refuses to start with `FIREBASE_AUTH_EMULATOR_HOST` set, because the emulator verifies no signature.
 
-It is `api`'s dev project, on the free Spark plan with sign-in through Google (R03, R39 api): one project for `api` and `app` (architecture 3.12 spec, the row "sign-in service"). For `app`, the author adds to it once, in the Firebase console:
+It is `api`'s dev project, on the free Spark plan with sign-in through Google: one project for `api` and `app`. For `app`, the author adds to it once, in the Firebase console:
 
 - a Web App, in Project settings → Your apps, whose app ID goes in `signIn`. Its API key is the project's Web API key, which `api`'s `dev.env` already holds as `API_DEV_WEB_API_KEY`. The author's first sign-in failed on a wrong `apiKey` in `deployment.local.json`, before any request reached `api`;
 - `127.0.0.1` in Authentication → Settings → Authorized domains.
 
-Your copy's project is not for this. The module keeps its authorized domains to `<project_id>.firebaseapp.com` and `<project_id>.web.app`, with no loopback host (R16).
+Your copy's project is not for this. The module keeps its authorized domains to `<project_id>.firebaseapp.com` and `<project_id>.web.app`, with no loopback host.
 
 ### What `infra` does not give, and why
 
 - **A Firebase project for a local run.**
   - The module turns on Identity Platform through OpenTofu, which needs a project with billing, on the Blaze plan. Its budget needs a billing account too. A local run needs neither.
-  - The module keeps loopback hosts out of a deployment's domains (R16).
+  - The module keeps loopback hosts out of a deployment's domains.
 - **A compose file or emulators.**
   - Work runs inside the devcontainers, and neither has Docker: a compose file would run on your machine, beside them.
-  - `api` keeps its databases on Neon, not in a container (R05 api).
-  - The Hosting emulator was rejected for `app`'s build (R17), and `api` refuses the sign-in emulator.
+  - `api` keeps its databases on Neon, not in a container.
+  - The Hosting emulator was rejected for `app`'s build, and `api` refuses the sign-in emulator.
 - **A list, a `/deployment.json` or facts in `deploy/`.** They name releases and a deployment, and a local run has neither.
 
 ## 13. Upload links to the operator's bucket
 
-An adult who writes samples on the samples page, or a parent who signs a form, sends the files to the operator's bucket by an upload link the organizer gives (R28). The link is one HTML page, made by `tools/organizer/organizer.mjs`. Its forms post the files straight to Cloud Storage, each under a random name, so neither your server nor GitHub sees them. A page works for at most 12 hours from when it was made: Google signs it for the upload service account with no key, and such a signature lasts no longer.
+An adult who writes samples on the samples page, or a parent who signs a form, sends the files to the operator's bucket by an upload link the organizer gives. The link is one HTML page, made by `tools/organizer/organizer.mjs`. Its forms post the files straight to Cloud Storage, each under a random name, so neither your server nor GitHub sees them. A page works for at most 12 hours from when it was made: Google signs it for the upload service account with no key, and such a signature lasts no longer.
 
 Run the tool as the organizer, not as the operator. Use a clone of your fork, since the tool reads your project and the operator's bucket from `tofu/production.auto.tfvars`, or from the file `--tfvars=FILE` names. Run it on Linux or macOS, or in Cloud Shell, where `gcloud` and Node.js are, signed in as your own Google account: the address `bootstrap.sh` was given for you. The devcontainer has no `gcloud`. The tool needs no package of `tools/`. It runs `gcloud` by an absolute path, never by `PATH`: from where the Google Cloud CLI usually installs it, or from `ORGANIZER_GCLOUD` — `export ORGANIZER_GCLOUD="$(command -v gcloud)"` when the tool says it found none.
 
