@@ -7,15 +7,6 @@ Open tasks outside the current epic, each as its body, in Russian (R154 spec, R1
 
 ## Tasks outside an epic
 
-#### T100. Ссылки по R171 spec: журнал решений, разделы «Cloud Run `api`» — «The eval keys»
-
-- **Цель:** записи разделов `##` `docs/decisions.md` от «Cloud Run `api`» до «The eval keys» включительно — без датированных поправок и со ссылками по R171 spec.
-- **Почему:** шестая часть T95 по шагу 9 её тела.
-- **Кто:** Claude. **План:** —. **Зависит от:** T95.
-- **Сделать:** как T98, для этих разделов.
-- **Как проверить:** как у T96, по этим разделам.
-- **Разделы:** как у T95.
-
 #### T101. Ссылки по R171 spec: журнал решений, разделы «The operator's guide» — «The procedure for a breach»
 
 - **Цель:** записи разделов `##` `docs/decisions.md` от «The operator's guide» до «The procedure for a breach» включительно — без датированных поправок и со ссылками по R171 spec.
