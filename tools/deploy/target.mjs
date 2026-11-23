@@ -125,7 +125,7 @@ export async function environmentsHoldToMain({ repository, token, names, api = "
   if (!repository || !token) throw new Refusal("GITHUB_REPOSITORY and GITHUB_TOKEN name the repository and read its environments");
   for (const name of names) {
     const at = `${api}/repos/${repository}/environments/${encodeURIComponent(name)}`;
-    const environment = await github(at, token, `the environment ${name}`, { missing: `there is no environment ${name}: a job in it would make it, with no rule of branches, and lend its identity to any branch; make it with the rule main first, as SELF-HOSTING.md says (R18)` });
+    const environment = await github(at, token, `the environment ${name}`, { missing: `there is no environment ${name}: a job in it would make it, with no rule of branches, and lend its identity to any branch; make it with the rule main first, as SELF-HOSTING.md says` });
     const policy = environment.deployment_branch_policy;
     if (!policy || policy.protected_branches || !policy.custom_branch_policies) throw new Refusal(`the environment ${name} is not run from chosen branches alone: its rule is main, and main alone`);
     const rules = ((await github(`${at}/deployment-branch-policies?per_page=100`, token, `the branches of the environment ${name}`)).branch_policies ?? []).map((rule) => `${rule.type ?? "branch"}:${rule.name}`);
@@ -209,7 +209,7 @@ export function decide({ dir, commit, tip, base, byHand = null }) {
   const no = { deliver: false, commit, image: false, api: false, facts: false, app: false };
   if (tip !== commit) return { ...no, lines: [`main stands on ${tip.slice(0, 12)} now, not on ${commit.slice(0, 12)}: its own run delivers it, and this one would roll it back`] };
   const missing = SETUP.filter((file) => !has(dir, commit, file));
-  if (missing.length) return { ...no, lines: [`the project is not set up yet: ${missing.join(", ")} not at ${commit.slice(0, 12)} (R18)`] };
+  if (missing.length) return { ...no, lines: [`the project is not set up yet: ${missing.join(", ")} not at ${commit.slice(0, 12)}`] };
 
   if (byHand !== null) {
     const parts = partsByHand(byHand);
@@ -242,10 +242,10 @@ export function decide({ dir, commit, tip, base, byHand = null }) {
   const serving = hasServing(dir, commit);
   const servingNew = serving && !(known && hasServing(dir, known));
   const app = serving && (changed.app || servingNew);
-  if (changed.app && !serving) lines.push(`${TFVARS} does not set api_serving = true yet, so api has no service for app to call: app waits for the run that sets it (R05)`);
+  if (changed.app && !serving) lines.push(`${TFVARS} does not set api_serving = true yet, so api has no service for app to call: app waits for the run that sets it`);
   if (app && !changed.app) lines.push(`${TFVARS} sets api_serving = true since the last run that delivered: app, which waited for the service`);
   if ((changed.api || changed.facts) && !hasImage(dir, commit)) {
-    lines.push(`${TFVARS} names no api_image yet, so api has no jobs: its image alone; name the digest it prints in api_image, then run api by hand (R11)`);
+    lines.push(`${TFVARS} names no api_image yet, so api has no jobs: its image alone; name the digest it prints in api_image, then run api by hand`);
     return { deliver: true, commit, image: changed.api, api: false, facts: false, app, lines };
   }
   return { deliver: true, commit, image: false, ...changed, app, lines };
@@ -257,7 +257,7 @@ export function identity(file) {
   try {
     text = fs.readFileSync(file, "utf8");
   } catch {
-    throw new Refusal(`${file} is not there: the project is not set up yet (R18)`);
+    throw new Refusal(`${file} is not there: the project is not set up yet`);
   }
   const { values, wrong } = envValues(text);
   if (wrong !== null) throw new Refusal(`${file} holds ${JSON.stringify(wrong)}, not one line of KEY=value of its own`);

@@ -457,7 +457,7 @@ export function rungHoldsForFacts(facts, rung, underEighteen) {
   }
   const minors = underEighteen.filter((category) => named.has(category));
   if (!minors.length) return `the facts name no category under 18, so the rung ${rung} may stand`;
-  if (rung !== "full") throw new Refusal(`production/facts.json names ${minors.join(", ")}, a category under 18, and the rung is ${rung}: facts for a learner under 18 come with the rung full (R149 spec)`);
+  if (rung !== "full") throw new Refusal(`production/facts.json names ${minors.join(", ")}, a category under 18, and the rung is ${rung}: facts for a learner under 18 come with the rung full`);
   return `the facts name ${minors.join(", ")}, and the rung is full`;
 }
 
@@ -561,7 +561,7 @@ export async function run(deployDir, base, standIns = {}) {
       if (!root) return `api in production/deployment.json is not compared with its service's address: ${deployDir} is not in a git repository, whose tofu/ would give it`;
       const origin = serviceOrigin(root);
       if (!origin) return "api in production/deployment.json is not compared with its service's address: the repository has no tofu/ci.env, and so no project";
-      if (deployment.api !== origin) throw new Refusal(`production/deployment.json names api ${JSON.stringify(deployment.api)}, not its service's address, ${origin}: the output api_origin, by the project of tofu/ci.env and the values of tofu/production.auto.tfvars (R05)`);
+      if (deployment.api !== origin) throw new Refusal(`production/deployment.json names api ${JSON.stringify(deployment.api)}, not its service's address, ${origin}: the output api_origin, by the project of tofu/ci.env and the values of tofu/production.auto.tfvars`);
       return `production/deployment.json names api at its service's address, ${origin}`;
     });
     await step("the build reads spec's version of the deployment configuration", () => {
@@ -594,7 +594,7 @@ export async function run(deployDir, base, standIns = {}) {
       const root = topOf(deployDir);
       if (!root) return `the rung ${rung} is not compared with the configuration's: ${deployDir} is not in a git repository, whose tofu/ would give it`;
       const told = configurationRung(root);
-      if (rung !== told) throw new Refusal(`the rung is ${rung}, and the configuration tells api ${told}: api_admission_rung of tofu/production.auto.tfvars, or its default in tofu/variables.tf, names the same (R05)`);
+      if (rung !== told) throw new Refusal(`the rung is ${rung}, and the configuration tells api ${told}: api_admission_rung of tofu/production.auto.tfvars, or its default in tofu/variables.tf, names the same`);
       return `the rung ${rung} is the one the configuration tells api`;
     });
     await step("facts for a learner under 18 come with the rung full", () => {
@@ -607,7 +607,7 @@ export async function run(deployDir, base, standIns = {}) {
       if (!before) return `api's tag: ${base} has no list yet, nothing to hold it to`;
       const was = before?.api?.release;
       if (typeof was !== "string" || !TAG.test(was)) throw new Refusal(`the list at ${base} names no tag of api`);
-      if (compare(api.release, was) < 0) throw new Refusal(`api ${api.release} is lower than ${was}, the list's at ${base}: api goes forward only (R05)`);
+      if (compare(api.release, was) < 0) throw new Refusal(`api ${api.release} is lower than ${was}, the list's at ${base}: api goes forward only`);
       return `api ${api.release} is no lower than ${was} at ${base}`;
     });
   } finally {

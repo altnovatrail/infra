@@ -806,14 +806,14 @@
 
 ## The structure of the documents
 
-**R26. `infra`'s documents are structured on the model of `spec`'s template: CLAUDE.md is thin, by the template; the checks of each part are its rule, `.claude/rules/tofu.md`, `deploy.md` and `ci.md`, with the part's files in `paths`; `.claude/settings.json` keeps the rules of `spec/.claude/rules/` out of `infra`'s sessions; AGENTS.md has the template's item "Rules by path"; the records of external facts are `docs/sources.md`, a record per item, and section 4 of `docs/architecture.md` is a pointer to it; the budgets are `docs-budgets.json`; `docs/` is in English, but for the archives `docs/plan/`.**
+**R26. `infra`'s documents are structured on the model of `spec`'s template: CLAUDE.md is thin, by the template; the checks of each part are its rule, `.claude/rules/tofu.md`, `deploy.md` and `ci.md`, with the part's files in `paths`; `.claude/settings.json` keeps the rules of `spec/.claude/rules/` out of `infra`'s sessions; AGENTS.md has the template's item "Rules by path"; the records of external facts are `docs/sources.md`, a record per item, and `docs/architecture.md` only points to the records; the budgets are `docs-budgets.json`; `docs/` is in English, but for the archives `docs/plan/`.**
 - **The rules of the parts:** `tofu.md` — `tofu/`, `deploy.md` — `deploy/` and `tools/`, `ci.md` — `.github/`, `.devcontainer/` and `justfile`: the checks of each part, how the justfile and CI run them, and where CI does not run them — the check of the list on an edit of `tofu/production.auto.tfvars` and `tofu/ci.env`.
 - **`claudeMdExcludes`** holds `"**/infra/spec/.claude/rules/**"`: without it a rule of a part of `spec` would load into a session of `infra` as soon as that session reads a file of that part in `spec/`.
 
 — *Why:* the reader of `docs/`, but for the archives, is a session of Claude Code, and the structure lets it load only what a task needs: a part's checks when it touches the part, a record of an external fact when a claim cites it, and the budgets keep each file within what a session reads at once.
 
 — *Rejected:*
-- rewriting the links to section 4 of `docs/architecture.md` in the archives `docs/plan/`: the archives are word for word, and their links are held by the pointer;
+- rewriting the archives' links to the place in `docs/architecture.md` where the records once stood: the archives are word for word, and the pointer left there holds their links;
 - the plugin `gopls-lsp`: `infra` is not of the kind `go`, and it has no Go code.
 
 — *Consequence:* `.claude/settings.json`; `.claude/rules/`; CLAUDE.md; AGENTS.md; `docs-budgets.json`; `docs/sources.md`; `docs/architecture.md`.

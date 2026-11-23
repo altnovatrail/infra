@@ -39,7 +39,7 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: "api's image of the list's release, pushed, before api's jobs exist (R11)"
+        description: "api's image of the list's release, pushed, before api's jobs exist"
         type: boolean
         default: false
       api:

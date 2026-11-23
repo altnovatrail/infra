@@ -162,6 +162,6 @@ run "the_web_app_is_kept_and_gives_the_sign_in_block" {
       projectId  = "novatrail-test-0"
       appId      = "1:123456789012:web:0a1b2c3d"
     }
-    error_message = "app_sign_in is the signIn block of /deployment.json, as R09 app names its fields."
+    error_message = "app_sign_in is the signIn block of /deployment.json, as app names its fields."
   }
 }

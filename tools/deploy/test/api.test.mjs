@@ -172,7 +172,7 @@ const steps = (calls) =>
     })
     .filter(Boolean);
 
-test("a release goes R05's way: image, facts, check and migrate on the new image, a revision with no traffic, all of it to that revision, then the other jobs' image and after", () => {
+test("a release goes the release's way: image, facts, check and migrate on the new image, a revision with no traffic, all of it to that revision, then the other jobs' image and after", () => {
   const w = world();
   const r = w.run("release");
   assert.equal(r.status, 0, r.output);

@@ -308,7 +308,7 @@ test("tofu/ci.env: the provider and the configuration's identity, of their forms
     fs.writeFileSync(file, text);
     assert.throws(() => identity(file), message);
   }
-  assert.throws(() => identity(path.join(dir, "none.env")), /is not there: the project is not set up yet \(R18\)/);
+  assert.throws(() => identity(path.join(dir, "none.env")), /is not there: the project is not set up yet$/);
 });
 
 test("the command line: current fails once main moved on, and target prints its outputs", () => {

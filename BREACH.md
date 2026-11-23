@@ -71,7 +71,7 @@ Do only the steps that match what leaked, and write each into the record with it
 
 ```bash
 gcloud projects get-iam-policy <project>
-gcloud secrets get-iam-policy <secret>                      # each secret of section 2
+gcloud secrets get-iam-policy <secret>                      # each secret of the table of where the data is
 gcloud iam service-accounts get-iam-policy <account>        # api-run, api-deploy, infra-config
 ```
 

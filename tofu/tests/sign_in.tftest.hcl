@@ -43,12 +43,12 @@ run "no_other_way_in_and_no_activity_log" {
       !google_identity_platform_config.this.sign_in[0].anonymous[0].enabled,
       !google_identity_platform_config.this.sign_in[0].allow_duplicate_emails,
     ])
-    error_message = "Sign-in by mail, by phone and anonymous sign-in are off (R03 api)."
+    error_message = "Sign-in by mail, by phone and anonymous sign-in are off: a user signs in through Google alone."
   }
 
   assert {
     condition     = !google_identity_platform_config.this.monitoring[0].request_logging[0].enabled
-    error_message = "Identity Platform's activity log stays off (R07)."
+    error_message = "Identity Platform's activity log stays off: it holds every sign-in request."
   }
 
   assert {
@@ -58,7 +58,7 @@ run "no_other_way_in_and_no_activity_log" {
 
   assert {
     condition     = !google_identity_platform_config.this.client[0].permissions[0].disabled_user_signup && google_identity_platform_config.this.client[0].permissions[0].disabled_user_deletion
-    error_message = "A user signs up through Google's window, and only api deletes a user (R03 api)."
+    error_message = "A user signs up through Google's window, and only api deletes a user."
   }
 }
 

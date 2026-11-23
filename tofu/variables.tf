@@ -13,7 +13,7 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Where everything this configuration keeps in a region lives: the services and jobs, the images, the secrets' replicas, the logs and the traces. The platform's is us-east4 (R04); a self-hosted copy chooses its own."
+  description = "Where everything this configuration keeps in a region lives: the services and jobs, the images, the secrets' replicas, the logs and the traces. The platform's is us-east4; a self-hosted copy chooses its own."
   type        = string
 
   validation {
@@ -23,7 +23,7 @@ variable "region" {
 }
 
 variable "log_retention_days" {
-  description = "How many days the logs in the region's bucket are kept. The platform's are 30 (R07); the audit in _Required is kept 400 days, which nothing here can change."
+  description = "How many days the logs in the region's bucket are kept. The platform's are 30; the audit in _Required is kept 400 days, which nothing here can change."
   type        = number
   default     = 30
   nullable    = false
@@ -171,7 +171,7 @@ variable "api_image" {
 }
 
 variable "api_jobs" {
-  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, whether it opens the store of the scans of consent forms — the bucket consent_forms_bucket and api's prefix in it —, for a job that runs by the clock its schedule in cron's form, UTC, every day and no longer than 3000s a run, and for a job the deployment runs its part in it: check, before the migrations; migrate; or after, once the new revision takes all traffic (R05, R15). A job of the check is told the store as the service is, whatever it says. Only commands api's release has go here."
+  description = "api's jobs, by name: the arguments of the command each runs, the secrets it reads as files, by the variable api reads each from and the secret's id, how long it may take, whether it opens the store of the scans of consent forms — the bucket consent_forms_bucket and api's prefix in it —, for a job that runs by the clock its schedule in cron's form, UTC, every day and no longer than 3000s a run, and for a job the deployment runs its part in it: check, before the migrations; migrate; or after, once the new revision takes all traffic. A job of the check is told the store as the service is, whatever it says. Only commands api's release has go here."
   type = map(object({
     args          = list(string)
     secrets       = optional(map(string), {})
@@ -329,7 +329,7 @@ variable "api_memory" {
 }
 
 variable "api_request_timeout" {
-  description = "How long a request to api may take before the platform cuts it off: as long as api's own write timeout, API_HTTP_WRITE_TIMEOUT, at its default, which is over the deadline of api's longest methods (R11)."
+  description = "How long a request to api may take before the platform cuts it off: as long as api's own write timeout, API_HTTP_WRITE_TIMEOUT, at its default, which is over the deadline of api's longest methods."
   type        = string
   default     = "120s"
   nullable    = false
@@ -345,7 +345,7 @@ variable "api_request_timeout" {
 # told.
 
 variable "api_admission_rung" {
-  description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so, as on novatrail (R149 spec). The list's admission.rung names the same, and the list's check holds the two equal (R05)."
+  description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so, as on novatrail; facts that name a category under 18 take full. The list's admission.rung names the same, and the list's check holds the two equal."
   type        = string
   default     = "full"
   nullable    = false
@@ -357,7 +357,7 @@ variable "api_admission_rung" {
 }
 
 variable "api_reading_mode" {
-  description = "How tutor reads the handwriting of a sheet and of a workbook page, API_READING_MODE of the service and of the jobs of the check: pair, the two readers of R68 spec, or single, Claude Haiku 5.5 at medium alone (R25; R88 api). Either holds at either rung. api reads it from v0.1.58, and api check refuses another value before the migrations."
+  description = "How tutor reads the handwriting of a sheet and of a workbook page, API_READING_MODE of the service and of the jobs of the check: pair, two readers whose readings are joined, or single, Claude Haiku 5.5 at medium alone. Either holds at either rung. api reads it from v0.1.58, and api check refuses another value before the migrations."
   type        = string
   default     = "pair"
   nullable    = false
@@ -369,7 +369,7 @@ variable "api_reading_mode" {
 }
 
 variable "api_catalog_modules" {
-  description = "The deployment's list of modules, API_CATALOG_MODULES of the service and of the jobs of the check: the IDs whose current version the catalog may give (R150 spec; R79 api). Empty, the variable is not set and the catalog gives the whole pinned index. An ID the pinned index of the release does not hold stops api check before the migrations."
+  description = "The deployment's list of modules, API_CATALOG_MODULES of the service and of the jobs of the check: the IDs whose current version the catalog may give. Empty, the variable is not set and the catalog gives the whole pinned index. An ID the pinned index of the release does not hold stops api check before the migrations."
   type        = list(string)
   default     = []
   nullable    = false
@@ -381,7 +381,7 @@ variable "api_catalog_modules" {
 }
 
 variable "api_anthropic_key_version" {
-  description = "The version of the secret api-anthropic-key, the platform's key of Anthropic, that api's service mounts as a file, its path in API_ANTHROPIC_KEY_FILE (R46 api): an exact version, which the operator adds before the merge that names it. Unset, the service has no key, and platform AI has no route to a provider. The key itself never enters this repository."
+  description = "The version of the secret api-anthropic-key, the platform's key of Anthropic, that api's service mounts as a file, its path in API_ANTHROPIC_KEY_FILE: an exact version, which the operator adds before the merge that names it. Unset, the service has no key, and platform AI has no route to a provider. The key itself never enters this repository."
   type        = string
   default     = null
 
@@ -395,7 +395,7 @@ variable "api_anthropic_key_version" {
 # operator's rights; the configuration makes neither and grants nothing in them.
 
 variable "operator_bucket" {
-  description = "The operator's bucket of Cloud Storage: the files of the samples page, their forms and the organizers' records and reports (R125, R126 spec). bootstrap.sh reads it from the same file of values and makes it in the region; the configuration does not use it, and takes it here so that a plan reads the file without a warning and checks the name's form. The platform's is novatrail-operator. Bucket names are global."
+  description = "The operator's bucket of Cloud Storage: the files of the samples page, their forms and the organizers' records and reports. bootstrap.sh reads it from the same file of values and makes it in the region; the configuration does not use it, and takes it here so that a plan reads the file without a warning and checks the name's form. The platform's is novatrail-operator. Bucket names are global."
   type        = string
 
   validation {
@@ -405,7 +405,7 @@ variable "operator_bucket" {
 }
 
 variable "consent_forms_bucket" {
-  description = "The bucket of the scans of the parents' consent forms, which api puts there from app under its prefix consent-forms/ (R116, R136 spec). bootstrap.sh reads it from the same file of values, makes it in the region and grants api's service account the right to create and erase objects under the prefix, once the first apply has made that account. The configuration names it and the prefix to api's service, to the jobs of the check and to the jobs whose consent_forms is true, sweep among them. The platform's is novatrail-consent-forms. Bucket names are global."
+  description = "The bucket of the scans of the parents' consent forms, which api puts there from app under its prefix consent-forms/. bootstrap.sh reads it from the same file of values, makes it in the region and grants api's service account the right to create and erase objects under the prefix, once the first apply has made that account. The configuration names it and the prefix to api's service, to the jobs of the check and to the jobs whose consent_forms is true, sweep among them. The platform's is novatrail-consent-forms. Bucket names are global."
   type        = string
 
   validation {
@@ -415,14 +415,14 @@ variable "consent_forms_bucket" {
 
   validation {
     condition     = var.consent_forms_bucket != var.operator_bucket
-    error_message = "consent_forms_bucket is not operator_bucket: in one bucket the organizers would list the names of the scans (R28)."
+    error_message = "consent_forms_bucket is not operator_bucket: in one bucket the organizers would list the names of the scans."
   }
 }
 
 # Who may deploy: the jobs of one GitHub environment of infra's repository.
 
 variable "workload_identity_pool_id" {
-  description = "The federated pool the repository's tokens are exchanged in. It exists before this configuration is ever applied, since the apply itself signs in through it, so it is named here rather than made: bootstrap.sh makes it under this id, which it reads from the same file of values (R13)."
+  description = "The federated pool the repository's tokens are exchanged in. It exists before this configuration is ever applied, since the apply itself signs in through it, so it is named here rather than made: bootstrap.sh makes it under this id, which it reads from the same file of values."
   type        = string
 
   validation {
@@ -432,12 +432,12 @@ variable "workload_identity_pool_id" {
 
   validation {
     condition     = var.workload_identity_pool_id != "github-eval"
-    error_message = "workload_identity_pool_id is not github-eval: that is the pool of eval, which bootstrap.sh makes beside this one (R20)."
+    error_message = "workload_identity_pool_id is not github-eval: that is the pool of eval, which bootstrap.sh makes beside this one."
   }
 }
 
 variable "github_oidc_subject_prefix" {
-  description = "How GitHub begins the subject of the repository's tokens: the owner and the repository, each with its numeric id, as `gh api repos/OWNER/NAME/actions/oidc/customization/sub --jq .sub_claim_prefix` prints it. A job's subject goes on to name its environment, so an identity bound to one subject is lent to the jobs of one environment alone. bootstrap.sh reads it from the same file of values, and its pool admits the tokens of these two numbers alone (R13)."
+  description = "How GitHub begins the subject of the repository's tokens: the owner and the repository, each with its numeric id, as `gh api repos/OWNER/NAME/actions/oidc/customization/sub --jq .sub_claim_prefix` prints it. A job's subject goes on to name its environment, so an identity bound to one subject is lent to the jobs of one environment alone. bootstrap.sh reads it from the same file of values, and its pool admits the tokens of these two numbers alone."
   type        = string
 
   validation {
@@ -447,7 +447,7 @@ variable "github_oidc_subject_prefix" {
 }
 
 variable "deploy_environment" {
-  description = "The GitHub environment whose jobs may borrow the deployment's identity: only main may run in it (R05)."
+  description = "The GitHub environment whose jobs may borrow the deployment's identity: only main may run in it."
   type        = string
   default     = "production"
   nullable    = false
@@ -466,7 +466,7 @@ variable "deploy_environment" {
 }
 
 variable "hosting_environment" {
-  description = "The GitHub environment whose jobs may borrow the identity that publishes app's build on Hosting: only main may run in it, and none of api's deployment does (R12)."
+  description = "The GitHub environment whose jobs may borrow the identity that publishes app's build on Hosting: only main may run in it, and none of api's deployment does."
   type        = string
   default     = "production-hosting"
   nullable    = false
@@ -488,7 +488,7 @@ variable "hosting_environment" {
 }
 
 variable "eval_github_subject_prefixes" {
-  description = "The repositories whose jobs of the GitHub environment eval read the platform's keys for eval, each as GitHub begins the subject of its tokens, repo:OWNER@OWNER_ID/NAME@REPOSITORY_ID: for the platform, modules and tutor (R120 spec). bootstrap.sh reads the same list, on one line, for the condition of the pool github-eval it makes, which names one owner: a change of the list is a run of bootstrap.sh again before the merge, as a change of the script is (R13). Empty, there is no eval: no secret, and the pool, if made, admits nobody."
+  description = "The repositories whose jobs of the GitHub environment eval read the platform's keys for eval, each as GitHub begins the subject of its tokens, repo:OWNER@OWNER_ID/NAME@REPOSITORY_ID: for the platform, modules and tutor. bootstrap.sh reads the same list, on one line, for the condition of the pool github-eval it makes, which names one owner: a change of the list is a run of bootstrap.sh again before the merge, as a change of the script is. Empty, there is no eval: no secret, and the pool, if made, admits nobody."
   type        = list(string)
   default     = []
   nullable    = false
@@ -510,7 +510,7 @@ variable "eval_github_subject_prefixes" {
 }
 
 variable "eval_providers" {
-  description = "The AI providers eval has a key of, each by its code in spec's admission table (R96 spec): a secret eval-key-<code> each (R120 spec). A new provider of eval is a new code here."
+  description = "The AI providers eval has a key of, each by its code in spec's admission table: a secret eval-key-<code> each. A new provider of eval is a new code here."
   type        = list(string)
   default     = ["anthropic", "openai"]
   nullable    = false
