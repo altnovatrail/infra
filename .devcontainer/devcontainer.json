@@ -11,7 +11,7 @@
     },
     "remoteUser": "vscode",
     // Closing the window leaves the container running, and docker stop ends it: the orchestrator's
-    // executor runs in it by docker exec, with no window (R156 spec).
+    // executor runs in it by docker exec, with no window.
     "shutdownAction": "none",
     // Runs on the host before the container starts, in this folder: gives it a network whose MTU
     // is the host's own, so a tunnel on the host does not silently truncate large downloads here,
@@ -46,7 +46,7 @@
         "source=novatrail-vscode-extensions-${devcontainerId},target=/home/vscode/.vscode-server/extensions,type=volume",
         // The clones of the tasks across repositories, .epics/<epic>/<repo> beside the host's clones:
         // every NovaTrail container mounts this one folder of the host, at one path, and nothing
-        // else beside the clones (R166 spec).
+        // else beside the clones.
         "source=${localWorkspaceFolder}/../.epics,target=/workspaces/.epics,type=bind"
     ],
     "containerEnv": {

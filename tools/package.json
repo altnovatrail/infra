@@ -1,7 +1,7 @@
 {
   "name": "novatrail-infra-tools",
   "private": true,
-  "description": "infra's tools: the checks of the deployment's list, deploy/production.json, that CI runs on a pull request (R05, R14).",
+  "description": "infra's tools: the checks of the deployment's list, deploy/production.json, that CI runs on a pull request.",
   "license": "Apache-2.0",
   "type": "module",
   "dependencies": {

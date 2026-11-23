@@ -13,7 +13,7 @@
 #
 # Each job signs in to Google through the federated pool, as the identity its environment alone may
 # borrow; none of the environments asks for an approval, the review of the pull request is the
-# approval (R05). "Re-run failed jobs" keeps what the jobs before decided, so on a later attempt
+# approval. "Re-run failed jobs" keeps what the jobs before decided, so on a later attempt
 # each job asks first whether main still stands on the commit. A deployment that did not go
 # through is run again so, or mended forward; a run started by hand delivers the configuration and
 # the parts it names.
@@ -39,7 +39,7 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: "api's image of the list's release, pushed, before api's jobs exist (R11)"
+        description: "api's image of the list's release, pushed, before api's jobs exist"
         type: boolean
         default: false
       api:

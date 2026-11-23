@@ -703,7 +703,7 @@ echo "    ${borrower##*/subject/}"
 # -- the operator's buckets -------------------------------------------------------
 #
 # The policy of a bucket is one resource, and the configuration would grant it at each apply of CI,
-# so the buckets and all their access are made here, as the pools and the custom roles are (R28).
+# so the buckets and all their access are made here, as the pools and the custom roles are.
 
 # A member of a policy as the script names it in what it prints: a person by what they are, never
 # by their address, also once their account is deleted.

@@ -343,13 +343,13 @@ case "$command" in
 
     release)
         ((${#migrate_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part migrate, and a release does not go without its migrations"
-        ((${#check_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part check, and a release does not go without api's check of its facts and rung before the migrations (R05; R106 spec)"
+        ((${#check_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part check, and a release does not go without api's check of its facts and rung before the migrations"
         described="$(describe_service)"
         if [[ -n "$described" ]]; then
             serving_image="$(serving_digest "$described")"
             serving="$(release_in "$(tag_of "$serving_image")")"
             if lower "$release" "$serving"; then
-                fail "api ${release} is lower than ${serving}, which takes the traffic: api goes forward only (R05)"
+                fail "api ${release} is lower than ${serving}, which takes the traffic: api goes forward only"
             fi
             echo "==> api ${release} after ${serving}, which takes the traffic"
         else
@@ -376,7 +376,7 @@ case "$command" in
         ;;
 
     facts)
-        ((${#check_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part check, and new facts do not go without api's check of them (R05)"
+        ((${#check_jobs[@]} > 0)) || fail "the configuration's api_jobs name no job of the part check, and new facts do not go without api's check of them"
         described="$(describe_service)"
         [[ -n "$described" ]] || fail "there is no service ${service} to give the facts to"
         serving_image="$(serving_digest "$described")"

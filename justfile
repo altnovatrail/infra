@@ -237,7 +237,7 @@ _tf-sinks:
     set -euo pipefail
     stray=$(grep -rnE '^[[:space:]]*resource[[:space:]]+"google_(logging_(project|folder|organization|billing_account)_sink|logging_project_exclusion)"' {{ quote(tofu_dir) }} --include='*.tf' | grep -vE ':[[:space:]]*resource[[:space:]]+"google_logging_project_sink"[[:space:]]+"sinks"[[:space:]]*\{' || true)
     if [ -n "$stray" ]; then
-        echo "tf-check: a log sink or exclusion outside google_logging_project_sink.sinks in tofu/logging.tf (R07):" >&2
+        echo "tf-check: a log sink or exclusion outside google_logging_project_sink.sinks in tofu/logging.tf:" >&2
         echo "$stray" >&2
         exit 1
     fi
@@ -273,7 +273,7 @@ _tf-grants:
     set -euo pipefail
     stray=$(grep -rnE '^[[:space:]]*resource[[:space:]]+"google_project_iam_(member|binding|policy)"' {{ quote(tofu_dir) }} --include='*.tf' | grep -vE ':[[:space:]]*resource[[:space:]]+"google_project_iam_member"[[:space:]]+"grants"[[:space:]]*\{' || true)
     if [ -n "$stray" ]; then
-        echo "tf-check: a grant on the project outside google_project_iam_member.grants in tofu/identities.tf (R13):" >&2
+        echo "tf-check: a grant on the project outside google_project_iam_member.grants in tofu/identities.tf:" >&2
         echo "$stray" >&2
         exit 1
     fi
@@ -299,7 +299,7 @@ _tf-test-values:
     null_in_tests=$(sed -n 's/^\([a-z0-9_]*\)[[:space:]]*=[[:space:]]*null[[:space:]]*$/\1/p' {{ quote(tofu_dir) }}/tests/terraform.tfvars | sort -u)
     copies=$(comm -23 <(printf '%s\n' "$defaulted") <(printf '%s\n' "$null_in_tests"))
     if [ -n "$copies" ]; then
-        echo "tf-check: tofu/tests/terraform.tfvars sets these variables with a default to something but null, so the tests would not read their default (R10):" >&2
+        echo "tf-check: tofu/tests/terraform.tfvars sets these variables with a default to something but null, so the tests would not read their default:" >&2
         echo "$copies" >&2
         exit 1
     fi
@@ -315,12 +315,12 @@ _tf-roles:
     missing=$(comm -23 <(printf '%s\n' "$used") <(printf '%s\n' "$named"))
     stale=$(comm -13 <(printf '%s\n' "$used") <(printf '%s\n' "$named"))
     if [ -n "$missing" ]; then
-        echo "tf-check: no role in {{ tofu_dir }}/bootstrap.sh is held for these types of {{ tofu_dir }}/ (R13):" >&2
+        echo "tf-check: no role in {{ tofu_dir }}/bootstrap.sh is held for these types of {{ tofu_dir }}/:" >&2
         echo "$missing" >&2
         exit 1
     fi
     if [ -n "$stale" ]; then
-        echo "tf-check: {{ tofu_dir }}/bootstrap.sh names types {{ tofu_dir }}/ no longer has (R13):" >&2
+        echo "tf-check: {{ tofu_dir }}/bootstrap.sh names types {{ tofu_dir }}/ no longer has:" >&2
         echo "$stale" >&2
         exit 1
     fi

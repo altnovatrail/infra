@@ -1,8 +1,9 @@
 // The test of tools/deploy/api.sh, with no cloud: stub.mjs stands in for gcloud and docker ahead on
 // PATH, and the script runs from a copy of the repository's layout in which tools/deploy-check/
 // fetch.mjs is a stand-in too, reading synthetic release files, so that the deployment's own fetch
-// keeps no hook to bypass release-verify. It holds the script to R05's steps and their order, to
-// what it refuses, and to the path of the facts alone. Run by `just deploy-api-test`.
+// keeps no hook to bypass release-verify. It holds the script to the steps of api's deployment and
+// their order, to what it refuses, and to the path of the facts alone. Run by
+// `just deploy-api-test`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -171,7 +172,7 @@ const steps = (calls) =>
     })
     .filter(Boolean);
 
-test("a release goes R05's way: image, facts, check and migrate on the new image, a revision with no traffic, all of it to that revision, then the other jobs' image and after", () => {
+test("a release goes the release's way: image, facts, check and migrate on the new image, a revision with no traffic, all of it to that revision, then the other jobs' image and after", () => {
   const w = world();
   const r = w.run("release");
   assert.equal(r.status, 0, r.output);

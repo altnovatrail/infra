@@ -1,5 +1,5 @@
 # Firebase Authentication's settings are written by configuration only through Identity Platform,
-# which it runs on. Turning it on cannot be undone, and a destroy only forgets this resource (R16).
+# which it runs on. Turning it on cannot be undone, and a destroy only forgets this resource.
 #
 # Sign-in with Google itself is not here: its OAuth client and consent screen cannot be made by any
 # API, and the provider's resource for it would keep the client's secret in the state in plain

@@ -13,5 +13,5 @@ tools/node_modules/
 gha-creds-*.json
 
 # The organizer's upload pages, which tools/organizer/organizer.mjs writes where it runs: whoever
-# holds one may upload by it until it expires (R28).
+# holds one may upload by it until it expires.
 upload-*.html

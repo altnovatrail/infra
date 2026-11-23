@@ -33,22 +33,22 @@ locals {
   exclusions = {
     "cloud-run-request-logs" = {
       filter      = "LOG_ID(\"run.googleapis.com/requests\")"
-      description = "Cloud Run's request logs hold the client's IP address, and the platform keeps none (R07)."
+      description = "Cloud Run's request logs hold the client's IP address, and the platform keeps none."
     }
     # All of it but the reads of a secret version, which the audit config below turns on.
     "data-access-audit" = {
       filter      = "LOG_ID(\"cloudaudit.googleapis.com/data_access\") AND NOT (protoPayload.serviceName=\"${local.audited_reads.service}\" AND (${join(" OR ", [for m in local.audited_reads.methods : "protoPayload.methodName:\"${m}\""])}))"
-      description = "The Data Access audit holds the caller's IP address; the platform keeps none but Secret Manager's reads (R07)."
+      description = "The Data Access audit holds the caller's IP address; the platform keeps none but Secret Manager's reads."
     }
     "identity-platform-requests" = {
       filter      = "LOG_ID(\"identitytoolkit.googleapis.com/requests\")"
-      description = "Identity Platform's activity log holds every sign-in request; the platform keeps none (R07)."
+      description = "Identity Platform's activity log holds every sign-in request; the platform keeps none."
     }
     # Hosting's request logs, should anyone link them to Cloud Logging in Firebase's console: they
     # hold remoteIp. By the resource type, since Firebase names the log only as webrequests.
     "firebase-hosting-requests" = {
       filter      = "resource.type=\"firebase_domain\""
-      description = "Firebase Hosting's request logs hold the client's IP address; the platform keeps none (R06, R07)."
+      description = "Firebase Hosting's request logs hold the client's IP address; the platform keeps none."
     }
   }
 
@@ -82,7 +82,7 @@ resource "google_logging_project_bucket_config" "logs" {
 
   # The _Default sink points here, and a destroy leaves the sink as it is: deleting the bucket would
   # leave the project's logs going to a bucket pending deletion, and a change of region would be
-  # such a delete too. A bucket's place does not change (R04), so this one is not deleted by the
+  # such a delete too. A bucket's place does not change, so this one is not deleted by the
   # configuration at all.
   deletion_policy = "PREVENT"
 

@@ -1,6 +1,6 @@
 // app: the release of app's build on Firebase Hosting by the list, in the steps below, through
 // Hosting's REST API rather than the Firebase CLI: the steps are five calls, and the CLI is a large
-// program of somebody else's that asks for more than a release needs (R17).
+// program of somebody else's that asks for more than a release needs.
 //
 //   node tools/deploy/app.mjs release <outputs.json> [<deploy dir>]
 //   node tools/deploy/app.mjs check <outputs.json> [<deploy dir>]
@@ -134,7 +134,7 @@ function siteOf(outputsFile) {
 // /deployment.json names, which must be the service's deterministic one, api_origin.
 function apiHolds(outputsFile, deploymentFile) {
   const outputs = readJson(outputsFile, "the configuration's outputs");
-  if (typeof outputs?.api_service_url?.value !== "string") throw new Refusal("the configuration's outputs name no api_service_url: api has no service yet, and app goes only once it has (R05)");
+  if (typeof outputs?.api_service_url?.value !== "string") throw new Refusal("the configuration's outputs name no api_service_url: api has no service yet, and app goes only once it has");
   const origin = outputs?.api_origin?.value;
   if (typeof origin !== "string" || !origin) throw new Refusal("the configuration's outputs name no api_origin");
   const named = readDeployment(deploymentFile)?.api;
