@@ -1,5 +1,5 @@
 # Sign-in in the platform's project, checked against mock providers: no credential, no call to
-# Google (R16).
+# Google.
 
 mock_provider "google" {
   mock_data "google_project" {
@@ -22,7 +22,7 @@ mock_provider "google-beta" {}
 # The variables every run starts from are in tests/terraform.tfvars.
 
 # The authorized domains are the whole list: Firebase's address of the project and app's, and no
-# localhost (R06).
+# localhost.
 run "the_authorized_domains_are_the_projects_two" {
   command = plan
 

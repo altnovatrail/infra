@@ -8,8 +8,7 @@ useDefault = true
 # app_sign_in: every browser that opens app receives it, and Firebase restricts it to its own APIs.
 # "API keys restricted to Firebase services do not need to be treated as secrets" (Firebase, Learn
 # about using and managing API keys for Firebase, read 2026-11-12). Only a key of that form, and
-# only in that file: any other secret there, or the key anywhere else, is still a finding (the
-# 2026-11-12 amendment to R17).
+# only in that file: any other secret there, or the key anywhere else, is still a finding (R17).
 [[allowlists]]
 description = "The Firebase Web API key in deploy/production/deployment.json"
 condition = "AND"

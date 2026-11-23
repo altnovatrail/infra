@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The organizer's tool for the operator's bucket (R28). It runs where gcloud is signed in as the
+// The organizer's tool for the operator's bucket. It runs where gcloud is signed in as the
 // measurement organizer or the eval-set organizer — Cloud Shell or their own machine with Linux or
 // macOS, where gcloud is a program of that name — on Node.js alone, with no package of
 // tools/package.json.
@@ -7,7 +7,7 @@
 //   link <purpose> [--samples=N] [--hours=H] [--session=ID] [--out=FILE]
 //       an upload link: one self-contained HTML page with a form per file, each form a V4 POST
 //       policy signed through IAM by the purpose's upload service account, with no key, valid for at
-//       most 12 hours (sources 10.1, 10.8);
+//       most 12 hours;
 //   time <object>... --date=YYYY-MM-DD
 //       the Custom-Time of a form, a record or a report, by its prefix: of a measurement's or a
 //       parent's form, the date of the last session under it plus 730 days; of a record, the date of
@@ -42,7 +42,7 @@ import { fileURLToPath } from "node:url";
 import { tfvarsValue } from "../deploy-check/setup.mjs";
 
 // What a link may be valid for: a signature through IAM, with no key of the service account, lives
-// at most 12 hours (sources 10.1; R28).
+// at most 12 hours (sources 10.1).
 export const MAX_HOURS = 12;
 
 // A sample file of the samples page of canvas, `<id>.json` of `application/json`: canvas bounds its
@@ -50,7 +50,7 @@ export const MAX_HOURS = 12;
 export const SAMPLE = { type: "application/json", extension: "json", max: 16 * 1024 * 1024 };
 
 // A scan of a form, as api takes one: a JPEG, a PNG or a PDF, up to 10 MiB (sources 10.5). A policy
-// holds one condition a field, so each type has a form of its own (sources 10.1).
+// holds one condition a field, so each type has a form of its own.
 export const SCANS = [
   { type: "application/pdf", extension: "pdf", accept: ".pdf,application/pdf", label: "one PDF" },
   { type: "image/jpeg", extension: "jpg", accept: ".jpg,.jpeg,image/jpeg", label: "a JPEG photo" },
@@ -59,14 +59,14 @@ export const SCANS = [
 export const SCAN_MAX = 10 * 1024 * 1024;
 
 // Each purpose's prefix and the upload service account its links are signed as: the measurement
-// organizer's for measurements and children, the eval-set organizer's for the eval sets (R28).
+// organizer's for measurements and children, the eval-set organizer's for the eval sets.
 export const PURPOSES = {
   measure: { account: "upload-measure", what: "measurement session", form: "the signed measurement form" },
   child: { account: "upload-measure", what: "children's samples session", form: "the parent's signed form" },
   "eval-set": { account: "upload-eval-set", what: "eval-set samples", form: "your signed volunteer form" },
 };
 
-// The prefixes whose lifecycle rule reads the Custom-Time, and how its date is reckoned (R28).
+// The prefixes whose lifecycle rule reads the Custom-Time, and how its date is reckoned.
 // A form of a measurement or of a parent keeps 5 years after its samples, which the rule of samples
 // erases 2 years from the session: its Custom-Time is the session plus 730 days.
 // `rule` is the days of the rule that erases by it, as bootstrap.sh writes the rules.
@@ -110,12 +110,12 @@ const pad = (n) => String(n).padStart(2, "0");
 // 20261113T090000Z, x-goog-date's basic format, and its date, the credential's scope.
 export const basic = (d) =>
   `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
-// 2026-11-13T21:00:00Z, as Google's library writes the policy's expiration (sources 10.8).
+// 2026-11-13T21:00:00Z, as Google's library writes the policy's expiration.
 export const extended = (d) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
 // The policy of one kind of file: the bucket, the prefix of the session's folder, the type and the
 // size, the status of the answer, and the algorithm, credential and date of the signature. Every
-// field the form sends but the signature, the policy and the file has its condition (sources 10.8).
+// field the form sends but the signature, the policy and the file has its condition.
 export function policyOf({ bucket, prefix, type, max, credential, date, expiration }) {
   return {
     conditions: [
@@ -134,7 +134,7 @@ export function policyOf({ bucket, prefix, type, max, credential, date, expirati
 
 // The policy as the form sends it, base64 of its JSON, and its signature, in hex: IAM's signBlob of
 // those base64 bytes as the upload service account, by gcloud, which writes the signature's raw
-// bytes to its output file (sources 10.8).
+// bytes to its output file.
 export function sign(policy, account, gcloud = runGcloud) {
   const encoded = Buffer.from(JSON.stringify(policy), "utf8").toString("base64");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "organizer-"));
@@ -168,7 +168,7 @@ function formOf({ bucket, key, type, accept, signed, credential, date, label }) 
   const fields = Object.entries(hidden)
     .map(([name, value]) => `      <input type="hidden" name="${escape(name)}" value="${escape(value)}">`)
     .join("\n");
-  // The file is the form's last field, as Cloud Storage asks (sources 10.8).
+  // The file is the form's last field, as Cloud Storage asks.
   return `    <form action="https://storage.googleapis.com/${escape(bucket)}/" method="post" enctype="multipart/form-data" target="_blank">
 ${fields}
       <label>${escape(label)} <input type="file" name="file" accept="${escape(accept)}" required></label>
@@ -220,7 +220,7 @@ export function link({ purpose, bucket, project, samples = 10, hours = MAX_HOURS
   const date = new Date(Math.floor(now.getTime() / 1000) * 1000);
   const expiration = new Date(date.getTime() + hours * 3600 * 1000);
   const account = `${PURPOSES[purpose].account}@${project}.iam.gserviceaccount.com`;
-  // The location `auto`, as Google's library writes the credential (sources 10.8).
+  // The location `auto`, as Google's library writes the credential.
   const credential = `${account}/${basic(date).slice(0, 8)}/auto/storage/goog4_request`;
   const common = { bucket, credential, date, expiration };
 
@@ -302,7 +302,7 @@ export function time({ bucket, objects, date, now = new Date(), gcloud = runGclo
     const found = describe(bucket, name, gcloud);
     plan.current = found.customTime;
     // A withdrawal set the form's 5 years from the day its samples were erased; a session after it
-    // would stretch them, and a new period takes a new form (R125 spec).
+    // would stretch them, and a new period takes a new form.
     if (found.metadata?.withdrawn) refuse(`${name}: its samples were withdrawn on ${found.metadata.withdrawn}, and its Custom-Time stays; a new session takes a new form`);
     // A Custom-Time cannot decrease (sources 10.3): a form whose samples were erased early is
     // rewritten by withdraw instead.
@@ -321,11 +321,11 @@ export function time({ bucket, objects, date, now = new Date(), gcloud = runGclo
 }
 
 // A withdrawal erases the samples before their term, and the form keeps 5 years from that day: the
-// form is rewritten with the day, since only a rewrite resets a Custom-Time (sources 10.3). gcloud
-// rewrites an object by a copy, which takes --custom-time in place of the source's, and copies none
-// onto itself, nor does objects update rewrite one of the same class (sources 10.8): so the form
-// moves to a name beside it and back, each move a copy and an erasure. The form keeps the day in
-// its metadata, `withdrawn`, by which time refuses to move it forward again.
+// form is rewritten with the day, since only a rewrite resets a Custom-Time. gcloud rewrites
+// an object by a copy, which takes --custom-time in place of the source's, and copies none onto
+// itself, nor does objects update rewrite one of the same class: so the form moves to a name beside
+// it and back, each move a copy and an erasure (sources 10.8). The form keeps the day in its
+// metadata, `withdrawn`, by which time refuses to move it forward again.
 export function withdraw({ bucket, objects, erased, now = new Date(), gcloud = runGcloud, say = console.log }) {
   if (objects.length === 0) refuse("name the forms whose samples were erased");
   const wanted = extended(erased);
@@ -371,7 +371,7 @@ function list(url, gcloud) {
 }
 
 // A volunteer's form by which a sample was contributed lives as long as the sample is published:
-// it moves, with its record, out of the prefix whose rule erases it in 12 months (R126 spec).
+// it moves, with its record, out of the prefix whose rule erases it in 12 months.
 export function contribute({ bucket, session, gcloud = runGcloud, say = console.log }) {
   if (!ID.test(session ?? "")) refuse(`a session is 16 hex characters, as the tool gives one, not ${session}`);
   const from = `eval-set/forms/${session}/`;

@@ -2,7 +2,7 @@
 // by spec's release-verify against Sigstore: its binary and Dockerfile pass, of the sha256 its
 // SHA256SUMS names, and a copy with one byte changed, beside the same bundle, is refused. It needs
 // the network, and when Sigstore or GitHub cannot be read it fails, as the check of a real list
-// would (R77 spec). Run by `just deploy-check-release-test`.
+// would. Run by `just deploy-check-release-test`.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";

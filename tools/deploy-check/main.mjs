@@ -1,5 +1,4 @@
-// deploy-check: the checks of the deployment's list that CI runs on a pull request (R05, R14), in
-// check.mjs.
+// deploy-check: the checks of the deployment's list that CI runs on a pull request, in check.mjs.
 //
 //   node tools/deploy-check/main.mjs [--base <ref>] [<deploy dir>]
 //

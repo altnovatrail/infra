@@ -3,13 +3,13 @@
 #
 # Sign-in with Google itself is not here: its OAuth client and consent screen cannot be made by any
 # API, and the provider's resource for it would keep the client's secret in the state in plain
-# text, so the operator turns it on in Firebase's console once, after the first apply (R16).
+# text, so the operator turns it on in Firebase's console once, after the first apply.
 
 resource "google_identity_platform_config" "this" {
   project = var.project_id
 
   # The whole list: Firebase's own address of the project, the authDomain app's sign-in window is
-  # opened on, and app's origin, the address of the Hosting site app is served from (R06). A domain
+  # opened on, and app's origin, the address of the Hosting site app is served from. A domain
   # set anywhere else is taken back by the next apply, a preview channel's among them: app is
   # released to the site's live channel alone, and a domain of its own joins this list when it is
   # bought. No localhost: app is run locally against a project of its own, never this one.
@@ -19,7 +19,7 @@ resource "google_identity_platform_config" "this" {
   ]
 
   # No way in that would hold a password, an address of mail or a number of phone, and none that
-  # would leave a user with nobody behind it (R03 api).
+  # would leave a user with nobody behind it.
   sign_in {
     allow_duplicate_emails = false
 
@@ -37,7 +37,7 @@ resource "google_identity_platform_config" "this" {
   }
 
   # Activity logging writes every request of sign-in; it stays off, and every sink excludes it all
-  # the same (R07).
+  # the same.
   monitoring {
     request_logging {
       enabled = false
@@ -53,7 +53,7 @@ resource "google_identity_platform_config" "this" {
   }
 
   # A user may sign up, through Google's window, and may not delete itself from the device: a user
-  # is deleted by api alone, with its account and after its tokens are revoked (R03 api), and app
+  # is deleted by api alone, with its account and after its tokens are revoked, and app
   # deletes an account through api.
   client {
     permissions {

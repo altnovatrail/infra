@@ -1,11 +1,11 @@
 # A stage of .devcontainer/Dockerfile — toolchain or toolchain-core — as the image
 # novatrail-toolchain, for the jobs of ci.yml that run their recipes in it by
-# spec/tools/toolchain/toolchain.sh (R30 spec; R32). The cache's key, path and image name are those
-# the shared workflows of .github and spec's script give the stage (R42 .github, R47 .github), so
-# that a stage keeps one entry for every workflow that takes it: the core's is the shared Documents
-# check's too. On a hit the Dockerfile does not run, and an outage of nodejs.org, GitHub or the
-# Ubuntu snapshot fails no check (R31 spec). Only a push to main saves an entry: one of a pull
-# request serves only its own re-runs, and crowds out main's.
+# spec/tools/toolchain/toolchain.sh. The cache's key, path and image name are those the shared
+# workflows of .github and spec's script give the stage, so that a stage keeps one entry for every
+# workflow that takes it: the core's is the shared Documents check's too. On a hit the Dockerfile
+# does not run, and an outage of nodejs.org, GitHub or the Ubuntu snapshot fails no check. Only a
+# push to main saves an entry: one of a pull request serves only its own re-runs, and crowds out
+# main's.
 #
 # Role build, the job toolchain, needs only the Dockerfile and this file checked out, and is called
 # once a stage, the core first, so that the build of toolchain reuses its layers. Role load needs the
@@ -87,7 +87,7 @@ runs:
         path: ${{ runner.temp }}/novatrail-${{ inputs.stage }}.tar
         key: ${{ steps.cache.outputs.cache-primary-key }}
 
-    # Kept a day and compressed fast, as go.yml of .github keeps its own (R42 .github).
+    # Kept a day and compressed fast, as go.yml of .github keeps its own.
     - id: upload
       name: Toolchain image as an artifact
       if: steps.build.outcome == 'success'

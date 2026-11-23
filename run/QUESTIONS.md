@@ -1,6 +1,6 @@
 # QUESTIONS.md — questions to the author of `infra`
 
-Table 3 of [RUN.md](../RUN.md): the author's open questions that tasks leave (R153 spec, R154 spec, R160 spec).
+Table 3 of [RUN.md](../RUN.md): the author's open questions that tasks leave (R153 spec, R160 spec).
 
 - Never read whole: take the rows the task and its sections name — `grep -n '^| В37 ' run/QUESTIONS.md` — and those `grep -n` finds by the paths and parts it changes (RUN.md rule 2).
 - A row is a question a task leaves open (RUN.md rule 9). Record the author's answer where it belongs — the task, a document or [DEBT.md](DEBT.md) — and delete the row.

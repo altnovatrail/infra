@@ -1,6 +1,6 @@
-# What this configuration is pinned to, and where its state lives (R10).
+# What this configuration is pinned to, and where its state lives.
 #
-# OpenTofu at the exact version the toolchain stage of .devcontainer/Dockerfile installs (R09):
+# OpenTofu at the exact version the toolchain stage of .devcontainer/Dockerfile installs:
 # a raise of the ARG there without this line stops `tofu init`, so the two move together.
 #
 # Two providers at one version. Firebase's resources are in the beta provider alone, and the two

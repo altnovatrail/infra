@@ -1,7 +1,7 @@
 // The checks of the deployment's list, on synthetic releases: no network, and a stand-in for
 // release-verify that refuses the file it is told to, both given to run() as the tests' stand-ins.
-// Each refusal R05 names is made on its own, and a list that holds passes; the command line, which
-// gives no stand-ins, is run where it needs no release. Run by `just deploy-check-test`.
+// Each refusal of the check is made on its own, and a list that holds passes; the command line,
+// which gives no stand-ins, is run where it needs no release. Run by `just deploy-check-test`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -463,7 +463,7 @@ test("release-verify runs by the just the recipe names, which on a runner of Dep
   assert.deepEqual(args.slice(2), ["release-verify", "api", "v0.2.0", "/nowhere/api_v0.2.0_linux_amd64"]);
 });
 
-// A self-hosted copy's folder of legal texts (R33): checked by legal-check-dir, and refused with a
+// A self-hosted copy's folder of legal texts: checked by legal-check-dir, and refused with a
 // link in it before that runs.
 test("a copy's folder of legal texts is checked by legal-check-dir, and none is nothing to check", async () => {
   const none = await world().check();

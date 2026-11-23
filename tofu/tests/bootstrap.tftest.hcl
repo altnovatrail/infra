@@ -1,4 +1,4 @@
-# The configuration against what bootstrap.sh lets the identity that applies it do (R13): a role
+# The configuration against what bootstrap.sh lets the identity that applies it do: a role
 # granted here and not let there would pass every other check and be refused at the apply, after
 # the merge. Read from the script itself, so that the two change together and the script is run
 # again before the merge.
@@ -102,7 +102,7 @@ run "the_publisher_in_the_configurations_environment_is_refused" {
 }
 
 # The buckets bootstrap.sh makes for the operator are named in the values both read, and the module
-# takes them in the form the script does, and not one bucket for both (R28).
+# takes them in the form the script does, and not one bucket for both.
 run "a_bucket_name_of_another_form_is_refused" {
   command = plan
 
@@ -137,7 +137,7 @@ run "bootstraps_api_account_is_the_modules" {
 
 # api is told the bucket bootstrap.sh makes for the scans, which both read from the same value, and
 # the prefix under which the script grants api's service account its right there: another prefix
-# would put every scan where api may not write (R28).
+# would put every scan where api may not write.
 run "the_scans_bucket_and_prefix_are_bootstraps" {
   command = plan
 

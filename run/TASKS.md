@@ -6,3 +6,66 @@ Open tasks outside the current epic, each as its body, in Russian (R154 spec, R1
 - A new task outside an epic goes here as a body, its number the one free when it is written down (RUN.md, Citations): a new release of `api` or `app` by the list among them (R29). When done, the body leaves for the archive (RUN.md rule 9).
 
 ## Tasks outside an epic
+
+#### T96. Ссылки по R171 spec: архитектура, BREACH.md, SELF-HOSTING.md, указатель
+
+- **Цель:** `docs/architecture.md`, [BREACH.md](../BREACH.md), [SELF-HOSTING.md](../SELF-HOSTING.md) и [docs/README.md](../docs/README.md) ссылаются по R171 spec.
+- **Почему:** вторая часть T95 по шагу 9 её тела; правила, замер и шаги — в T95, архив E6.
+- **Кто:** Claude. **План:** —. **Зависит от:** T95.
+- **Сделать:** шаги 3–8 T95 для этих четырёх файлов: механические места — `docs-check-repo` с ключом `"citations": true`, поставленным только на время проверки; остальное — `grep -nE` по шаблону `measurements 1.18 spec`. Ключ в `docs-budgets.json` не коммитить.
+- **Как проверить:** `docs-check-repo` без ключа — зелёный, с ключом — ни одного места в этих файлах; `/code-review high`, один круг; в отчёте — ссылок было и стало по командам `measurements 1.18 spec`.
+- **Разделы:** как у T95.
+
+#### T97. Ссылки по R171 spec: `docs/sources.md` и `docs/measurements.md`
+
+- **Цель:** `docs/sources.md` и `docs/measurements.md` ссылаются по R171 spec; начало `docs/sources.md` — по заготовке `spec/repo-template/files/docs/sources.md`.
+- **Почему:** третья часть T95 по шагу 9 её тела.
+- **Кто:** Claude. **План:** —. **Зависит от:** T95.
+- **Сделать:** шаги 3–8 T95 для этих двух файлов, как в T96; цитаты источников не трогать — они вне правила ссылок.
+- **Как проверить:** как у T96.
+- **Разделы:** как у T95; `spec/repo-template/files/docs/sources.md`.
+
+#### T98. Ссылки по R171 spec: журнал решений, начало и разделы «The `spec` tag» — «Hosting and domains»
+
+- **Цель:** начало `docs/decisions.md` — по заготовке `spec/repo-template/files/docs/decisions.md`; записи разделов `##` от «The `spec` tag» до «Hosting and domains» включительно — без датированных поправок и со ссылками по R171 spec.
+- **Почему:** четвёртая часть T95 по шагу 9 её тела.
+- **Кто:** Claude. **План:** —. **Зависит от:** T95.
+- **Сделать:** шаги 3–8 T95 для этих разделов; в описании PR — таблица «поправка → место в новом тексте».
+- **Как проверить:** как у T96, по этим разделам.
+- **Разделы:** как у T95.
+
+#### T99. Ссылки по R171 spec: журнал решений, разделы «Logs and traces» — «The root module»
+
+- **Цель:** записи разделов `##` `docs/decisions.md` от «Logs and traces» до «The root module» включительно — без датированных поправок и со ссылками по R171 spec.
+- **Почему:** пятая часть T95 по шагу 9 её тела.
+- **Кто:** Claude. **План:** —. **Зависит от:** T95.
+- **Сделать:** как T98, для этих разделов.
+- **Как проверить:** как у T96, по этим разделам.
+- **Разделы:** как у T95.
+
+#### T100. Ссылки по R171 spec: журнал решений, разделы «Cloud Run `api`» — «The eval keys»
+
+- **Цель:** записи разделов `##` `docs/decisions.md` от «Cloud Run `api`» до «The eval keys» включительно — без датированных поправок и со ссылками по R171 spec.
+- **Почему:** шестая часть T95 по шагу 9 её тела.
+- **Кто:** Claude. **План:** —. **Зависит от:** T95.
+- **Сделать:** как T98, для этих разделов.
+- **Как проверить:** как у T96, по этим разделам.
+- **Разделы:** как у T95.
+
+#### T101. Ссылки по R171 spec: журнал решений, разделы «The operator's guide» — «The procedure for a breach»
+
+- **Цель:** записи разделов `##` `docs/decisions.md` от «The operator's guide» до «The procedure for a breach» включительно — без датированных поправок и со ссылками по R171 spec.
+- **Почему:** седьмая часть T95 по шагу 9 её тела.
+- **Кто:** Claude. **План:** —. **Зависит от:** T95.
+- **Сделать:** как T98, для этих разделов.
+- **Как проверить:** как у T96, по этим разделам.
+- **Разделы:** как у T95.
+
+#### T102. Ссылки по R171 spec: журнал решений, разделы «The operator's bucket» — конец, и ключ `"citations"`
+
+- **Цель:** записи разделов `##` `docs/decisions.md` от «The operator's bucket» до конца — без датированных поправок и со ссылками по R171 spec; `docs-budgets.json` — `"citations": true`, и `docs-check-repo` с ним зелёный.
+- **Почему:** последняя часть T95 по шагу 9 её тела: ключ включает она.
+- **Кто:** Claude. **План:** —. **Зависит от:** T95–T101.
+- **Сделать:** как T98, для этих разделов; затем ключ — как в `spec/repo-template/files/docs-budgets.json` — и то, что он ещё найдёт по всему репозиторию; строка 7.49 COORDINATION.md spec ждёт этой задачи.
+- **Как проверить:** `docs-check-repo` с ключом — зелёный; `/code-review high`, один круг; в отчёте — ссылок было и стало, по видам, по всему репозиторию: замер «до» — в T95, коммит 015d936.
+- **Разделы:** как у T95.

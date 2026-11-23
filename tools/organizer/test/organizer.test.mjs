@@ -1,8 +1,8 @@
 // The test of tools/organizer/organizer.mjs, with no cloud: gcloud-stub.mjs stands in for gcloud,
 // named to the tool by ORGANIZER_GCLOUD, and signs with a key made here, so that each form's
-// signature is checked as Cloud Storage would check it. It holds the link to R28 — the purpose's
-// own prefixes and upload service account, at most 12 hours, the type and size of each file, a
-// random name for each — and the Custom-Time to the lifecycle rules of R28. Run by
+// signature is checked as Cloud Storage would check it. It holds the link to R28's rules —
+// the purpose's own prefixes and upload service account, at most 12 hours, the type and size of
+// each file, a random name for each — and the Custom-Time to R28's lifecycle rules. Run by
 // `just organizer-test`.
 
 import assert from "node:assert/strict";
@@ -24,9 +24,9 @@ after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-// What R28 sets, written here and not taken from the tool, so that a tool that drifts
+// What the upload link's rules set, written here and not taken from the tool, so that a tool that drifts
 // from them fails: at most 12 hours; each purpose's prefixes and upload service account; a sample
-// of the samples page, and a scan as api takes one (sources 10.5, 10.8).
+// of the samples page, and a scan as api takes one.
 const MAX_HOURS = 12;
 const ACCOUNTS = { measure: "upload-measure", child: "upload-measure", "eval-set": "upload-eval-set" };
 const SAMPLE = { type: "application/json", max: 16 * 1024 * 1024 };
@@ -77,7 +77,7 @@ function formsOf(page) {
 }
 
 // What Cloud Storage would take of a form: its policy, decoded, by the signature of the service
-// account the credential names, and each field the form sends held to its condition (sources 10.8).
+// account the credential names, and each field the form sends held to its condition.
 function accepted(form) {
   const { fields } = form;
   assert.ok(crypto.verify("sha256", Buffer.from(fields.policy), publicKey, Buffer.from(fields["x-goog-signature"], "hex")), "the signature holds");

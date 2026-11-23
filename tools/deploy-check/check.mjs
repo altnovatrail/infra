@@ -1,27 +1,27 @@
 // deploy-check's checks: what CI asks of a pull request that changes the deployment's list,
-// with no access to production (R05, R14). main.mjs runs them; the tests import them.
+// with no access to production. main.mjs runs them; the tests import them.
 //
-// It reads <deploy dir>/production.json, deploy/ by default, and holds it, in R05's order, to:
+// It reads <deploy dir>/production.json, deploy/ by default, and holds it, in this order, to:
 //   1. its own schema, deploy/schema/production.schema.json;
-//   2. the name api's release gives its binary, api_<tag>_linux_amd64 (R28 api);
+//   2. the name api's release gives its binary, api_<tag>_linux_amd64;
 //   3. the files of both releases — api's binary and Dockerfile, app's archive —, each downloaded
 //      with its bundle from the release on GitHub, accepted by spec's release-verify and of the
-//      sha256 the list names (R77 spec);
+//      sha256 the list names;
 //   4. production/deployment.json, of the sha256 the list names; accepted by spec's reading of the
 //      deployment configuration at the tag of the submodule — its schema and its rules — and by the
-//      deployment.schema.json of the archive of that build, whose version is spec's (R85 spec); the
-//      archive holding what a release of the build is made of, and its csp.json making the header
-//      of that deployment.json (R17); its api, the address of api's service, the output api_origin,
-//      by the project tofu/ci.env names and the values of tofu/production.auto.tfvars (R05);
+//      deployment.schema.json of the archive of that build, whose version is spec's; the archive
+//      holding what a release of the build is made of, and its csp.json making the header of that
+//      deployment.json; its api, the address of api's service, the output api_origin, by the project
+//      tofu/ci.env names and the values of tofu/production.auto.tfvars;
 //   5. production/facts.json, by the facts a deployment declares in spec's admission schemas, with
 //      every provider and fact of the dictionary of spec's admission table, at the tag of the
-//      submodule: an early sign, since api checks the file again with its own table (R25 api);
+//      submodule: an early sign, since api checks the file again with its own table;
 //   6. a self-hosted copy's production/legal, if there is one: nothing but files and folders, and
 //      spec's legal-check-dir at the tag of the submodule — an early sign too, since api checks the
-//      folder again by its own part legal/ (R33);
+//      folder again by its own part legal/;
 //   7. the rung the configuration tells api's service and the jobs of the check: api_admission_rung
 //      of tofu/production.auto.tfvars, or its default in tofu/variables.tf, and the rung full
-//      wherever the facts name a category under 18 (R05; R149 spec);
+//      wherever the facts name a category under 18;
 //   8. api's tag no lower than in the list at <ref>, the main a pull request merges into; with no
 //      list there, nothing to hold it to.
 // A list that fails its schema is refused there; every other check runs, each says what it found,
@@ -45,10 +45,10 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const SPEC = path.join(ROOT, "spec");
 const LIST_SCHEMA = path.join(ROOT, "deploy", "schema", "production.schema.json");
 // The path of the schema of /deployment.json stays the same from version to version, and its $id
-// names the version (R85 spec).
+// names the version.
 const SPEC_DEPLOYMENT_SCHEMA = path.join(SPEC, "deployment", "schemas", "deployment.schema.json");
 const DEPLOYMENT_ID = /^https:\/\/altnovatrail\.github\.io\/spec\/deployment\/([1-9]\d*)\/deployment\.schema\.json$/;
-// The platform's app is open on Hosting, at https://<site>.web.app (R06), never on a loopback host.
+// The platform's app is open on Hosting, at https://<site>.web.app, never on a loopback host.
 // A pull request's check knows no site, and the rules of reading look at no more of the origin than
 // whether its host is a loopback one: it reads the file at the origin of web.app itself.
 export const HOSTED_ORIGIN = "https://web.app";
@@ -59,9 +59,9 @@ const TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 // The programs the checks run, by absolute path, as spec's tools run theirs (spec/tools/shared.mjs):
 // no directory on PATH decides which program runs. just is the one that runs the recipe, whose path
 // the justfile exports as INFRA_JUST: /usr/local/bin/just of the toolchain stages, or, on a runner of
-// the workflow Deploy, the one tools/ci/install.sh put in a folder no fixed path names (R14). Run
-// outside a recipe, it is the toolchain stages'. git is the devcontainers base image's, or else the
-// system's; tar the system's.
+// the workflow Deploy, the one tools/ci/install.sh put in a folder no fixed path names. Run outside
+// a recipe, it is the toolchain stages'. git is the devcontainers base image's, or else the system's;
+// tar the system's.
 const JUST = justProgram(process.env.INFRA_JUST);
 const GIT = first(["/usr/local/bin/git", "/usr/bin/git", "/bin/git"]);
 const TAR = first(["/usr/bin/tar", "/bin/tar"]);
@@ -142,7 +142,7 @@ async function fetchRelease(repository, tag, name, work, releases) {
 }
 
 // spec's release-verify, or, for the tests, a command that stands in for it with the same
-// arguments (R77 spec).
+// arguments.
 export function verify(repository, tag, file, command = [JUST, "-f", path.join(SPEC, "justfile"), "release-verify"]) {
   const run = spawnSync(command[0], [...command.slice(1), repository, tag, file], { encoding: "utf8" });
   if (run.error) throw new Refusal(`${command[0]} cannot be run: ${run.error.message}`);
@@ -208,7 +208,7 @@ export function deploymentOfTheList(app, deploymentFile) {
 // What a build of app holds at the root of its archive, and what a release of it is made of: its
 // page, its assets, the schema of /deployment.json, the table of the CSP header and the notices of
 // the licenses of what it bundles, NOTICE and LICENSE; never a deployment.json of its own, which is
-// the deployment's (R17; R85 spec).
+// the deployment's.
 const BUILD_FILES = ["index.html", "deployment.schema.json", "csp.json", "NOTICE", "LICENSE"];
 
 // The archive of a build unpacked into dir, once its listing shows nothing but files and folders
@@ -301,8 +301,8 @@ export function defaultOf(lines, name) {
 }
 
 // api's address as the configuration makes it, the output api_origin of tofu/outputs.tf:
-// https://<api_service_name>-<the project's number>.<region>.run.app (R05). The number is in the
-// provider of the federated pool tofu/ci.env names (R13); the region and the service's name are the
+// https://<api_service_name>-<the project's number>.<region>.run.app. The number is in the provider
+// of the federated pool tofu/ci.env names; the region and the service's name are the
 // values of tofu/production.auto.tfvars, and the name, when they leave it out, its default in
 // tofu/variables.tf. Null with no tofu/ci.env in the repository: no project to compare with.
 export function serviceOrigin(root) {
@@ -329,8 +329,7 @@ function configurationValue(root, values, name) {
 }
 
 // The lowest admission rung the configuration tells api's service and the jobs of the check: the
-// value of tofu/production.auto.tfvars, or, when they leave it out, its default in tofu/variables.tf
-// (R05).
+// value of tofu/production.auto.tfvars, or, when they leave it out, its default in tofu/variables.tf.
 export function configurationRung(root) {
   const rung = configurationValue(root, null, "api_admission_rung");
   if (!rung) throw new Refusal("neither tofu/production.auto.tfvars nor the default in tofu/variables.tf names api_admission_rung, and the rung the configuration tells api is not known");
@@ -338,7 +337,7 @@ export function configurationRung(root) {
 }
 
 // deployment, the parsed /deployment.json, read as spec's deployment configuration reads it, with
-// app open at origin: its schema, then its rules of reading (R85 spec; reading.mjs).
+// app open at origin: its schema, then its rules of reading (reading.mjs).
 export function deploymentReadBySpec(spec, deployment, origin) {
   const reading = readingOf(spec.validate, origin, deployment);
   if (!reading.refused_by) return;
@@ -348,8 +347,7 @@ export function deploymentReadBySpec(spec, deployment, origin) {
 
 // The build reads the version of the deployment configuration that spec has at the submodule's tag,
 // or it is refused, naming both: a build of a higher version waits for infra to move to a tag of
-// spec of that version, by a task of its own, and a build of a lower one is not the build to list
-// (R85 spec).
+// spec of that version, by a task of its own, and a build of a lower one is not the build to list.
 export function buildReadsSpecVersion(built, spec) {
   if (built.version > spec.version) {
     throw new Refusal(`the build reads the deployment configuration ${built.version}, and spec at the submodule's tag is of ${spec.version}: infra moves to a tag of spec of version ${built.version} first`);
@@ -368,7 +366,7 @@ export function deploymentHoldsToItsBuild(built, deployment) {
 
 // What a release asks of its deployment.json, with the build unpacked and app open at origin, in the
 // order of the check of a pull request: the file passes spec's reading, the build reads spec's
-// version, and the file holds to the build's schema (R17).
+// version, and the file holds to the build's schema.
 export function deploymentHolds(build, deploymentFile, origin) {
   const spec = specDeployment();
   const deployment = readDeployment(deploymentFile);
@@ -379,7 +377,7 @@ export function deploymentHolds(build, deploymentFile, origin) {
 }
 
 // The Content-Security-Policy header of a release, out of the build's csp.json and the
-// deployment.json it ships with (R17). csp.json is one table of directives, each name to its
+// deployment.json it ships with. csp.json is one table of directives, each name to its
 // sources as one string, with two places in it: {api}, which takes the origin of api, and
 // {authDomain}, the host sign-in's window is opened on (sources 4.5). frame-ancestors is 'none',
 // and a table that does not say so gets it: the header is the only place it holds, a meta tag
@@ -448,7 +446,7 @@ function factsHoldToTheTable(factsFile) {
 // The list's rung against the categories the facts name: any rung for an adult's facts alone, full
 // for facts that name a category under 18, one of underEighteen, in spec's order. tutor's list
 // selects its entries by the deployment's rung, not by the learner's category, so at the rung author
-// the entries the author's word admitted with no eval would read a child's work (R05; R149 spec).
+// the entries the author's word admitted with no eval would read a child's work.
 // What is not of the facts' form names no category here: the check of the facts refuses it.
 export function rungHoldsForFacts(facts, rung, underEighteen) {
   const named = new Set();
@@ -464,9 +462,9 @@ export function rungHoldsForFacts(facts, rung, underEighteen) {
 }
 
 // A self-hosted copy's folder of legal texts, production/legal, by spec's recipe legal-check-dir, as
-// spec's part legal/ has a copy check it (R115 spec), or, for the tests, a command that stands in
+// spec's part legal/ has a copy check it, or, for the tests, a command that stands in
 // for it with the same argument; the deployment lays the folder over api's image, where
-// API_LEGAL_DIR names it (R33). What is neither a file nor a folder is refused first: a link would
+// API_LEGAL_DIR names it. What is neither a file nor a folder is refused first: a link would
 // lay into the image what the review did not see. With no folder api serves the texts of its tag of
 // spec, as the platform's does, and there is nothing to check.
 export function legalFolder(deployDir, command = [JUST, "-f", path.join(SPEC, "justfile"), "legal-check-dir"]) {
@@ -555,7 +553,7 @@ export async function run(deployDir, base, standIns = {}) {
       deploymentReadBySpec(spec, deployment, HOSTED_ORIGIN);
       return `production/deployment.json is accepted by spec's reading of the deployment configuration ${spec.version}`;
     });
-    // The release of app compares the same once the configuration is applied, by its outputs (R17);
+    // The release of app compares the same once the configuration is applied, by its outputs;
     // here, before the merge, by the files the outputs come from.
     await step("production/deployment.json names api at its service's address", () => {
       if (!deployment) return "api in production/deployment.json is not compared with its service's address: the file was not read";

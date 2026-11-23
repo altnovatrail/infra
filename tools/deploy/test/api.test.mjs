@@ -408,7 +408,7 @@ test("an output the configuration does not give is refused before anything runs"
 });
 
 // A self-hosted copy: its own project, region and registry come from the configuration's outputs,
-// and nothing of the platform's own deployment reaches a command, through a whole release (R21).
+// and nothing of the platform's own deployment reaches a command, through a whole release.
 test("a copy's release runs on the copy's project, region and registry, every command of it", () => {
   const w = world({ project: "acme-learning-1", region: "europe-west3" });
   const r = w.run("release");

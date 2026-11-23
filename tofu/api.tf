@@ -1,16 +1,16 @@
-# api's Cloud Run service and jobs, and the schedule of the jobs that run by the clock (R11).
+# api's Cloud Run service and jobs, and the schedule of the jobs that run by the clock.
 #
 # Which image they run is the deployment's to say, and so is the one value a deployment changes
 # beside it: the version of the facts secret that the service and the jobs of the check mount. The
 # configuration sets the two only when it creates the service or a job, and owns everything around
 # them — the lowest admission rung, the mode of reading, the catalog's list of modules and the
 # version of the platform's key of Anthropic among it —, each a value of the deployment's file of
-# values (R05; R25; R106 spec).
+# values.
 #
 # Nothing here exists until api_image names an image in this project's registry: a Cloud Run
 # resource cannot be made without one, and Google's placeholder image is no production image of
-# NovaTrail (R105 spec). The jobs come first and the service after them, once api_serving says so,
-# so that the service is made on a database the jobs have already migrated (R05).
+# NovaTrail. The jobs come first and the service after them, once api_serving says so, so that the
+# service is made on a database the jobs have already migrated.
 
 locals {
   api_created = var.api_image != null
@@ -31,14 +31,13 @@ locals {
 
   # The lowest admission rung, which the list's admission.rung names too, the mode of reading and the
   # catalog's list of modules, unset when it is empty: the service and the jobs of the check are told
-  # the same, so that api check checks what the revision will run with (R25; R45 api, R79 api,
-  # R88 api).
+  # the same, so that api check checks what the revision will run with.
   admission_rung = var.api_admission_rung
   reading_mode   = var.api_reading_mode
   catalog        = length(var.api_catalog_modules) > 0 ? { API_CATALOG_MODULES = join(",", var.api_catalog_modules) } : {}
 
   # Where the service reads the platform's key of Anthropic, a file of one exact version of its
-  # secret, with the path in API_ANTHROPIC_KEY_FILE (R46 api); none when no version is named.
+  # secret, with the path in API_ANTHROPIC_KEY_FILE; none when no version is named.
   anthropic_key_dir  = "/etc/api/anthropic"
   anthropic_key_file = "key"
   anthropic_key      = var.api_anthropic_key_version == null ? {} : { "anthropic-key" = var.api_anthropic_key_version }
@@ -60,7 +59,7 @@ locals {
 
   # The store of the scans of the parents' consent forms: the bucket bootstrap.sh makes, and api's
   # prefix in it, under which bootstrap.sh grants api's service account the right to create and
-  # erase objects (R28). api takes the prefix only with its slash at the end (README api).
+  # erase objects. api takes the prefix only with its slash at the end (README api).
   consent_forms_prefix = "consent-forms/"
   consent_forms = {
     API_CONSENT_FORMS_BUCKET = var.consent_forms_bucket
@@ -68,7 +67,7 @@ locals {
   }
 
   # The origin app is served at, the one api answers CORS for: the default site, named after the
-  # project (R06).
+  # project.
   app_origin = "https://${google_firebase_hosting_site.app.site_id}.web.app"
 
   # The jobs that run by the clock, once the service exists: before it, the first deployment has not
@@ -88,7 +87,7 @@ resource "google_cloud_run_v2_service" "api" {
   location = var.region
 
   # app calls it from the families' browsers, over the public internet, at its own address on
-  # run.app (R06).
+  # run.app.
   ingress = "INGRESS_TRAFFIC_ALL"
 
   # Nothing is lost with the service: the data is in api's databases, and the service is made again
@@ -144,13 +143,13 @@ resource "google_cloud_run_v2_service" "api" {
         value = local.admission_path
       }
 
-      # How tutor reads handwriting: the two readers of R68 spec, or Haiku alone (R88 api).
+      # How tutor reads handwriting: the two readers, or Haiku alone.
       env {
         name  = "API_READING_MODE"
         value = local.reading_mode
       }
 
-      # The Firebase project whose ID tokens api accepts: the platform's own (R16).
+      # The Firebase project whose ID tokens api accepts: the platform's own.
       env {
         name  = "API_FIREBASE_PROJECT_ID"
         value = var.project_id
@@ -169,7 +168,7 @@ resource "google_cloud_run_v2_service" "api" {
         value = local.app_origin
       }
 
-      # Which modules the catalog may give, when the deployment names them (R150 spec).
+      # Which modules the catalog may give, when the deployment names them.
       dynamic "env" {
         for_each = local.catalog
 
@@ -189,7 +188,7 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
 
-      # Where serve puts a parent's scan of a consent form, and erases it (R28).
+      # Where serve puts a parent's scan of a consent form, and erases it.
       dynamic "env" {
         for_each = local.consent_forms
 
@@ -200,9 +199,9 @@ resource "google_cloud_run_v2_service" "api" {
       }
 
       # The pooler's connection strings, each in its variable from the latest version of its secret,
-      # resolved when an instance starts: api takes a secret from its variable or from a file, alike
-      # (R26 api). Not volumes: the facts' volume stays the service's first, the one whose version
-      # the deployment changes and the configuration leaves alone by its place.
+      # resolved when an instance starts: api takes a secret from its variable or from a file alike.
+      # Not volumes: the facts' volume stays the service's first, the one whose version the
+      # deployment changes and the configuration leaves alone by its place.
       dynamic "env" {
         for_each = local.api_service_secrets
 
@@ -234,7 +233,7 @@ resource "google_cloud_run_v2_service" "api" {
     }
 
     # The deployment facts, a file in one version of the secret. The deployment adds each version
-    # and mounts the one it names; at creation the latest stands in (R05).
+    # and mounts the one it names; at creation the latest stands in.
     volumes {
       name = "admission-facts"
 
@@ -282,7 +281,7 @@ resource "google_cloud_run_v2_service" "api" {
   # computes it when no block names it, so a move of traffic is not undone by the next apply. The
   # apply sends back the traffic it read. Once a deployment has given all of it to one revision by
   # name, a change to the template here makes a revision that takes none, and reaches the traffic
-  # with the next deployment of api, whose revision is made from this template (R15); before that,
+  # with the next deployment of api, whose revision is made from this template; before that,
   # the service follows its latest revision.
   lifecycle {
     ignore_changes = [
@@ -307,9 +306,9 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 # api's jobs, one for each entry of the list, with the same image as the service once the deployment
 # has set it. A job added to the list later is made with api_image, the first image, and gets the
 # serving one when the deployment sets the image of every job: a job joins the list with the release
-# of api that has its command, so the deployment of that release follows its apply (R05). A job's
+# of api that has its command, so the deployment of that release follows its apply. A job's
 # secrets come as files, each the latest version of its secret, with the path in the variable the
-# name names with the suffix _FILE, as api reads any secret (R29 api).
+# name names with the suffix _FILE, as api reads any secret.
 resource "google_cloud_run_v2_job" "api" {
   for_each = local.api_created ? var.api_jobs : {}
 
@@ -342,17 +341,17 @@ resource "google_cloud_run_v2_job" "api" {
         }
 
         # The same Firebase project as the service's, for a job that goes through api's users of
-        # sign-in (R16).
+        # sign-in.
         env {
           name  = "API_FIREBASE_PROJECT_ID"
           value = var.project_id
         }
 
         # A job of the check checks the facts, the rung, the mode of reading and the catalog's list
-        # the revision will run with: the same rung, mode and list, and the facts at the same path
-        # (R05; R106 spec). It reads no key, as api check does not.
+        # the revision will run with: the same rung, mode and list, and the facts at the same path.
+        # It reads no key, as api check does not.
         # The store of the scans goes to a job that opens it, and to a job of the check, which checks
-        # it as the revision will take it (R28).
+        # it as the revision will take it.
         dynamic "env" {
           for_each = merge(
             each.value.deploy == "check" ? merge({
@@ -398,7 +397,7 @@ resource "google_cloud_run_v2_job" "api" {
       }
 
       # The facts come first, in a job of the check: the deployment sets the version it has just
-      # added, the one the revision will mount, before it runs the job (R15), and the configuration
+      # added, the one the revision will mount, before it runs the job, and the configuration
       # leaves that version alone by the volume's place. In a job of another part the first volume is
       # one of its own secrets, at the latest version, which nothing but the configuration sets. A
       # job that leaves the check keeps in the state the version its facts had: name it anew, by

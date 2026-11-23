@@ -1,19 +1,19 @@
-# The identities of api and of its deployment, and the narrow rights each holds (R11).
+# The identities of api and of its deployment, and the narrow rights each holds.
 #
 # The pool a deployment's tokens are exchanged in is not described here. It is what this
 # configuration itself is applied through, and a door is not built by whoever walks in by it: the
 # pool, its provider and the identity that applies the configuration are made once, from outside,
-# by bootstrap.sh, and named here by id (R13).
+# by bootstrap.sh, and named here by id.
 #
 # Nor are the three custom roles below, the deployment's, the publisher's and api's of sign-in:
 # bootstrap.sh makes them and holds their permissions, and the configuration grants them by name.
 # The identity that applies the configuration may grant the publisher's role and api's on the
 # project, and IAM's limit on such a grant holds only while that identity cannot change the role
-# itself, so it holds no right to change any role (R13).
+# itself, so it holds no right to change any role.
 #
 # The deployment's identity is lent to the jobs of one GitHub environment, by the subject GitHub
 # gives such a job, which names the environment: infra's workflow of the deployment alone, never a
-# component's repository, which has no access to production (R106 spec).
+# component's repository, which has no access to production.
 
 locals {
   # Everybody whose token carries the repository's subject, ready for its environment.
@@ -59,8 +59,8 @@ resource "google_secret_manager_secret_iam_member" "api_reads_anthropic_key" {
   member    = "serviceAccount:${google_service_account.api.email}"
 }
 
-# How a deployment gets in: an identity with just enough rights for the steps of R05, borrowed by
-# the jobs of the environment that deploys. No service account key exists anywhere.
+# How a deployment gets in: an identity with just enough rights for the deployment's steps,
+# borrowed by the jobs of the environment that deploys. No service account key exists anywhere.
 resource "google_service_account" "deployer" {
   account_id   = "${var.api_service_name}-deploy"
   display_name = "Deployment identity of ${var.api_service_name}"
@@ -92,7 +92,7 @@ resource "google_secret_manager_secret_iam_member" "deployer_adds_facts" {
 # run the jobs with the new image and roll a revision of the one service — and only those. The
 # ready-made developer role carries far more, deleting the service among it; a deployment needs
 # the permissions of bootstrap.sh's role apiDeployer, run.operations.get among them, granted on the
-# service and on each job (R11).
+# service and on each job.
 resource "google_cloud_run_v2_service_iam_member" "deployer" {
   count = local.api_serving ? 1 : 0
 
@@ -121,11 +121,10 @@ resource "google_service_account_iam_member" "deployer_runs_as_api" {
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# The publisher of app's build on Hosting, and nothing else (R12). Its job releases a build that
-# came from elsewhere through Hosting's REST API (R17), so it has an environment and an identity
+# The publisher of app's build on Hosting, and nothing else. Its job releases a build that
+# came from elsewhere through Hosting's REST API, so it has an environment and an identity
 # of its own and reaches neither api, nor this configuration, nor the settings of sign-in:
-# <project>.web.app is put among the authorized domains by the configuration itself (sign_in.tf;
-# R16).
+# <project>.web.app is put among the authorized domains by the configuration itself (sign_in.tf).
 resource "google_service_account" "hosting" {
   account_id   = "hosting-publish"
   display_name = "Publishes app's build on Firebase Hosting"
@@ -141,7 +140,7 @@ resource "google_service_account_iam_member" "hosting_from_github" {
 
 # Every grant on the project, in one list: the condition bootstrap.sh puts on the configuration's
 # right to grant there names the same roles, a test holds the two together, and tf-check refuses a
-# grant on the project declared anywhere else (R13).
+# grant on the project declared anywhere else.
 resource "google_project_iam_member" "grants" {
   for_each = local.project_grants
 
@@ -161,7 +160,7 @@ locals {
     # bootstrap.sh's role hostingPublisher, the ready-made Firebase Hosting Admin less the making
     # and the deleting of sites. A release goes through firebasehosting.sites.update, and the site
     # app's address is stays out of its reach. It is made by Hosting's REST API, which reads no API
-    # key, so the publisher holds no reading of them (R17).
+    # key, so the publisher holds no reading of them.
     hosting = {
       role   = local.hosting_role
       member = "serviceAccount:${google_service_account.hosting.email}"
@@ -169,7 +168,7 @@ locals {
 
     # Sign-in takes no grant on anything smaller than the project either, so api's role of it is
     # there: bootstrap.sh's signInUsers, which reads a user, revokes the user's tokens and deletes
-    # the user, and changes no setting of sign-in (R16).
+    # the user, and changes no setting of sign-in.
     api_sign_in = {
       role   = local.sign_in_role
       member = "serviceAccount:${google_service_account.api.email}"

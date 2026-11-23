@@ -1,5 +1,5 @@
 # What a deployment says about itself. The platform's values come in a file of their own when its
-# project is created; a self-hosted copy gives its own (R10). Each part of the configuration
+# project is created; a self-hosted copy gives its own. Each part of the configuration
 # brings the variables it needs.
 
 variable "project_id" {
@@ -73,7 +73,7 @@ variable "image_max_age" {
   }
 }
 
-# The spend alert (R06).
+# The spend alert.
 
 variable "billing_account" {
   description = "The billing account the project pays through; the spend alert is made on it. It names the account that pays, so it is not written beside the deployment's other values and arrives from the environment, as TF_VAR_billing_account."
@@ -106,7 +106,7 @@ variable "budget_currency" {
   }
 }
 
-# The alerts on Cloud Run's built-in metrics (R07).
+# The alerts on Cloud Run's built-in metrics.
 
 variable "operator_email" {
   description = "The address the alerts are mailed to, and the project's contact for Google's security notifications. Empty means neither. It is a person's address, so it is not written in this repository: it arrives from the environment, as TF_VAR_operator_email."
@@ -145,7 +145,7 @@ variable "error_alert_per_minute" {
   }
 }
 
-# api's service and jobs (R11).
+# api's service and jobs.
 
 variable "api_serving" {
   description = "Whether api's service is made: once api_image has made the jobs and the first deployment has run the check of the configuration and the migrations with them. Until then there are jobs and no service, so the first revision starts on a database already migrated."
@@ -184,14 +184,14 @@ variable "api_jobs" {
 
   # The jobs api's binary has (README api). check checks the deployment's facts and rung for
   # admission to AI, before the migrations, and reads no database: the configuration gives it the
-  # facts and the rung itself (R05; R45 api). migrate applies the migrations of both databases with
+  # facts and the rung itself. migrate applies the migrations of both databases with
   # each deployment. sweep is the daily pass that finishes the deletions a request left and deletes
   # what is past its term: by the clock, at 09:00 UTC, night in every time zone of the US, where the
-  # platform's learners are (R109 spec). A pass runs 9 minutes at most, sweep's -for, and reads what
+  # platform's learners are. A pass runs 9 minutes at most, sweep's -for, and reads what
   # serve opens: the pooler's strings, the service's own secrets, and the store of the scans of
   # consent forms, whose scans past their term it erases. after is the pass the deployment runs once
   # the new revision takes all traffic: it closes "unchecked" what is open on packages the image no
-  # longer gives (R106 spec; R51 api). It reads api's pooler's string alone, the service's own
+  # longer gives. It reads api's pooler's string alone, the service's own
   # secret, and the packages at the image's API_PACKAGES_DIR, and its pass runs 9 minutes at most,
   # as sweep's does.
   default = {
@@ -342,10 +342,10 @@ variable "api_request_timeout" {
 
 # Platform AI on the deployment: the lowest admission rung, the mode of reading, the catalog's list
 # of modules and the platform's key of Anthropic, which the service and the jobs of the check are
-# told (R25).
+# told.
 
 variable "api_admission_rung" {
-  description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so, as on novatrail (R45, R79 api; R149 spec). The list's admission.rung names the same, and the list's check holds the two equal (R05)."
+  description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so, as on novatrail (R149 spec). The list's admission.rung names the same, and the list's check holds the two equal (R05)."
   type        = string
   default     = "full"
   nullable    = false
@@ -391,7 +391,7 @@ variable "api_anthropic_key_version" {
   }
 }
 
-# The operator's buckets (R28). bootstrap.sh makes both and holds all their access, with the
+# The operator's buckets. bootstrap.sh makes both and holds all their access, with the
 # operator's rights; the configuration makes neither and grants nothing in them.
 
 variable "operator_bucket" {
@@ -419,7 +419,7 @@ variable "consent_forms_bucket" {
   }
 }
 
-# Who may deploy: the jobs of one GitHub environment of infra's repository (R11).
+# Who may deploy: the jobs of one GitHub environment of infra's repository.
 
 variable "workload_identity_pool_id" {
   description = "The federated pool the repository's tokens are exchanged in. It exists before this configuration is ever applied, since the apply itself signs in through it, so it is named here rather than made: bootstrap.sh makes it under this id, which it reads from the same file of values (R13)."
@@ -458,7 +458,7 @@ variable "deploy_environment" {
   }
 
   # production-config is the environment whose jobs borrow the identity this configuration is applied
-  # as, which bootstrap.sh lends to them alone (R13).
+  # as, which bootstrap.sh lends to them alone.
   validation {
     condition     = lower(var.deploy_environment) != "production-config"
     error_message = "deploy_environment is not production-config, in any case of letters: that environment's jobs apply this configuration, and no other identity is lent to them."

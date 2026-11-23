@@ -1,13 +1,13 @@
 # The keys for eval are read by the jobs of the GitHub environment eval straight through the pool
-# github-eval, with no service account between and no long-lived copy in GitHub (R120 spec).
+# github-eval, with no service account between and no long-lived copy in GitHub.
 #
-# The pool and its provider are bootstrap.sh's, with R120 spec's condition, though R120 spec puts
-# them in the module: no IAM condition narrows a right over pools to one of them, so the right to
-# make this pool would be the right to change the pool this configuration is applied through
-# (R13; R20).
+# The pool and its provider, with the condition that admits those jobs alone, are bootstrap.sh's,
+# though R120 spec puts them in the module: no IAM condition narrows a right over pools to one of
+# them, so the right to make this pool would be the right to change the pool this configuration is
+# applied through (R20).
 
 locals {
-  # The ids bootstrap.sh gives the pool and its provider, and the environment R120 spec names.
+  # The ids bootstrap.sh gives the pool and its provider, and the environment of the eval jobs.
   eval_pool        = "github-eval"
   eval_provider    = "github"
   eval_environment = "eval"

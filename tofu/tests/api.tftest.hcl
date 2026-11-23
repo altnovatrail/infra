@@ -1,5 +1,5 @@
 # api's service, jobs and schedule, and the identities of api and of its deployment, checked against
-# mock providers: no credential, no call to Google (R11). The values are synthetic, the image's
+# mock providers: no credential, no call to Google. The values are synthetic, the image's
 # digest among them.
 
 mock_provider "google" {
@@ -477,7 +477,7 @@ run "a_job_of_the_check_reads_the_facts_and_the_rung_the_service_does" {
 
 # Platform AI on a deployment at the rung author: the rung author, the mode single and the catalog's
 # list go to the service and to the job of the check, and the key, an exact version of its secret,
-# to the service alone, as its second volume (R25).
+# to the service alone, as its second volume.
 run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
   command = plan
 
@@ -543,8 +543,7 @@ run "the_rung_the_catalog_and_the_key_reach_the_service_and_the_check" {
 }
 
 # Handwriting read by Haiku alone: the mode goes to the service and to the job of the check at the
-# rung full too; at author, the run of the rung, the catalog and the key below checks it (R25;
-# R88 api).
+# rung full too; at author, the run of the rung, the catalog and the key below checks it.
 run "the_mode_single_reaches_the_service_and_the_check" {
   command = plan
 
@@ -694,7 +693,7 @@ run "a_job_with_a_schedule_runs_by_the_clock" {
 }
 
 # The deployment's way in: one GitHub environment of the repository, and the rights the
-# deployment's steps need, each on its own resource (R05).
+# deployment's steps need, each on its own resource.
 run "the_deployment_holds_what_its_steps_need_and_no_more" {
   command = plan
 
@@ -829,7 +828,7 @@ run "a_job_timeout_past_168_hours_is_refused" {
 }
 
 # The alert on a job by the clock that did not run looks 25 hours back: a job that runs less often
-# than every day, or may run longer than 3000s, would empty the window with nothing missed (R07).
+# than every day, or may run longer than 3000s, would empty the window with nothing missed.
 run "a_job_by_the_clock_not_every_day_is_refused" {
   command = plan
 
@@ -909,8 +908,7 @@ run "a_request_timeout_past_an_hour_is_refused" {
 }
 
 # Each job's part in api's deployment, which the deployment reads from the configuration's outputs
-# with the service's name and the file of the facts: migrate migrates; a job of the clock has none
-# (R15).
+# with the service's name and the file of the facts: migrate migrates; a job of the clock has none.
 run "the_deployment_reads_the_jobs_parts_from_the_outputs" {
   command = plan
 

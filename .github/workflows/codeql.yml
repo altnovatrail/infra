@@ -1,5 +1,5 @@
-# CodeQL over the repository's workflows and its languages (R09 .github), pinned to a release of
-# .github. The job gives the shared workflow what it needs to upload its results. Besides the
+# CodeQL over the repository's workflows and its languages, pinned to a release of .github. The
+# job gives the shared workflow what it needs to upload its results. Besides the
 # workflows, the code is JavaScript: the checks and the deployment under tools/ and the tests of
 # tofu/. CodeQL analyses neither HCL nor bash: its list of supported languages names neither
 # (CodeQL, Supported languages and frameworks, read 2026-11-09).

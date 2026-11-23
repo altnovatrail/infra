@@ -40,7 +40,7 @@ output "api_service_url" {
 
 # The deterministic address of the service, which Cloud Run gives a service for its name, its
 # project's number and its region, and which is known before the service is: /deployment.json names
-# it with the first list (R05). api_service_name stays short enough for its jobs' names, so the DNS
+# it with the first list. api_service_name stays short enough for its jobs' names, so the DNS
 # segment of name and number stays under the 63 characters such an address may have.
 output "api_origin" {
   description = "api's origin as /deployment.json names it: https://<service>-<project number>.<region>.run.app, known before the service exists."
@@ -58,7 +58,7 @@ output "hosting_url" {
 }
 
 # What production/deployment.json names in signIn, for the operator to write into it: the file is
-# the list's, reviewed in its pull request, and the deployment copies it as it is (R05; R17).
+# the list's, reviewed in its pull request, and the deployment copies it as it is.
 output "app_sign_in" {
   description = "The signIn block of /deployment.json: the Firebase web app app signs in as."
   value = {
@@ -76,7 +76,7 @@ output "hosting_service_account" {
 }
 
 # What api's deployment works on, read with tofu output -json in the deployment's job after the
-# apply (R15): the service, the jobs with their part in the deployment, and the file of the facts.
+# apply: the service, the jobs with their part in the deployment, and the file of the facts.
 output "api_service_name" {
   description = "The name of api's Cloud Run service, whether it is made yet or not."
   value       = var.api_service_name
@@ -93,7 +93,7 @@ output "admission_facts_file" {
 }
 
 # What modules and tutor sign in with and read, for the operator to hand them: the provider of the
-# pool bootstrap.sh makes, and the secrets by provider (R120 spec; R20). null with no eval.
+# pool bootstrap.sh makes, and the secrets by provider. null with no eval.
 output "eval_access" {
   description = "The workload identity provider of the pool github-eval and the eval secrets by provider, or null with no eval."
   value = length(var.eval_github_subject_prefixes) == 0 ? null : {
@@ -103,7 +103,7 @@ output "eval_access" {
 }
 
 # The GitHub environments whose jobs may borrow api's deployment and the publisher: the workflow runs
-# its jobs in them, and checks first that each is there and run from main alone (R18).
+# its jobs in them, and checks first that each is there and run from main alone.
 output "deploy_environment" {
   description = "The GitHub environment of api's deployment."
   value       = var.deploy_environment

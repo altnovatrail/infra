@@ -1,6 +1,6 @@
 // The test of tofu/bootstrap.sh, with no cloud: gcloud-stub.mjs stands in for gcloud ahead on
 // PATH, and synthetic values stand in for production.auto.tfvars and backend.hcl. It holds the
-// script to what R13 and R28 say it makes, to what it takes back on a run again, to its refusals,
+// script to what it makes, to what it takes back on a run again, to its refusals,
 // and to never printing the billing account or a person's address. Run by `just bootstrap-test`.
 
 import assert from "node:assert/strict";
@@ -106,7 +106,7 @@ const unconditioned = (state) =>
 
 const expression = `api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['projects/${project}/roles/hostingPublisher', 'projects/${project}/roles/signInUsers'])`;
 
-// Each test has a world of its own, so that they run four at a time (R32).
+// Each test has a world of its own, so that they run four at a time.
 suite("bootstrap.sh", { concurrency: 4 }, () => {
   test("a first run makes the project, its state, the pool and the configuration's identity", async () => {
     const w = world();
@@ -145,7 +145,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
     });
   });
 
-  // modules and tutor, as the platform names them: their subjects are public (R120 spec).
+  // modules and tutor, as the platform names them: their subjects are public.
   const evalList = 'eval_github_subject_prefixes = ["repo:altnovatrail@344507087/modules@1425775415", "repo:altnovatrail@344507087/tutor@1425813274"]';
   const evalCondition =
     "assertion.repository_owner_id=='344507087' && (assertion.repository_id=='1425775415' || assertion.repository_id=='1425813274') && assertion.environment=='eval' && assertion.actor!='dependabot[bot]'";
@@ -492,7 +492,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
     assert.ok(!w.calls().some((c) => c.join(" ").startsWith("iam roles create")), w.calls().map((c) => c.join(" ")).join("\n"));
   });
 
-  // -- the operator's buckets (R28) ---------------------------------------------------------------
+  // -- the operator's buckets ---------------------------------------------------------------------
 
   const operatorBucket = `gs://${project}-operator`;
   const consentBucket = `gs://${project}-consent-forms`;
@@ -523,7 +523,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
     },
   };
 
-  // The one binding of a new bucket each bucket keeps: the project's owners keep the bucket (R28).
+  // The one binding of a new bucket each bucket keeps: the project's owners keep the bucket.
   const owners = { role: "roles/storage.legacyBucketOwner", member: `projectOwner:${project}`, condition: "" };
   const operatorPolicy = [
     owners,
@@ -743,7 +743,7 @@ suite("bootstrap.sh", { concurrency: 4 }, () => {
     }
   });
 
-  // BREACH.md ends a person's access by a run again with their variable set to none (R27).
+  // BREACH.md ends a person's access by a run again with their variable set to none.
   test("a run again with a person set to none takes back all they held, and keeps the others' access", async () => {
     const w = applied();
     assert.equal((await w.run({ BOOTSTRAP_EVAL_SET_ORGANIZER: measureOrganizer })).status, 0);
