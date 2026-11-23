@@ -499,7 +499,7 @@ export async function run(deployDir, base, standIns = {}) {
   const listFile = path.join(deployDir, "production.json");
   if (!fs.existsSync(listFile)) {
     // A list once on main is not taken away by a pull request: the next list would then be held to
-    // no tag of api, and api goes forward only (R05).
+    // no tag of api, and api goes forward only.
     if (base && baseList(base, deployDir)) throw new Refusal(`production.json is gone, and ${base} has one: a pull request changes the list, it does not remove it`);
     return { lines: [`deploy-check: ${listFile} is not there yet, and there is nothing to check`], refusals: [] };
   }

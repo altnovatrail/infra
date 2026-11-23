@@ -1,6 +1,6 @@
 // app: the release of app's build on Firebase Hosting by the list, in the steps below, through
 // Hosting's REST API rather than the Firebase CLI: the steps are five calls, and the CLI is a large
-// program of somebody else's that asks for more than a release needs (R17).
+// program of somebody else's that asks for more than a release needs.
 //
 //   node tools/deploy/app.mjs release <outputs.json> [<deploy dir>]
 //   node tools/deploy/app.mjs check <outputs.json> [<deploy dir>]

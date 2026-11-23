@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "The deployment's list",
-  "description": "deploy/production.json, format 1: the exact releases of api and of app's build that the deployment ships, by tag and sha256 of each file, and the lowest admission rung of api's models (R05). A pull request changes it by hand, and its merge into main is the deployment. A field this schema does not know is an error.",
+  "description": "deploy/production.json, format 1: the exact releases of api and of app's build that the deployment ships, by tag and sha256 of each file, and the lowest admission rung of api's models. A pull request changes it by hand, and its merge into main is the deployment. A field this schema does not know is an error.",
   "type": "object",
   "properties": {
     "format": {
@@ -21,7 +21,7 @@
             "name": {
               "type": "string",
               "pattern": "^api_v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)_linux_amd64$",
-              "description": "The binary's file in the release, api_<tag>_linux_amd64, as api's release names it (R28 api); the check holds its tag to release."
+              "description": "The binary's file in the release, api_<tag>_linux_amd64, as api's release names it; the check holds its tag to release."
             },
             "sha256": {
               "$ref": "#/$defs/sha256"
@@ -44,7 +44,7 @@
       },
       "required": ["release", "binary", "dockerfile"],
       "unevaluatedProperties": false,
-      "description": "The release of api. The packages of the modules are not named here: the build of api's image puts them in by the modules.json its binary holds (R07 api)."
+      "description": "The release of api. The packages of the modules are not named here: the build of api's image puts them in by the modules.json its binary holds."
     },
     "app": {
       "type": "object",
@@ -89,7 +89,7 @@
       "properties": {
         "rung": {
           "enum": ["author", "full"],
-          "description": "The lowest admission rung of api's models, by tutor's code: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so (R149 spec). The check of the list holds it to the rung the configuration tells api, api_admission_rung of tofu/ (R05)."
+          "description": "The lowest admission rung of api's models, by tutor's code: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so. The check of the list holds it to the rung the configuration tells api, api_admission_rung of tofu/."
         }
       },
       "required": ["rung"],
