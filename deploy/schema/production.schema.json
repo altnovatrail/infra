@@ -89,7 +89,7 @@
       "properties": {
         "rung": {
           "enum": ["author", "full"],
-          "description": "The lowest admission rung of api's models, by tutor's code: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so (R45, R79 api; R149 spec). The check of the list holds it to the rung the configuration tells api, api_admission_rung of tofu/ (the 2026-11-16 amendment to R05)."
+          "description": "The lowest admission rung of api's models, by tutor's code: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so (R149 spec). The check of the list holds it to the rung the configuration tells api, api_admission_rung of tofu/ (R05)."
         }
       },
       "required": ["rung"],

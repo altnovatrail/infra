@@ -50,7 +50,7 @@ switch (true) {
     break;
   case command === "storage objects update": {
     const found = object(positional[3]);
-    // A Custom-Time can be neither removed nor decreased, but by a rewrite (sources 10.3).
+    // A Custom-Time can be neither removed nor decreased, but by a rewrite.
     if (args.includes("--clear-custom-time") && found.customTime) fail("HTTPError 400: Custom time cannot be removed.");
     const wanted = flag("custom-time");
     if (wanted !== undefined) {
@@ -73,7 +73,7 @@ switch (true) {
   }
   case positional.slice(0, 2).join(" ") === "storage mv": {
     // A copy, which keeps the source's Custom-Time unless --custom-time names another, then an
-    // erasure; never onto the source itself (sources 10.8).
+    // erasure; never onto the source itself.
     const [from, to] = positional.slice(2).map(nameOf);
     if (from === to) fail(`Source URL matches destination URL: gs://${state.bucket}/${from}`);
     if (state.failMove === to) fail(`HTTPError 503: ${to}`);

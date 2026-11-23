@@ -1,5 +1,5 @@
-// target: what a run of the deployment's workflow delivers (R05, R18), decided once by its first
-// job and asked again by every later job on a retry.
+// target: what a run of the deployment's workflow delivers, decided once by its first job and
+// asked again by every later job on a retry.
 //
 //   node tools/deploy/target.mjs target <commit> [--by-hand=<parts>]
 //   node tools/deploy/target.mjs current <commit>
@@ -9,21 +9,21 @@
 // target prints, one `key=value` a line for $GITHUB_OUTPUT, whether the run delivers and which parts
 // of the list it delivers: `deliver`, `commit`, `image`, `api`, `facts`, `app`, each part true or
 // false. It delivers only while main still stands on <commit>, and only once the project is set up:
-// tofu/ci.env, tofu/production.auto.tfvars and tofu/backend.hcl at <commit> (R18). The parts are
+// tofu/ci.env, tofu/production.auto.tfvars and tofu/backend.hcl at <commit>. The parts are
 // the list's blocks that changed against the commit of the last run of the workflow that delivered:
 // pushed to main, green, and its job Configuration through — a run that delivered nothing, because
 // main had moved on or the project was not set up, is green too and counts for nothing. Not against
 // the push before this one either, which a run waiting in the queue and replaced by a newer one, or a
 // run that failed, would leave undelivered. With no such run, every part the list has; with no list,
 // none, and the run applies the configuration alone. Until tofu/production.auto.tfvars names
-// api_image, api has no jobs to run a release with (R11), and a changed api is its image alone; until
+// api_image, api has no jobs to run a release with, and a changed api is its image alone; until
 // it sets api_serving = true, api has no service, and a changed app waits for the run that sets it,
-// which delivers app (R05). The part facts is facts.json and, for a self-hosted copy, its folder of
-// legal texts, deploy/production/legal/: either changed goes by api.sh's path of the facts (R33). So
+// which delivers app. The part facts is facts.json and, for a self-hosted copy, its folder of
+// legal texts, deploy/production/legal/: either changed goes by api.sh's path of the facts. So
 // does what else api's revision runs with but its image: the list's rung, and the values of
 // tofu/production.auto.tfvars that tell it the rung, the mode of reading, the catalog's list and the
 // key's version. The apply makes a revision of them that takes no traffic, and only a new revision
-// brings them to it (R05).
+// brings them to it.
 //
 // A run started by hand delivers the parts it names, among image, api, facts and app, and none when
 // it names none: --by-hand=<parts>, apart by commas, or, in the workflow, GITHUB_EVENT_NAME
@@ -32,14 +32,14 @@
 // it did deliver is delivered again by the next push, which is safe.
 //
 // current fails unless main still stands on <commit>: a job run again after main moved on would
-// roll production back to an older list (R45 canvas-api).
+// roll production back to an older list.
 //
 // identity prints, for $GITHUB_OUTPUT, the provider of the federated pool and the configuration's
-// identity that tofu/ci.env names, as bootstrap.sh printed them (R13), once each holds to its form.
+// identity that tofu/ci.env names, as bootstrap.sh printed them, once each holds to its form.
 //
 // environments fails unless each GitHub environment it names is there and is run from main alone:
 // the configuration lends its identities to the jobs of these environments, and GitHub makes an
-// environment a job names that it does not have, with no rule of branches (R18).
+// environment a job names that it does not have, with no rule of branches.
 //
 // It reads the repository it runs in, its origin and, for the last run that delivered, GitHub's
 // API with GITHUB_TOKEN; GITHUB_REPOSITORY names the repository, GITHUB_API_URL the API.
@@ -120,7 +120,7 @@ function objectAt(dir, commit, file) {
 // The GitHub environments the configuration lends its identities to — its own, api's deployment's
 // and app's publisher's, as its outputs name them — each there and run from main alone. A job that
 // names an environment GitHub does not have makes it, with no rule of branches, and then a workflow
-// of any branch could borrow the identity lent to it (R12, R13, R18).
+// of any branch could borrow the identity lent to it.
 export async function environmentsHoldToMain({ repository, token, names, api = "https://api.github.com" }) {
   if (!repository || !token) throw new Refusal("GITHUB_REPOSITORY and GITHUB_TOKEN name the repository and read its environments");
   for (const name of names) {
@@ -168,7 +168,7 @@ function setsVariable(dir, commit, name, holds) {
 const hasImage = (dir, commit) => setsVariable(dir, commit, "api_image", (value) => /^"[^"]+"/.test(value));
 
 // Whether the configuration of the commit makes api's service: app goes only once it is there, since
-// its /deployment.json names the service's address (R05).
+// its /deployment.json names the service's address.
 // The value true, or the string "true", which OpenTofu reads as the same bool.
 const hasServing = (dir, commit) => setsVariable(dir, commit, "api_serving", (value) => /^("true"|true)(\s|#|$)/.test(value));
 
@@ -238,7 +238,7 @@ export function decide({ dir, commit, tip, base, byHand = null }) {
   else lines.push(`against ${known.slice(0, 12)}, the last run that delivered: ${Object.entries(changed).filter(([, is]) => is).map(([part]) => part).join(", ") || "no part"} changed`);
   // app goes after api's service, whose address its /deployment.json names: a run before it would
   // ship a build that calls an api not there. The run that brings the service delivers it, changed
-  // or not since the last run that delivered, which held it back (R05).
+  // or not since the last run that delivered, which held it back.
   const serving = hasServing(dir, commit);
   const servingNew = serving && !(known && hasServing(dir, known));
   const app = serving && (changed.app || servingNew);

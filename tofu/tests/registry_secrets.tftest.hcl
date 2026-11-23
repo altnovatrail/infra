@@ -1,5 +1,5 @@
 # The registry of images and the secret of api's deployment facts, checked against mock providers:
-# no credential, no call to Google (R04, R05). The values are synthetic.
+# no credential, no call to Google. The values are synthetic.
 
 mock_provider "google" {
   mock_data "google_project" {
@@ -23,7 +23,7 @@ mock_provider "google-beta" {}
 
 
 # One repository of Docker images, in the region, never deleted by the configuration: the serving
-# revision's image is in it (R04, R05).
+# revision's image is in it.
 run "the_registry_is_in_the_region_and_kept" {
   command = plan
 
@@ -109,7 +109,7 @@ run "an_age_not_of_artifact_registrys_form_is_refused" {
 }
 
 # The facts' secret keeps its replicas in the region alone, and no value comes with it: the
-# deployment adds each version (R04, R05).
+# deployment adds each version.
 run "the_facts_secret_stays_in_the_region_without_a_value" {
   command = plan
 

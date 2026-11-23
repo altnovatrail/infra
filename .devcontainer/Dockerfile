@@ -107,17 +107,19 @@ FROM toolchain-core AS toolchain
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 # OpenTofu: the language of the root module in tofu/, whose fmt, validate and test run in this
-# stage. It never ships; its license, MPL 2.0, is a named exception (R09; R12 spec).
+# stage. It never ships and puts none of its code into what ships, so its license, MPL 2.0, is
+# allowed as a named exception.
 ARG OPENTOFU_VERSION=1.13.9
 # ShellCheck: the analyser of the repository's shell scripts, and of the workflows' scripts through
-# actionlint. It never ships; its license, GPL-3.0, is a named exception (R09; R12 spec).
+# actionlint. It never ships and puts none of its code into what ships, so its license, GPL-3.0,
+# is allowed as a named exception.
 ARG SHELLCHECK_VERSION=0.11.0
 # actionlint: the deployment's workflow runs only after a merge, so this check is where its mistakes
-# show before one (R18). Its license, MIT, is compatible with Apache-2.0 (R09).
+# show before one. Its license, MIT, is compatible with Apache-2.0.
 ARG ACTIONLINT_VERSION=1.7.12
 # The sums, as in the core: tofu_<version>_SHA256SUMS of the OpenTofu release, whose own signature
-# is checked by hand with gpg each time the version is raised (R09), actionlint_<version>_checksums.txt
-# of the actionlint release, and, for ShellCheck, which publishes no list of sums, the digest GitHub
+# is checked by hand with gpg each time the version is raised, actionlint_<version>_checksums.txt of
+# the actionlint release, and, for ShellCheck, which publishes no list of sums, the digest GitHub
 # gives each asset of the release, checked against the archive itself. The helper below is the
 # core's, written again as the devcontainer stage writes it.
 ARG OPENTOFU_SHA256_AMD64=b34b327cc1ef07178207b6f2cd1f5276537d3e5b7be316500f6dac50d4c0a857

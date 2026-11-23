@@ -1,5 +1,5 @@
-# NovaTrail's shared checks (R03 .github), pinned to a release of .github by SHA with its version
-# beside it; Dependabot moves both. The repository's own jobs go beside them.
+# NovaTrail's shared checks, pinned to a release of .github by SHA with its version beside it;
+# Dependabot moves both. The repository's own jobs go beside them.
 name: CI
 
 on:
@@ -31,8 +31,8 @@ jobs:
     uses: altnovatrail/.github/.github/workflows/documents.yml@f1c7e9e6f8245fdbdbc23c4091f3c26350e3a44e # v0.1.33
 
   # Each stage infra's jobs run in is built at most once a run, here, and handed to them as an
-  # artifact of the run (R32; R42 .github, R47 .github). The shared Documents check keeps the core's
-  # entry too, but builds its own on a miss: a called workflow does not see the jobs of this file.
+  # artifact of the run. The shared Documents check keeps the core's entry too, but builds its own
+  # on a miss: a called workflow does not see the jobs of this file.
   toolchain:
     name: Toolchain image
     runs-on: ubuntu-24.04
@@ -96,8 +96,8 @@ jobs:
           spec/tools/toolchain/toolchain.sh run just ci-actionlint
 
   # The checks of the deployment's list and the tests of the deployment, in the core: they call none
-  # of the three tools of OpenTofu's stage (R34). The whole history, so that the list on main is
-  # there to compare with (R14).
+  # of the three tools of OpenTofu's stage. The whole history, so that the list on main is there to
+  # compare with.
   # The check of a real release waits on the network, so it runs beside the tests on stand-ins, in a
   # container of its own, once deploy-check-test has installed the packages of tools/ it reads too.
   # Its output comes after theirs, even when one of them fails, and the step fails when any does.
@@ -142,7 +142,7 @@ jobs:
           if [ "$status" -ne 0 ]; then exit "$status"; fi
           spec/tools/toolchain/toolchain.sh run just ci-deploy-check origin/main
 
-  # The deployment's tools as its jobs install them, on the runner they run on (R18): each download
+  # The deployment's tools as its jobs install them, on the runner they run on: each download
   # against the sum written down, and the runner's Docker engine against the version named. A sum or
   # an engine that no longer holds shows here, in a pull request, not first in a deployment.
   tools:

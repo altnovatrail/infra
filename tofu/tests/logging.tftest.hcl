@@ -1,5 +1,5 @@
 # The logs and the traces, checked against mock providers, as the configuration's other tests are:
-# no credential, no call to Google (R04, R07). The values are synthetic.
+# no credential, no call to Google. The values are synthetic.
 
 mock_provider "google" {
   mock_data "google_project" {
@@ -25,7 +25,7 @@ mock_provider "google-beta" {}
 # Every sink the project has excludes Cloud Run's request logs, which hold the client's address,
 # the Data Access audit but Secret Manager's, Identity Platform's activity log and Firebase
 # Hosting's request logs: the ones to come too, since they are made from the same list, which
-# tf-check holds every sink to (R07).
+# tf-check holds every sink to.
 run "every_sink_excludes_what_the_platform_keeps_none_of" {
   command = plan
 
@@ -47,7 +47,7 @@ run "every_sink_excludes_what_the_platform_keeps_none_of" {
 
 # Of the Data Access audit, the reads of Secret Manager's versions alone are on, and the exclusion
 # lets through those reads of that one service and nothing else, so a breach shows who read a
-# connection string (R07).
+# connection string.
 run "the_reads_of_the_secrets_alone_are_audited_and_kept" {
   command = plan
 
@@ -78,7 +78,7 @@ run "the_reads_of_the_secrets_alone_are_audited_and_kept" {
 }
 
 # The _Default sink keeps taking what it took, word for word, and sends it to the region's bucket
-# rather than to the global one (R04).
+# rather than to the global one.
 run "the_default_sink_goes_to_the_regions_bucket" {
   command = plan
 
@@ -93,7 +93,7 @@ run "the_default_sink_goes_to_the_regions_bucket" {
   }
 }
 
-# The logs are kept 30 days in a bucket of the region (R04, R07).
+# The logs are kept 30 days in a bucket of the region.
 run "the_logs_are_kept_30_days_in_the_region" {
   command = plan
 
@@ -118,7 +118,7 @@ run "the_logs_are_kept_30_days_in_the_region" {
   }
 }
 
-# The place _Trace is made in, with the first trace, is the region (R04).
+# The place _Trace is made in, with the first trace, is the region.
 run "traces_are_kept_in_the_region" {
   command = plan
 
@@ -130,7 +130,7 @@ run "traces_are_kept_in_the_region" {
 
 # A self-hosted copy made in another region keeps its logs and traces there: nothing names us-east4
 # but the variable. This is a new project's plan, not a move: the log bucket is never deleted, and
-# _Trace keeps the place it was made in (R04).
+# _Trace keeps the place it was made in.
 run "another_region_moves_the_logs_and_the_traces" {
   command = plan
 

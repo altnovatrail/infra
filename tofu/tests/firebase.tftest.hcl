@@ -1,5 +1,5 @@
 # Firebase, the Hosting site of app's build and the identity that publishes it, checked against
-# mock providers: no credential, no call to Google (R06, R12).
+# mock providers: no credential, no call to Google.
 
 mock_provider "google" {
   mock_data "google_project" {
@@ -30,7 +30,7 @@ mock_provider "google-beta" {
 # The variables every run starts from are in tests/terraform.tfvars.
 
 # Firebase in the project, and its default Hosting site under the project's id, which makes app's
-# address <project>.web.app; the configuration never deletes it (R06).
+# address <project>.web.app; the configuration never deletes it.
 run "the_site_is_the_projects_and_kept" {
   command = plan
 
@@ -52,9 +52,9 @@ run "the_site_is_the_projects_and_kept" {
 
 # The publisher of app's build: lent to the jobs of production-hosting alone, holding Hosting's
 # rights less the making and deleting of sites — bootstrap.sh's role hostingPublisher, whose
-# permissions its test holds — and nothing else: nothing of api's, of sign-in or of API keys
-# (R12). With api's service made too, and the publisher given an address of its own,
-# so that a grant to it among api's would show.
+# permissions its test holds — and nothing else: nothing of api's, of sign-in or of API keys.
+# With api's service made too, and the publisher given an address of its own, so that a grant to it
+# among api's would show.
 run "the_publisher_holds_hosting_alone" {
   command = plan
 
@@ -136,7 +136,7 @@ run "one_environment_in_another_case_is_refused" {
   expect_failures = [var.hosting_environment]
 }
 
-# The web app app signs in as, kept, and the signIn block of /deployment.json out of it (R17).
+# The web app app signs in as, kept, and the signIn block of /deployment.json out of it.
 # Applied against the mocks: the web app's configuration is read once the web app is there, after
 # a plan.
 run "the_web_app_is_kept_and_gives_the_sign_in_block" {

@@ -1,7 +1,7 @@
 // fetch: one file of a release, downloaded with its bundle from the release on GitHub into <dir>,
 // of the sha256 the list names and accepted by spec's release-verify, as check.mjs takes it. The
 // deployment runs it again before it builds an image, so that what reaches production is the file
-// verified (R05, R15). Prints the file's path; a refusal is an error.
+// verified. Prints the file's path; a refusal is an error.
 //
 //   node tools/deploy-check/fetch.mjs <repository> <tag> <file> <sha256> <dir>
 

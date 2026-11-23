@@ -1,5 +1,5 @@
 # The tools a job of the deployment runs, each at its exact version and of its sha256, put on the
-# job's PATH by tools/ci/install.sh (R18): what it installs and from where is written there and in
+# job's PATH by tools/ci/install.sh: what it installs and from where is written there and in
 # tools/ci/versions.env, and nowhere here. Needs the repository checked out.
 name: Deployment tools
 description: Installs the deployment's tools at the versions and sums the repository names.

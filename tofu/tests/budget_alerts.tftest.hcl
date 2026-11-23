@@ -1,5 +1,5 @@
 # The spend alert and the alerts on Cloud Run's built-in metrics, checked against mock providers:
-# no credential, no call to Google (R06, R07). The values are synthetic, and the operator's address
+# no credential, no call to Google. The values are synthetic, and the operator's address
 # is example.com's.
 
 mock_provider "google" {
@@ -24,7 +24,7 @@ mock_provider "google-beta" {}
 
 
 # The budget counts this project alone, by its number, a month at a time, and mails at half of
-# the amount, nine tenths of it and all of it. It is an alert, not a cap (R06).
+# the amount, nine tenths of it and all of it. It is an alert, not a cap.
 run "the_budget_counts_this_project_by_the_month" {
   command = plan
 
@@ -71,7 +71,7 @@ run "no_operator_makes_no_alert" {
 # With an operator, Google's security notifications of the project go to the operator's address, and
 # no other category: Security's fallback is the Organization Administrator, whom a project with no
 # organization lacks, and the others fall back to the owners and the billing account's
-# administrators (R27).
+# administrators.
 run "an_operator_is_the_security_contact" {
   command = plan
 
@@ -91,7 +91,7 @@ run "an_operator_is_the_security_contact" {
 }
 
 # With an operator: two alerts on api's request count, both read from Cloud Run's metrics and
-# neither from a log, and both mailed to the operator (R07).
+# neither from a log, and both mailed to the operator.
 run "an_operator_gets_the_load_and_the_error_alerts" {
   command = plan
 
@@ -179,7 +179,7 @@ run "an_operator_hears_of_a_failed_job_by_the_clock" {
 
 # With an operator and the service: an alert on a job by the clock that has not run for 25 hours,
 # whatever the cause, read from the same count of completed executions, with no result asked: no
-# point in the window is the miss (R07).
+# point in the window is the miss.
 run "an_operator_hears_of_a_job_by_the_clock_that_did_not_run" {
   command = plan
 

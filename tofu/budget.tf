@@ -1,4 +1,4 @@
-# The spend alert. On the Blaze plan nothing stops a project at a number (R06): this is an alert
+# The spend alert. On the Blaze plan nothing stops a project at a number: this is an alert
 # and not a cap, and what it buys is finding out on the day something starts costing money rather
 # than at the end of the month. It is mailed to the billing account's administrators and users, as a
 # budget is by default, and to the operator's channel too, where one is named: whoever gets the
@@ -16,7 +16,7 @@ resource "google_billing_budget" "spend" {
   # of the type FREE_TIER and is taken off before this is measured. The allowance is the billing
   # account's, shared with every project on it, so this one can be charged before it has used any.
   # No other credit is taken off: the Free Trial's is a PROMOTION, and a budget that took it off
-  # would measure nothing until the trial's credit ran out (R06).
+  # would measure nothing until the trial's credit ran out.
   budget_filter {
     projects               = ["projects/${data.google_project.this.number}"]
     calendar_period        = "MONTH"

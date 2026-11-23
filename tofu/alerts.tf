@@ -1,5 +1,5 @@
 # The alerts on Cloud Run's built-in metrics, which Cloud Monitoring keeps by itself and at no
-# charge (R07). The alerts themselves are charged by each metric a condition names and the points
+# charge. The alerts themselves are charged by each metric a condition names and the points
 # its query returns, so each condition names one.
 #
 # The spend alert hears of a burst only once Billing has counted it, hours later; these read the
@@ -117,7 +117,7 @@ resource "google_monitoring_alert_policy" "api" {
 # Cloud Run's own count of a job's completed executions by their result: every result but
 # "succeeded". Google's list of metrics names the label and not its values; on the project Cloud
 # Run wrote "succeeded" and "failed". Matching what is not a success, a value spelled otherwise
-# mails too many rather than none (R07).
+# mails too many rather than none.
 locals {
   # The names of the jobs by the clock, as Cloud Run knows them.
   api_clock_job_names = [for name in keys(local.api_scheduled_jobs) : google_cloud_run_v2_job.api[name].name]
@@ -184,7 +184,7 @@ resource "google_monitoring_alert_policy" "api_jobs" {
 # A job by the clock that did not run at all: Cloud Scheduler could not call it — its account's
 # right, the job's address —, the schedule is paused, or Cloud Scheduler failed. No execution writes
 # no point, so the alert above stays silent; Cloud Scheduler has no metric of its own and retries no
-# failed call (R07). This counts each job's executions whatever their result over the last 25
+# failed call. This counts each job's executions whatever their result over the last 25
 # hours, the longest window an alert may roll, and takes no data as the condition met: a job that
 # runs every day and completes within the hour always has a point in it, and a day with no run
 # empties it about an hour after the run it missed. A condition on absence waits 23.5 hours at

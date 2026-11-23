@@ -1,5 +1,5 @@
-# The deployment after a merge to main, by the list (R05, R18): only while main still stands on the
-# commit, the cloud's configuration on every run, then only the parts of the list that changed.
+# The deployment after a merge to main, by the list: only while main still stands on the commit,
+# the cloud's configuration on every run, then only the parts of the list that changed.
 #
 #   target   decides, with no access to anything: whether main still stands on the commit, whether
 #            the project is set up (tofu/ci.env), and which parts changed against the last run
@@ -7,16 +7,16 @@
 #   config   applies the configuration as infra-config, in the environment production-config, and
 #            hands its outputs on;
 #   api      api's image, release or facts as api-deploy, in the environment the configuration
-#            names for it, production by default (R15);
+#            names for it, production by default;
 #   app      app's build as hosting-publish, in the environment the configuration names for it,
-#            production-hosting by default, once api is through (R17).
+#            production-hosting by default, once api is through.
 #
 # Each job signs in to Google through the federated pool, as the identity its environment alone may
-# borrow (R11, R12, R13); none of the environments asks for an approval, the review of the pull
-# request is the approval (R05). "Re-run failed jobs" keeps what the jobs before decided, so on a
-# later attempt each job asks first whether main still stands on the commit (R45 canvas-api). A
-# deployment that did not go through is run again so, or mended forward; a run started by hand
-# delivers the configuration and the parts it names.
+# borrow; none of the environments asks for an approval, the review of the pull request is the
+# approval (R05). "Re-run failed jobs" keeps what the jobs before decided, so on a later attempt
+# each job asks first whether main still stands on the commit. A deployment that did not go
+# through is run again so, or mended forward; a run started by hand delivers the configuration and
+# the parts it names.
 name: Deploy
 
 on:
@@ -157,7 +157,7 @@ jobs:
         run: just ci-tf-outputs "$RUNNER_TEMP/outputs.json" >> "$GITHUB_OUTPUT"
 
       # The environments the configuration lends its identities to, as its outputs name them: each
-      # there and run from main alone, before a job of api or app runs in it (R18).
+      # there and run from main alone, before a job of api or app runs in it.
       - name: The environments
         env:
           GITHUB_TOKEN: ${{ github.token }}

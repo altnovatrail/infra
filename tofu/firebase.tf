@@ -2,7 +2,7 @@
 #
 # The export of Hosting's request logs to Cloud Logging is switched on only by a button in
 # Firebase's console, and nothing here switches it on; every sink excludes those logs all the same,
-# since they hold the client's address (R07).
+# since they hold the client's address.
 
 resource "google_firebase_project" "this" {
   provider = google-beta
@@ -17,7 +17,7 @@ resource "google_firebase_project" "this" {
 # is made, and the first one made becomes the default; one given Firebase before that date got its
 # default site at once, under the project's id, and this resource takes that site over rather than
 # making it again (Firebase, Understand the default Hosting site: "The first Hosting site created in
-# your Firebase project always becomes your default Hosting site"; R12).
+# your Firebase project always becomes your default Hosting site").
 resource "google_firebase_hosting_site" "app" {
   provider = google-beta
 
@@ -29,7 +29,7 @@ resource "google_firebase_hosting_site" "app" {
   depends_on = [google_firebase_project.this]
 }
 
-# The web app app signs in as; its id and API key go into /deployment.json (R17). The key is a
+# The web app app signs in as; its id and API key go into /deployment.json. The key is a
 # browser key restricted to Firebase's APIs and no secret. The app is never deleted: a new one comes
 # with a new key, which signs everybody out of app on every device.
 resource "google_firebase_web_app" "app" {

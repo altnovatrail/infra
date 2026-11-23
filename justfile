@@ -1,7 +1,7 @@
 # infra's own recipes; spec's, the documents check among them, run from spec's justfile:
 # `just -f spec/justfile docs-check-repo`. CI runs them in a stage of .devcontainer/Dockerfile by
 # spec/tools/toolchain/toolchain.sh: those of the job Deploy run in toolchain-core, which has no
-# OpenTofu, ShellCheck or actionlint, so they call none of the three (R30 spec; R34).
+# OpenTofu, ShellCheck or actionlint, so they call none of the three.
 
 # The Dockerfile whose ARGs the ci- recipes of the three tools read; their tests point it at broken
 # copies.
@@ -24,7 +24,7 @@ _arg name:
     fi
     echo "$value"
 
-# The OpenTofu on PATH is the one the toolchain stage installs, at the version its ARG names (R09).
+# The OpenTofu on PATH is the one the toolchain stage installs, at the version its ARG names.
 # In the devcontainer it stops a container not rebuilt since the ARG was raised; in CI, where the
 # stage is built from the same Dockerfile, it shows that the stage installed tofu and that tofu runs.
 # OpenTofu on PATH at the version of its ARG
@@ -97,7 +97,7 @@ ci-tofu-test:
     echo "ci-tofu-test: ok"
 
 # ShellCheck over the repository's scripts — tofu/bootstrap.sh, tools/deploy/*.sh and tools/ci/*.sh — by the
-# ShellCheck the toolchain stage installs, at the version its ARG names (R09).
+# ShellCheck the toolchain stage installs, at the version its ARG names.
 ci-shellcheck:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -152,9 +152,8 @@ ci-shellcheck-test:
     env PATH="$work/bin:$PATH" "$just" ci-shellcheck >"$work/out" 2>&1 || { echo "ci-shellcheck-test: ci-shellcheck refused shellcheck ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-shellcheck-test: ok"
 
-# The deployment's workflow runs only after a merge, so this is where its mistakes show before one
-# (R18).
-# actionlint over .github/workflows, with ShellCheck for their scripts, both of the toolchain stage (R09)
+# The deployment's workflow runs only after a merge, so this is where its mistakes show before one.
+# actionlint over .github/workflows, with ShellCheck for their scripts, both of the toolchain stage
 ci-actionlint:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -214,7 +213,7 @@ ci-actionlint-test:
     env PATH="$work/bin:$PATH" "$just" ci-actionlint >"$work/out" 2>&1 || { echo "ci-actionlint-test: ci-actionlint refused actionlint ${want}:" >&2; cat "$work/out" >&2; exit 1; }
     echo "ci-actionlint-test: ok"
 
-# The root module in tofu/, by the OpenTofu of the toolchain stage (R10).
+# The root module in tofu/, by the OpenTofu of the toolchain stage.
 tofu_dir := "tofu"
 
 # Format the module in place.
@@ -231,7 +230,7 @@ tf-check: _tf-sinks _tf-grants _tf-roles _tf-test-values _tf-copy
     tofu -chdir={{ tofu_dir }} test
 
 # Every log sink is declared in the one list of tofu/logging.tf, google_logging_project_sink.sinks,
-# so that each gets the exclusions R07 asks for and the tests hold each to them: a sink declared
+# so that each excludes Cloud Run's request logs and the tests hold each to it: a sink declared
 # anywhere else would pass them by.
 _tf-sinks:
     #!/usr/bin/env bash
@@ -247,7 +246,7 @@ _tf-sinks:
 # nothing_of_the_platform_reaches_a_copy of tofu/tests/copy.tftest.hcl, and the list names nothing
 # the module lacks, so that the platform's name, region and numbers reach none of a copy's resources
 # and calls: one the list leaves out would pass the check by. The list is the run's lines that start
-# with jsonencode(, so a commented entry or a name in a message does not count (R10).
+# with jsonencode(, so a commented entry or a name in a message does not count.
 _tf-copy:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -267,7 +266,7 @@ _tf-copy:
 
 # Every grant on the project is in the one list of tofu/identities.tf, google_project_iam_member.grants,
 # so that the test holds each against the roles bootstrap.sh's condition lets the configuration's
-# identity grant there (R13): a grant declared anywhere else would pass it by and be refused at the
+# identity grant there: a grant declared anywhere else would pass it by and be refused at the
 # apply, after the merge.
 _tf-grants:
     #!/usr/bin/env bash
@@ -306,8 +305,8 @@ _tf-test-values:
     fi
 
 # Every type of resource and data in tofu/*.tf is named by a role that bootstrap.sh gives the
-# identity the configuration is applied as, and every type a role names is still there (R13): a type
-# no role is held for would pass every other check and be refused at the apply, after the merge.
+# identity the configuration is applied as, and every type a role names is still there: a type no
+# role is held for would pass every other check and be refused at the apply, after the merge.
 _tf-roles:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -328,9 +327,9 @@ _tf-roles:
 
 # Run once, by someone who may make projects and link them to the billing account, with
 # TF_VAR_billing_account set and tofu/production.auto.tfvars and tofu/backend.hcl filled in; again
-# whenever the script changes, before the merge that needs it (R13). BOOTSTRAP_MEASURE_ORGANIZER,
+# whenever the script changes, before the merge that needs it. BOOTSTRAP_MEASURE_ORGANIZER,
 # BOOTSTRAP_EVAL_SET_ORGANIZER and BOOTSTRAP_OPERATOR give the people of the operator's buckets, an
-# address or none each; one not set stops the script (R28).
+# address or none each; one not set stops the script.
 # Make the project, its state bucket, the federated pool, the identity CI applies the configuration as, and the operator's buckets
 bootstrap:
     bash {{ quote(tofu_dir) }}/bootstrap.sh
@@ -352,14 +351,13 @@ _tools:
     fi
 
 # The packages of tools/package-lock.json against the licenses NovaTrail builds from, by spec's check
-# (R12 spec).
 ci-licenses:
     just -f spec/justfile licenses-check-repo tools/package-lock.json
 
-# The checks R05 asks of a pull request that changes the deployment's list (R14): deploy/production.json
-# by its schema, the files of its releases by release-verify and sha256, deployment.json, the facts,
-# a copy's folder of legal texts by spec's legal-check-dir (R33), the rung, and api's tag no lower
-# than in the list at base. It reads the releases from GitHub and Sigstore. With no list yet there is
+# The checks of a pull request that changes the deployment's list: deploy/production.json by its
+# schema, the files of its releases by release-verify and sha256, deployment.json, the facts, a
+# copy's folder of legal texts by spec's legal-check-dir, the rung, and api's tag no lower than in
+# the list at base. It reads the releases from GitHub and Sigstore. With no list yet there is
 # nothing to check, and it says so.
 # Check the deployment's list in deploy/ against the list at base
 deploy-check base="origin/main": _tools
@@ -370,9 +368,8 @@ deploy-check base="origin/main": _tools
 # the tag of spec, whose admission table and release-verify the checks read, or tofu/variables.tf,
 # whose default names api's service — and otherwise nothing, so that a pull request of documents
 # downloads no release. Not tofu/ci.env or the values: a fork's first pull request changes them
-# alone, while its list is still the platform's, with the platform's address of api (R14). But a
-# change of the line of the values that names the rung does run them: the list's rung is held to
-# that line (R05).
+# alone, while its list is still the platform's, with the platform's address of api. But a change
+# of the line of the values that names the rung does run them: the list's rung is held to that line.
 ci-deploy-check base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -396,13 +393,13 @@ ci-deploy-check base="origin/main":
 deploy-check-test: _tools
     node --test tools/deploy-check/test/check.test.mjs tools/deploy-check/test/reading.test.mjs
 
-# The check of a release's files on a real release of api, against GitHub and Sigstore (R14).
+# The check of a release's files on a real release of api, against GitHub and Sigstore.
 deploy-check-release-test: _tools
     node --test tools/deploy-check/test/release.test.mjs
 
-# api's deployment by the list, as R05 lays out its steps (R15), on what the configuration's outputs
-# name, as `tofu output -json` prints them after the apply of the same commit; a relative path to them
-# is the caller's, from where just is run. They run gcloud and docker, signed in as api's deployment.
+# api's deployment by the list, on what the configuration's outputs name, as `tofu output -json`
+# prints them after the apply of the same commit; a relative path to them is the caller's, from
+# where just is run. They run gcloud and docker, signed in as api's deployment.
 # Build api's image of the list's release, push it and print its digest
 deploy-api-image outputs: _tools
     cd {{ quote(invocation_directory()) }} && {{ quote(justfile_directory() / "tools/deploy/api.sh") }} image {{ quote(outputs) }} {{ quote(justfile_directory() / "deploy") }}
@@ -419,8 +416,8 @@ deploy-api-facts outputs:
 deploy-api-test:
     node --test tools/deploy/test/api.test.mjs
 
-# The release of app's build on Firebase Hosting by the list, as R06 lays out its steps (R17), on
-# the site the configuration's outputs name. It signs in with an access token gcloud gives for the
+# The release of app's build on Firebase Hosting by the list, on the site the configuration's
+# outputs name. It signs in with an access token gcloud gives for the
 # identity it is signed in as, hosting-publish where the workflow runs it, and the token goes to the
 # script through its environment, never its command line.
 # Release the list's build of app on Hosting, with the assets of the build released, and check it
@@ -441,7 +438,7 @@ deploy-app-check outputs: _tools
 deploy-app-test: _tools
     node --test tools/deploy/test/app.test.mjs
 
-# The workflow of the deployment, .github/workflows/deploy.yml, runs these (R18); each also runs
+# The workflow of the deployment, .github/workflows/deploy.yml, runs these; each also runs
 # by hand, where the repository is checked out with its origin.
 # What a run delivers, as key=value lines for $GITHUB_OUTPUT: given --by-hand=<parts>, the parts a
 # run started by hand names
@@ -463,7 +460,7 @@ ci-deploy-identity:
     node tools/deploy/target.mjs identity
 
 # The GitHub environments the configuration lends its identities to, each there and run from main
-# alone, by GitHub's API (R18).
+# alone, by GitHub's API.
 ci-deploy-environments +names:
     node tools/deploy/target.mjs environments {{ names }}
 
@@ -508,6 +505,6 @@ tools-install-test:
     node --test tools/ci/test/install.test.mjs
 
 # The organizer's tool, tools/organizer/organizer.mjs, against a stand-in for gcloud that signs with a
-# key made by the test: no cloud, no network (R28).
+# key made by the test: no cloud, no network.
 organizer-test:
     node --test tools/organizer/test/organizer.test.mjs

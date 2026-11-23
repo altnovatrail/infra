@@ -1,5 +1,5 @@
 # The configuration's own rules, checked against mock providers: nothing here signs in anywhere or
-# reads a deployment, so the tests run in tf-check and in CI with no credential at all (R10). Both
+# reads a deployment, so the tests run in tf-check and in CI with no credential at all. Both
 # providers are mocked; a provider left out would be the real one, and a plan with it would call
 # Google. The values below are synthetic; the platform's own are production.auto.tfvars.
 
@@ -62,7 +62,7 @@ run "the_apis_the_parts_need_are_on" {
   }
 }
 
-# The platform writes no traces of its own, so the configuration enables no Cloud Trace API (R07).
+# The platform writes no traces of its own, so the configuration enables no Cloud Trace API.
 run "cloud_trace_stays_off" {
   command = plan
 

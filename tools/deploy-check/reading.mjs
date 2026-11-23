@@ -1,8 +1,8 @@
 // The reading of a deployment configuration, /deployment.json, as spec's deployment/README.md lays
 // it out: the schema first, then the rules in the order of the text's table, and the first step
 // that finds something wrong refuses the file and names every field it refuses, by its path. The
-// rollout is a reader, as app is: it accepts the file so before it writes it (R85 spec). spec's
-// vectors of reading hold this to the text (test/reading.test.mjs).
+// rollout is a reader, as app is: it accepts the file so before it writes it. spec's vectors of
+// reading hold this to the text (test/reading.test.mjs).
 
 export const RULES = ["deployment.api-origin", "deployment.loopback"];
 

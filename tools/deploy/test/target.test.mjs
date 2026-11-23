@@ -1,6 +1,6 @@
 // tools/deploy/target.mjs against git repositories made here — an origin and its clone — and a
-// stand-in for GitHub's API on this machine, and the shape of .github/workflows/deploy.yml that
-// R18 holds it to: no network. Run by `just deploy-target-test`.
+// stand-in for GitHub's API on this machine, and the shape of .github/workflows/deploy.yml it is
+// held to: no network. Run by `just deploy-target-test`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -123,10 +123,10 @@ test("against the last run that delivered, each part changes alone, and the rest
     ["app", { "deploy/production.json": list("v0.1.5", "v0.1.1") }, { api: false, facts: false, app: true }],
     ["nothing of the list: the configuration alone", { "tofu/main.tf": "# changed" }, { api: false, facts: false, app: false }],
     ["the list's layout alone, the same values", { "deploy/production.json": JSON.stringify(list()) }, { api: false, facts: false, app: false }],
-    // A self-hosted copy's folder of legal texts goes by the path of the facts (R33).
+    // A self-hosted copy's folder of legal texts goes by the path of the facts.
     ["a copy's legal texts, put in", { "deploy/production/legal/VERSION": "3\n" }, { api: false, facts: true, app: false }],
     // What else the revision runs with goes by the same path: the apply alone makes a revision of it
-    // that takes no traffic (R05).
+    // that takes no traffic.
     ["the list's rung", { "deploy/production.json": { ...list(), admission: { rung: "author" } } }, { api: false, facts: true, app: false }],
     ["the rung of the values", { "tofu/production.auto.tfvars": `${tfvars}api_admission_rung = "author"\n` }, { api: false, facts: true, app: false }],
     ["the catalog's list", { "tofu/production.auto.tfvars": `${tfvars}api_catalog_modules = ["novatrail/check-board"]\n` }, { api: false, facts: true, app: false }],
@@ -338,7 +338,7 @@ test("the command line: current fails once main moved on, and target prints its 
   assert.match(dispatched.stdout, /^api=false$/m);
 });
 
-// The workflow's shape, as R18 has it: what actionlint cannot know.
+// The workflow's shape: what actionlint cannot know.
 test("the workflow: every job after target asks again on a retry, signs in only where it deploys, and every action is pinned", () => {
   const text = fs.readFileSync(path.join(root, ".github", "workflows", "deploy.yml"), "utf8");
   const jobs = {};

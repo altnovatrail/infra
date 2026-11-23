@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The deployment of api by the list, as R05 lays out its steps (R15).
+# The deployment of api by the list, in the steps that follow.
 #
 #   tools/deploy/api.sh image   <outputs.json> [<deploy dir>]
 #   tools/deploy/api.sh release <outputs.json> [<deploy dir>]
@@ -8,12 +8,12 @@
 # image builds api's image of the list's release and pushes it, tagged with the release, and prints
 # its digest: the files of the release are downloaded and verified again, release-verify and sha256,
 # by tools/deploy-check/fetch.mjs, and the image is built as api's release says, around the binary
-# alone. A project's first deployment runs it before api_image names the image (R15).
+# alone. A project's first deployment runs it before api_image names the image.
 #
 # A self-hosted copy whose deploy/production/legal/ holds its operator's legal texts runs the image
 # of its release with that folder laid over it: the image FROM the release's image by its digest,
 # the folder at /etc/api/legal and API_LEGAL_DIR naming it, under the tag of the release and the
-# folder's sha256 (R33). image, release and facts all give the revision and the jobs that image; the
+# folder's sha256. image, release and facts all give the revision and the jobs that image; the
 # platform has no folder, and its image is the release's own.
 #
 # release runs the whole of a new release of api: a release lower than the one that takes the
@@ -29,7 +29,7 @@
 # again when it changed or none when it went, and with that version, and then a new revision on that
 # image, by its digest, with it. No build of the release, no migration and no release-verify, since
 # the release's files have not changed; facts or texts that api's check refuses stop before any
-# revision (R05; R33).
+# revision.
 #
 # What it works on comes from the configuration's outputs, as `tofu output -json` prints them after
 # the apply of the same commit: the project, the region, the registry, the service, the jobs with
@@ -56,7 +56,7 @@ list="$deploy/production.json"
 facts_file="$deploy/production/facts.json"
 legal_dir="$deploy/production/legal"
 # Where a copy's folder of legal texts lies in its image, as API_LEGAL_DIR names it there, and the
-# steps that lay it over the release's image (R33).
+# steps that lay it over the release's image.
 legal_path=/etc/api/legal
 legal_steps="COPY --chown=0:0 legal ${legal_path}
 ENV API_LEGAL_DIR=${legal_path}"
@@ -152,7 +152,7 @@ registry_tags() {
 }
 
 # The tag the image of that digest has in the registry: one, as the deployment gives each image, or
-# a refusal (R15).
+# a refusal.
 tag_of() {
     local digest="$1" all tags
     all="$(registry_tags)" || fail "the registry's tags of ${image_name} cannot be read"
@@ -163,7 +163,7 @@ tag_of() {
 }
 
 # The release of an image's tag: the tag itself, or, for an image with a copy's texts, the tag before
-# -legal- and the folder's sha256 (R33); an exact tag of a release, or a refusal.
+# -legal- and the folder's sha256; an exact tag of a release, or a refusal.
 release_in() {
     local tag="$1"
     [[ "$tag" =~ ^(.+)-legal-[0-9a-f]{64}$ ]] && tag="${BASH_REMATCH[1]}"
@@ -209,7 +209,7 @@ build_image() {
     dockerfile="$(node "$root/tools/deploy-check/fetch.mjs" api "$release" Dockerfile "$dockerfile_sha256" "$work/files")"
 
     # The release's Dockerfile reads the binary as api from the build context binary, and nothing of
-    # the main context, which is left empty (R28 api).
+    # the main context, which is left empty.
     echo "==> the image ${image_name}:${release}"
     mkdir -p "$work/binary" "$work/context"
     cp "$binary" "$work/binary/api"
@@ -240,7 +240,7 @@ legal_sum() {
 # The image the revision and the jobs run, from $image, the image of the release $1: that image itself
 # when the copy has no folder of legal texts, as the platform has none; otherwise that image with the
 # folder laid over it at $legal_path, owned by root and read by all, and API_LEGAL_DIR naming it, which
-# api's check and serve read and refuse by the rules of spec's part legal/ (R33). It is built FROM the
+# api's check and serve read and refuse by the rules of spec's part legal/. It is built FROM the
 # release's image by its digest, for the same platform, under the tag <release>-legal-<sha256 of the
 # folder>, and one the registry holds under that tag already is the one taken, as for the release's.
 with_texts() {
@@ -275,7 +275,7 @@ add_facts() {
 
 # The image on each job; with a version of the facts first, as set_image <version> <job>..., that
 # version too, in the same update: a job of the check gets the exact version the revision will
-# mount, which run as it is would be the latest, whichever that is by then (R15).
+# mount, which run as it is would be the latest, whichever that is by then.
 set_image() {
     local version="" job flags
     if [[ "${1:-}" =~ ^[0-9]+$ ]]; then

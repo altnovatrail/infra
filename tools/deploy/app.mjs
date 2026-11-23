@@ -1,6 +1,6 @@
-// app: the release of app's build on Firebase Hosting by the list, as R06 lays out its steps
-// (R17), through Hosting's REST API rather than the Firebase CLI: the steps are five calls, and the
-// CLI is a large program of somebody else's that asks for more than a release needs (R12).
+// app: the release of app's build on Firebase Hosting by the list, in the steps below, through
+// Hosting's REST API rather than the Firebase CLI: the steps are five calls, and the CLI is a large
+// program of somebody else's that asks for more than a release needs (R17).
 //
 //   node tools/deploy/app.mjs release <outputs.json> [<deploy dir>]
 //   node tools/deploy/app.mjs check <outputs.json> [<deploy dir>]
@@ -12,22 +12,23 @@
 // release:
 //   1. production/deployment.json, of the sha256 the list names;
 //   2. the archive of the list's build, through check.mjs's releaseFile — the sha256 and
-//      release-verify again, so that what reaches production is the file verified (R05) — unpacked,
+//      release-verify again, so that what reaches production is the file verified — unpacked,
 //      and deployment.json by spec's reading at the site's origin and by the build's
 //      deployment.schema.json, of the version of spec's deployment configuration at the submodule;
 //      then its api, which must be the configuration's api_origin, with api's service there: a
-//      build released before the service would call an api that is not there (R05);
+//      build released before the service would call an api that is not there;
 //   3. the build before, by the message of the live channel's release: none, and this is the first
 //      release; a message not of this script's, and the release is refused; otherwise that build's
 //      archive, through releaseFile too, and its assets/ into the folder, which keep a page loaded
-//      before the release working (R06). The build before is the one released, or, when the list's
+//      before the release working. The build before is the one released, or, when the list's
 //      build is the one released already, the one whose assets that release kept: a release of the
 //      same build again keeps what the first kept;
 //   4. deployment.json into the folder;
-//   5. a version of the folder with its configuration — the headers and the rewrite of R06 — its
-//      files uploaded, finalized and released, with the message that names the build;
+//   5. a version of the folder with its configuration — the headers and the rewrite of
+//      servingConfig — its files uploaded, finalized and released, with the message that names the
+//      build;
 //   6. check, in rounds until the site answers as the release has it or the rounds are out.
-// check: what the site answers, against the list's build (R06), in one round.
+// check: what the site answers, against the list's build, in one round.
 //
 // Each line of release and check goes to the log as it is said, so that the rounds of the check
 // are seen while it waits and a refusal comes after what was done before it, and is returned too.
@@ -57,7 +58,7 @@ const gzip = promisify(zlib.gzip);
 
 // The check after a release reads the site again until it answers as the release has it: for a
 // while after a release Hosting's CDN still serves the build before — / the old index.html and the
-// new build's file of assets/ a 404, for up to a minute (R17). A round every 10 s, so that the site
+// new build's file of assets/ a 404, for up to a minute. A round every 10 s, so that the site
 // is read soon after it turns; rounds for 120 s, twice the lag seen, and a site still wrong then is
 // wrong. One round is the first read and one 10 s after each round before, so the waits add up to
 // 120 s. A read of the site that takes over 10 s is a wrong answer of its round, which reads every
@@ -88,12 +89,12 @@ async function inParallel(items, work) {
   }));
 }
 
-// The configuration of a version (R06). Two sets of paths that do not overlap, so that no header
+// The configuration of a version. Two sets of paths that do not overlap, so that no header
 // depends on which of two matching rules Hosting applies: outside /assets/** the CSP header and
 // no-cache, since index.html and deployment.json change with every release and a path of the SPA
 // is index.html; under /assets/**, whose names change with their content, immutable. Both get
 // nosniff and HSTS, and nobody gets Cross-Origin-Opener-Policy: same-origin, which breaks the
-// window of sign-in (R06). The rewrite takes a path outside /assets/** that holds no file to
+// window of sign-in. The rewrite takes a path outside /assets/** that holds no file to
 // index.html — Hosting rewrites only a path no file is at — so that a file of /assets/ that is gone
 // is a 404, not the page. The paths are matched before the rewrite, by the path asked for.
 export function servingConfig(csp) {
@@ -130,7 +131,7 @@ function siteOf(outputsFile) {
 }
 
 // api's service, which the configuration makes once api_serving says so, and the address
-// /deployment.json names, which must be the service's deterministic one, api_origin (R05).
+// /deployment.json names, which must be the service's deterministic one, api_origin.
 function apiHolds(outputsFile, deploymentFile) {
   const outputs = readJson(outputsFile, "the configuration's outputs");
   if (typeof outputs?.api_service_url?.value !== "string") throw new Refusal("the configuration's outputs name no api_service_url: api has no service yet, and app goes only once it has (R05)");
@@ -273,12 +274,12 @@ export async function release({ outputsFile, deployDir = path.join(ROOT, "deploy
   return lines;
 }
 
-// What the site answers, against the build (R06), in rounds of all of it, ROUND_EVERY apart, until
+// What the site answers, against the build, in rounds of all of it, ROUND_EVERY apart, until
 // one finds nothing wrong: refused when the last of them still does, with what it found. A round
 // that finds something wrong before the last says its number and what is wrong. Each round asks for
 // index.html's bytes, with its headers, at / and at a path of the SPA; a file of assets/ with its
 // own; a 404 for a file of /assets/ that is not there; deployment.json as app reads it; the build's
-// NOTICE and LICENSE at /NOTICE and /LICENSE (R85 spec). The paths that hold no file are new each
+// NOTICE and LICENSE at /NOTICE and /LICENSE. The paths that hold no file are new each
 // round, so that no answer of a round before stands in for them.
 async function answers({ url, build, deploymentFile, csp, fetchSite = fetch, rounds = 1, sleep = sleepFor, say }) {
   const asset = buildFiles(build).find((file) => file.startsWith("assets/"));
