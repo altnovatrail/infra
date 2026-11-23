@@ -108,11 +108,11 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 # OpenTofu: the language of the root module in tofu/, whose fmt, validate and test run in this
 # stage. It never ships and puts none of its code into what ships, so its license, MPL 2.0, is
-# allowed as a named exception.
+# allowed as a named exception of R09.
 ARG OPENTOFU_VERSION=1.13.9
 # ShellCheck: the analyser of the repository's shell scripts, and of the workflows' scripts through
 # actionlint. It never ships and puts none of its code into what ships, so its license, GPL-3.0,
-# is allowed as a named exception.
+# is allowed as a named exception of R09.
 ARG SHELLCHECK_VERSION=0.11.0
 # actionlint: the deployment's workflow runs only after a merge, so this check is where its mistakes
 # show before one. Its license, MIT, is compatible with Apache-2.0.

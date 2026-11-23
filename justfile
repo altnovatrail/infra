@@ -230,7 +230,7 @@ tf-check: _tf-sinks _tf-grants _tf-roles _tf-test-values _tf-copy
     tofu -chdir={{ tofu_dir }} test
 
 # Every log sink is declared in the one list of tofu/logging.tf, google_logging_project_sink.sinks,
-# so that each excludes Cloud Run's request logs and the tests hold each to it: a sink declared
+# so that each gets every exclusion of local.exclusions and the tests hold each to them: a sink declared
 # anywhere else would pass them by.
 _tf-sinks:
     #!/usr/bin/env bash

@@ -2,8 +2,8 @@
 # github-eval, with no service account between and no long-lived copy in GitHub.
 #
 # The pool and its provider, with the condition that admits those jobs alone, are bootstrap.sh's,
-# though spec puts them in the module: no IAM condition narrows a right over pools to one of them,
-# so the right to make this pool would be the right to change the pool this configuration is
+# though R120 spec puts them in the module: no IAM condition narrows a right over pools to one of
+# them, so the right to make this pool would be the right to change the pool this configuration is
 # applied through (R20).
 
 locals {

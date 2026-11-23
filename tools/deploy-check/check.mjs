@@ -185,7 +185,7 @@ function baseList(base, deployDir) {
   }
 }
 
-// app reads /deployment.json only if it is no larger.
+// app reads /deployment.json only if it is no larger (sources 4.5).
 const DEPLOYMENT_LIMIT = 16 * 1024;
 
 // The list of <deploy dir>, held to its schema: what the release of either part reads it as.
@@ -379,7 +379,7 @@ export function deploymentHolds(build, deploymentFile, origin) {
 // The Content-Security-Policy header of a release, out of the build's csp.json and the
 // deployment.json it ships with. csp.json is one table of directives, each name to its
 // sources as one string, with two places in it: {api}, which takes the origin of api, and
-// {authDomain}, the host sign-in's window is opened on. frame-ancestors is 'none',
+// {authDomain}, the host sign-in's window is opened on (sources 4.5). frame-ancestors is 'none',
 // and a table that does not say so gets it: the header is the only place it holds, a meta tag
 // cannot carry it. Anything else — another shape, another place, a value that would end a directive or
 // start another — is refused rather than guessed at.

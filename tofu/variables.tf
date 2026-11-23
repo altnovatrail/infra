@@ -345,7 +345,7 @@ variable "api_request_timeout" {
 # told.
 
 variable "api_admission_rung" {
-  description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so, as on novatrail (R45, R79 api; R149 spec). The list's admission.rung names the same, and the list's check holds the two equal (R05)."
+  description = "The lowest admission rung of api's models, API_ADMISSION_RUNG of the service and of the jobs of the check: full, or author, the models checked on one person's handwriting, where the author alone learns or the privacy policy tells the adults so, as on novatrail (R149 spec). The list's admission.rung names the same, and the list's check holds the two equal (R05)."
   type        = string
   default     = "full"
   nullable    = false

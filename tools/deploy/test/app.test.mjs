@@ -1,7 +1,7 @@
 // The release of app's build, tools/deploy/app.mjs, against a stand-in for Hosting's REST API on
 // this machine, synthetic releases of app and a stand-in for release-verify, all given as the
 // tests' stand-ins: no network, no cloud. What the site answers after the release is a stand-in
-// too, built to answer as the release has it, and broken one answer at a time. Run by
+// too, built to answer as R06 has it, and broken one answer at a time. Run by
 // `just deploy-app-test`.
 
 import assert from "node:assert/strict";
@@ -166,7 +166,7 @@ function world({ tag = "v0.3.0", builds = { "v0.3.0": ["index-new.js"], "v0.2.0"
   const verify = path.join(dir, "verify");
   fs.writeFileSync(verify, 'case "$4" in *"$1"*) echo "release-verify: the bundle does not hold $4" >&2; exit 1;; esac\n');
 
-  // The site answering as the release has it, from the build of `tag` and deployment.json;
+  // The site answering as R06 has it, from the build of `tag` and deployment.json;
   // `breaks` changes one answer.
   const site = (breaks = {}) => async (url, options) => {
     assert.equal(options.redirect, "manual");

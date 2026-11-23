@@ -42,15 +42,15 @@ import { fileURLToPath } from "node:url";
 import { tfvarsValue } from "../deploy-check/setup.mjs";
 
 // What a link may be valid for: a signature through IAM, with no key of the service account, lives
-// at most 12 hours.
+// at most 12 hours (sources 10.1).
 export const MAX_HOURS = 12;
 
 // A sample file of the samples page of canvas, `<id>.json` of `application/json`: canvas bounds its
-// size by nothing, and its largest synthetic sample of v0.3.16 is 890,008 bytes.
+// size by nothing, and its largest synthetic sample of v0.3.16 is 890,008 bytes (sources 10.8).
 export const SAMPLE = { type: "application/json", extension: "json", max: 16 * 1024 * 1024 };
 
-// A scan of a form, as api takes one: a JPEG, a PNG or a PDF, up to 10 MiB. A policy holds one
-// condition a field, so each type has a form of its own.
+// A scan of a form, as api takes one: a JPEG, a PNG or a PDF, up to 10 MiB (sources 10.5). A policy
+// holds one condition a field, so each type has a form of its own.
 export const SCANS = [
   { type: "application/pdf", extension: "pdf", accept: ".pdf,application/pdf", label: "one PDF" },
   { type: "image/jpeg", extension: "jpg", accept: ".jpg,.jpeg,image/jpeg", label: "a JPEG photo" },
@@ -304,8 +304,8 @@ export function time({ bucket, objects, date, now = new Date(), gcloud = runGclo
     // A withdrawal set the form's 5 years from the day its samples were erased; a session after it
     // would stretch them, and a new period takes a new form.
     if (found.metadata?.withdrawn) refuse(`${name}: its samples were withdrawn on ${found.metadata.withdrawn}, and its Custom-Time stays; a new session takes a new form`);
-    // A Custom-Time cannot decrease: a form whose samples were erased early is rewritten by
-    // withdraw instead.
+    // A Custom-Time cannot decrease (sources 10.3): a form whose samples were erased early is
+    // rewritten by withdraw instead.
     if (plan.current && Date.parse(plan.current) > Date.parse(wanted))
       refuse(`${name}: its Custom-Time is ${plan.current}, later than ${wanted}, and it cannot decrease; a form whose samples were withdrawn takes withdraw`);
     refuseIfDue(name, wanted, rule, now);
