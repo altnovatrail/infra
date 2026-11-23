@@ -7,15 +7,6 @@ Open tasks outside the current epic, each as its body, in Russian (R154 spec, R1
 
 ## Tasks outside an epic
 
-#### T97. Ссылки по R171 spec: `docs/sources.md` и `docs/measurements.md`
-
-- **Цель:** `docs/sources.md` и `docs/measurements.md` ссылаются по R171 spec; начало `docs/sources.md` — по заготовке `spec/repo-template/files/docs/sources.md`.
-- **Почему:** третья часть T95 по шагу 9 её тела.
-- **Кто:** Claude. **План:** —. **Зависит от:** T95.
-- **Сделать:** шаги 3–8 T95 для этих двух файлов, как в T96; цитаты источников не трогать — они вне правила ссылок.
-- **Как проверить:** как у T96.
-- **Разделы:** как у T95; `spec/repo-template/files/docs/sources.md`.
-
 #### T98. Ссылки по R171 spec: журнал решений, начало и разделы «The `spec` tag» — «Hosting and domains»
 
 - **Цель:** начало `docs/decisions.md` — по заготовке `spec/repo-template/files/docs/decisions.md`; записи разделов `##` от «The `spec` tag» до «Hosting and domains» включительно — без датированных поправок и со ссылками по R171 spec.
