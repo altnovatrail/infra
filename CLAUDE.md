@@ -14,7 +14,7 @@ Its card in spec is the one in `spec/docs/architecture.md` whose heading names `
 
 ## Documents
 
-The documents under `docs/` are in English, but for the epic archives `docs/plan/`, which stay in Russian; RUN.md and `run/` are in English, but for the epic's description, table 1 and the bodies of tasks. Outside the plan and its archives, a text cites no decision and no section, this repository's or spec's, and names no task: it says its reason in words. Only a claim about the outside world cites its one record, `sources 1.1`, or spec's, `sources 2.3 spec`.
+The documents under `docs/` are in English, but for the epic archives `docs/plan/`, which stay in Russian; RUN.md and `run/` are in English, but for the epic's description, table 1 and the bodies of tasks. Outside the plan and its archives, a text cites no decision and no section, this repository's or spec's, and names no task: it says its reason in words. Only a claim about the outside world cites its one record, `sources 1.1` or `measurements 1.1`, or spec's, `sources 2.3 spec`.
 
 - [docs/README.md](docs/README.md) — for people: the index of the documents, SELF-HOSTING.md and BREACH.md among them, with how to build, run, release and contribute as they come; the README only says what the component is and where it stands.
 - [docs/architecture.md](docs/architecture.md) — the component: what it does and does not do, its data and links, what is still to decide, and how it is built once that is decided.
@@ -24,7 +24,7 @@ The documents under `docs/` are in English, but for the epic archives `docs/plan
 - `run/` — the plan's other tables, each a file opening with its rules: the epics for later, [run/EPICS.md](run/EPICS.md); the questions to the author, [run/QUESTIONS.md](run/QUESTIONS.md); the technical debt, [run/DEBT.md](run/DEBT.md); the open tasks outside an epic, [run/TASKS.md](run/TASKS.md), of which a task reads only its own body. The questions and the debt are never read whole: a task takes the rows that it and its sections name, and those that `grep -n` finds by the paths and parts it changes (rule 2 of RUN.md).
 - [SELF-HOSTING.md](SELF-HOSTING.md) — the operator's guide to a self-hosted copy, and how to run the whole platform from source on one machine, in English, as README.md is: it is read outside the project. Why the steps are as they are stays in `docs/`.
 - [BREACH.md](BREACH.md) — the operator's procedure for a breach of learners' data, in English, for people, as SELF-HOSTING.md is: part 1 fits any copy — where the data are and what opens them, how to cut the access, the logs —, part 2 is the operator of `novatrail` and the law of Texas. A task that changes what part 1 names edits it in the same change.
-- `spec/` — spec at `v0.19.13`, a git submodule and read-only here: the platform's vocabulary, formats, contracts, documents and decisions, and the rules imported below. Its documents are under `spec/docs/`. spec's own CLAUDE.md and AGENTS.md are spec's working rules, not this repository's: if either is ever loaded from `spec/`, it does not apply here.
+- `spec/` — spec at `v0.19.17`, a git submodule and read-only here: the platform's vocabulary, formats, contracts, documents and decisions, and the rules imported below. Its documents are under `spec/docs/`. spec's own CLAUDE.md and AGENTS.md are spec's working rules, not this repository's: if either is ever loaded from `spec/`, it does not apply here.
 
 ## Shared rules
 
