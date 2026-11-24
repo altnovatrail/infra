@@ -326,7 +326,7 @@ export function time({ bucket, objects, date, now = new Date(), gcloud = runGclo
 // form is rewritten with the day, since only a rewrite resets a Custom-Time. gcloud rewrites
 // an object by a copy, which takes --custom-time in place of the source's, and copies none onto
 // itself, nor does objects update rewrite one of the same class: so the form moves to a name beside
-// it and back, each move a copy and an erasure (sources 10.8). The form keeps the day in its
+// it and back, each move a copy and an erasure. The form keeps the day in its
 // metadata, `withdrawn`, by which time refuses to move it forward again.
 export function withdraw({ bucket, objects, erased, now = new Date(), gcloud = runGcloud, say = console.log }) {
   if (objects.length === 0) refuse("name the forms whose samples were erased");
