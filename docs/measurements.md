@@ -1,6 +1,6 @@
 # infra — measurements
 
-> The results of the repository's measurements: what was measured, how, on what, and the numbers. The documents that describe how things are built cite them as a section, `measurements 1`; the external facts they rest on are records of [sources.md](sources.md). A measurement taken again is a new row or item with its date, and an earlier one is not edited.
+> The results of the repository's measurements: what was measured, how, on what, and the numbers. The documents that describe how things are built cite them as a section, `measurements 1`; the facts no run of ours checks that they rest on are records of [sources.md](sources.md), and a program's documentation or code at a version or commit is a link beside the claim. A measurement taken again is a new row or item with its date, and an earlier one is not edited.
 
 ## 1. Tokens of the epics' sessions
 

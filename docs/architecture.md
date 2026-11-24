@@ -444,7 +444,7 @@ OpenTofu, the open fork of Terraform, at an exact version, describes the infrast
 
 ### 3.7. The operator's bucket
 
-The operator's private Cloud Storage bucket: the measurement organizer and the eval-set organizer get the files of the samples page and the scans of their forms into it by an upload link. Beside it is a bucket of its own for the scans of the parents' consent forms that `api` puts there from `app`. The sources are sources 7.2 and 10.1–10.9. `tofu/bootstrap.sh` makes the buckets and their access, the module names the scans' bucket and `api`'s prefix to `api`, and `tools/organizer/organizer.mjs` is the organizer's tool.
+The operator's private Cloud Storage bucket: the measurement organizer and the eval-set organizer get the files of the samples page and the scans of their forms into it by an upload link. Beside it is a bucket of its own for the scans of the parents' consent forms that `api` puts there from `app`. The sources are sources 7.2 and 10.1–10.4, 10.6–10.9. `tofu/bootstrap.sh` makes the buckets and their access, the module names the scans' bucket and `api`'s prefix to `api`, and `tools/organizer/organizer.mjs` is the organizer's tool.
 
 **Who makes them.** `tofu/bootstrap.sh`, with the operator's rights, as the pools and the custom roles: the two buckets and their settings, the lifecycle rules, the custom roles, the upload service accounts and the whole IAM policy of each bucket. The module grants nothing in them and only names the scans' bucket and the prefix `consent-forms/` to the service `api`, to `sweep` and to `check`, as `API_CONSENT_FORMS_BUCKET` and `API_CONSENT_FORMS_PREFIX`; a test holds the prefix to the one of the script's condition. A rerun of the script brings the settings, the rules and the policies back where they have drifted, as for `infra-config`.
 
@@ -508,7 +508,7 @@ Beyond the buckets: the measurement organizer holds `roles/iam.serviceAccountTok
 
   | File | `Content-Type` | Up to | Why |
   |---|---|---|---|
-  | a sample | `application/json` | 16 MiB | the samples page saves `<id>.json` and bounds no size; its synthetic samples weigh up to 0.9 MB |
+  | a sample | `application/json` | 16 MiB | the samples page saves `<id>.json` and bounds no size; its synthetic samples weigh up to 0.9 MB ([`canvas` v0.3.16](https://github.com/altnovatrail/canvas/blob/v0.3.16/page/main.ts), `page/main.ts` and the release's `synthetic-samples` archive) |
   | the scan of the form | `application/pdf`, `image/jpeg` or `image/png` | 10 MiB | as `api` takes a scan ([`api` v0.1.27](https://github.com/altnovatrail/api/blob/v0.1.27/internal/account/consents.go)) |
 - the policy is valid `--hours`, 12 if not given and never more; it carries a condition for each field the form sends — the bucket, `success_action_status` 201, so that the answer names the object, the algorithm `GOOG4-RSA-SHA256`, the credential `<upload service account>/<date>/auto/storage/goog4_request` and the date — and its expiration in the extended format, as Google's library writes them;
 - signs the base64 of each policy with `gcloud iam service-accounts sign-blob --iam-account=<upload service account>`, which writes the signature's raw bytes; the form carries it in hex. `measure` and `child` are signed as `upload-measure`, `eval-set` as `upload-eval-set`;
