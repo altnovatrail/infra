@@ -46,11 +46,13 @@ import { tfvarsValue } from "../deploy-check/setup.mjs";
 export const MAX_HOURS = 12;
 
 // A sample file of the samples page of canvas, `<id>.json` of `application/json`: canvas bounds its
-// size by nothing, and its largest synthetic sample of v0.3.16 is 890,008 bytes (sources 10.8).
+// size by nothing, and its largest synthetic sample of v0.3.16 is 890,008 bytes (page/main.ts and
+// the release's synthetic-samples archive, github.com/altnovatrail/canvas at v0.3.16).
 export const SAMPLE = { type: "application/json", extension: "json", max: 16 * 1024 * 1024 };
 
-// A scan of a form, as api takes one: a JPEG, a PNG or a PDF, up to 10 MiB (sources 10.5). A policy
-// holds one condition a field, so each type has a form of its own.
+// A scan of a form, as api takes one: a JPEG, a PNG or a PDF, up to 10 MiB (internal/account/
+// consents.go, github.com/altnovatrail/api at v0.1.27). A policy holds one condition a field, so each
+// type has a form of its own.
 export const SCANS = [
   { type: "application/pdf", extension: "pdf", accept: ".pdf,application/pdf", label: "one PDF" },
   { type: "image/jpeg", extension: "jpg", accept: ".jpg,.jpeg,image/jpeg", label: "a JPEG photo" },

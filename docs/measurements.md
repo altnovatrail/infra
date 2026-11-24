@@ -1,6 +1,6 @@
 # infra — measurements
 
-> The results of the repository's measurements: what was measured, how, on what, and the numbers. The documents that describe how things are built cite them as a section, `measurements 1`; the external facts they rest on are records of [sources.md](sources.md). A measurement taken again is a new row or item with its date, and an earlier one is not edited.
+> The results of the repository's measurements: what was measured, how, on what, and the numbers. The documents that describe how things are built cite them as a section, `measurements 1`; the facts no run of ours checks that they rest on are records of [sources.md](sources.md), and a program's documentation or code at a version or commit is a link beside the claim. A measurement taken again is a new row or item with its date, and an earlier one is not edited.
 
 ## 1. Tokens of the epics' sessions
 
@@ -56,3 +56,9 @@ The run of CI of pull request 90, 43907985039, a miss of both entries, since the
 - **`Toolchain image`** — 106 s: the core built, saved and uploaded as `toolchain-core-image`, 489,200,988 bytes at level 1, by 16:30:26, 61 s after the job's first lookup; then `toolchain` as `toolchain-image`, 535,206,283 bytes, by 16:31:04, 37 s more;
 - **Documents** — "The checks without a browser run in the stage toolchain-core.", "Cache not found" for `toolchain-core-Linux-X64-<sha256>`, its own build, 48 s;
 - **`Deploy`** — 104 s, the core by the artifact's ID after "Cache not found"; **`OpenTofu`** — 148 s, `toolchain` the same way. Neither ran the Dockerfile.
+
+## 3. Checks on the project
+
+### 3.1. `DELETE` of an absent object without `storage.objects.get`, 2026-11-14
+
+What `sweep` of `api` meets when it erases a scan erased already: by the JSON API of Cloud Storage, as `api-run`, which holds `storage.objects.create` and `storage.objects.delete` under `consent-forms/` of the bucket of the scans and no `storage.objects.get`, on the project `novatrail`. `DELETE` of an object it had just erased, and of one never made, answered `404`, "No such object: novatrail-consent-forms/consent-forms/…", not `403`. So `sweep` takes a scan erased already for erased, as the store's `Delete` of `api` expects: it takes `204` or `404` ([`internal/forms/forms.go`](https://github.com/altnovatrail/api/blob/v0.1.27/internal/forms/forms.go) at v0.1.27).
