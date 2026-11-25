@@ -18,17 +18,17 @@ concurrency:
 jobs:
   secrets:
     name: Secrets
-    uses: altnovatrail/.github/.github/workflows/secrets.yml@f1c7e9e6f8245fdbdbc23c4091f3c26350e3a44e # v0.1.33
+    uses: altnovatrail/.github/.github/workflows/secrets.yml@baa18cde370b3515e85b180d0563cb3eaa4955f2 # v0.1.34
 
   # A pull request's commits are what it checks; a push to main has been checked as one.
   dco:
     name: DCO
     if: github.event_name == 'pull_request'
-    uses: altnovatrail/.github/.github/workflows/dco.yml@f1c7e9e6f8245fdbdbc23c4091f3c26350e3a44e # v0.1.33
+    uses: altnovatrail/.github/.github/workflows/dco.yml@baa18cde370b3515e85b180d0563cb3eaa4955f2 # v0.1.34
 
   documents:
     name: Documents
-    uses: altnovatrail/.github/.github/workflows/documents.yml@f1c7e9e6f8245fdbdbc23c4091f3c26350e3a44e # v0.1.33
+    uses: altnovatrail/.github/.github/workflows/documents.yml@baa18cde370b3515e85b180d0563cb3eaa4955f2 # v0.1.34
 
   # Each stage infra's jobs run in is built at most once a run, here, and handed to them as an
   # artifact of the run. The shared Documents check keeps the core's entry too, but builds its own
