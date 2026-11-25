@@ -136,7 +136,7 @@ run "the_service_is_made_with_the_first_image" {
   }
 
   assert {
-    condition     = google_cloud_run_v2_service.api[0].template[0].timeout == "120s"
+    condition     = google_cloud_run_v2_service.api[0].template[0].timeout == "330s"
     error_message = "A request may run as long as api's own write timeout at its default."
   }
 
