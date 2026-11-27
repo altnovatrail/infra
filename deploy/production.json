@@ -11,10 +11,10 @@
     }
   },
   "app": {
-    "release": "v0.1.57",
+    "release": "v0.1.58",
     "archive": {
-      "name": "app_v0.1.57.tar.gz",
-      "sha256": "d51be5c20b3f5ca02f42d8906ff87cc3d9d8f9fdb71b443941688c65be39f205"
+      "name": "app_v0.1.58.tar.gz",
+      "sha256": "c1e53cecaeff582e8e2fb64261fd9fb4b79cc533398ca0a1f2e395def1ae6d41"
     },
     "deployment": {
       "sha256": "13e18579cf1f53c10f0bd2a3ff704fdc75e8224ba1b6a804d04e3a3cadf26cd4"
