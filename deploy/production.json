@@ -14,7 +14,7 @@
     "release": "v0.1.62",
     "archive": {
       "name": "app_v0.1.62.tar.gz",
-      "sha256": "c925b3d0527b5289d39f75bd7d183573b1aa344dedb3a3e2591c7d70202df325"
+      "sha256": "6466a07096c71ea64b3658514e0f1f3e7c80a55de68c86f59446025cfa882894"
     },
     "deployment": {
       "sha256": "13e18579cf1f53c10f0bd2a3ff704fdc75e8224ba1b6a804d04e3a3cadf26cd4"
