@@ -11,9 +11,9 @@
     }
   },
   "app": {
-    "release": "v0.1.61",
+    "release": "v0.1.62",
     "archive": {
-      "name": "app_v0.1.61.tar.gz",
+      "name": "app_v0.1.62.tar.gz",
       "sha256": "c925b3d0527b5289d39f75bd7d183573b1aa344dedb3a3e2591c7d70202df325"
     },
     "deployment": {
