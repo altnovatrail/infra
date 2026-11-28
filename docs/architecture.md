@@ -559,7 +559,7 @@ A Custom-Time cannot decrease, but a rewrite of the object resets it. A form wit
 | the facts | what holds for `novatrail` alone: Anthropic's data processing agreement, for adults | `deploy/production/facts.json` |
 | the key | the secret `api-anthropic-key`, one exact version, mounted in the service alone as `/etc/api/anthropic/key`, its path in `API_ANTHROPIC_KEY_FILE` | `api_anthropic_key_version`; the value — the operator, by hand |
 | the catalog | the modules `tofu/production.auto.tfvars` names, `novatrail/english-essays` among them | `api_catalog_modules`, `API_CATALOG_MODULES` of the service and of the jobs `check` |
-| the mode of reading | `single`, one reading by one model for everyone, in place of the platform's pair of two readers; the default `pair` | `api_reading_mode`, `API_READING_MODE` of the service and of the jobs `check` |
+| the mode of reading | `single`, one reading by one model for everyone, as by default; `pair`, two readers, only when chosen | `api_reading_mode`, `API_READING_MODE` of the service and of the jobs `check` |
 
 **The order of opening it:**
 1. the author sets the spend limit of the Anthropic workspace whose key it will be (Д11 `api`);

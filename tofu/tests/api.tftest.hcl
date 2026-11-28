@@ -146,8 +146,8 @@ run "the_service_is_made_with_the_first_image" {
   }
 
   assert {
-    condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_READING_MODE"]) == "pair"
-    error_message = "Handwriting is read by the pair of readers by default."
+    condition     = one([for e in google_cloud_run_v2_service.api[0].template[0].containers[0].env : e.value if e.name == "API_READING_MODE"]) == "single"
+    error_message = "Handwriting is read by one reader by default."
   }
 
   assert {

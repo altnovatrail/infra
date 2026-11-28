@@ -357,9 +357,9 @@ variable "api_admission_rung" {
 }
 
 variable "api_reading_mode" {
-  description = "How tutor reads the handwriting of a sheet and of a workbook page, API_READING_MODE of the service and of the jobs of the check: pair, two readers whose readings are joined, or single, Claude Haiku 5.5 at medium alone. Either holds at either rung. api reads it from v0.1.58, and api check refuses another value before the migrations."
+  description = "How tutor reads the handwriting of a sheet, API_READING_MODE of the service and of the jobs of the check: single, Claude Haiku 5.5 at medium alone, the default, or pair, two readers whose readings are joined. Either holds at either rung. api reads it from v0.1.58, and api check refuses another value before the migrations."
   type        = string
-  default     = "pair"
+  default     = "single"
   nullable    = false
 
   validation {
